@@ -1,6 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Card, CardContent } from "@/components/ui/card";
 
 type Entry = {
   id: number;
@@ -44,40 +47,34 @@ export default function Home() {
       <h1 className="mb-8 text-2xl font-semibold">Dashboard</h1>
 
       <form onSubmit={addEntry} className="mb-8 flex gap-2">
-        <input
-          className="flex-1 rounded border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-500 dark:border-zinc-700 dark:bg-zinc-900"
+        <Input
           placeholder="New entry..."
           value={input}
           onChange={(e) => setInput(e.target.value)}
           disabled={submitting}
         />
-        <button
-          type="submit"
-          disabled={submitting || !input.trim()}
-          className="rounded bg-zinc-900 px-4 py-2 text-sm text-white transition hover:bg-zinc-700 disabled:opacity-40 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-300"
-        >
+        <Button type="submit" disabled={submitting || !input.trim()}>
           Add
-        </button>
+        </Button>
       </form>
 
       {loading ? (
-        <p className="text-sm text-zinc-400">Loading...</p>
+        <p className="text-sm text-muted-foreground">Loading...</p>
       ) : entries.length === 0 ? (
-        <p className="text-sm text-zinc-400">No entries yet.</p>
+        <p className="text-sm text-muted-foreground">No entries yet.</p>
       ) : (
-        <ul className="space-y-2">
+        <div className="space-y-2">
           {entries.map((entry) => (
-            <li
-              key={entry.id}
-              className="flex items-start justify-between rounded border border-zinc-200 px-4 py-3 dark:border-zinc-800"
-            >
-              <span className="text-sm">{entry.content}</span>
-              <span className="ml-4 shrink-0 text-xs text-zinc-400">
-                {new Date(entry.created_at).toLocaleString()}
-              </span>
-            </li>
+            <Card key={entry.id}>
+              <CardContent className="flex items-start justify-between py-3">
+                <span className="text-sm">{entry.content}</span>
+                <span className="ml-4 shrink-0 text-xs text-muted-foreground">
+                  {new Date(entry.created_at).toLocaleString()}
+                </span>
+              </CardContent>
+            </Card>
           ))}
-        </ul>
+        </div>
       )}
     </main>
   );
