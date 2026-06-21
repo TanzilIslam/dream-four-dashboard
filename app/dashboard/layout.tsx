@@ -17,6 +17,14 @@ import {
   ContactRound,
   ShoppingCart,
   ClipboardList,
+  Undo2,
+  Wallet,
+  Banknote,
+  HandCoins,
+  AlertCircle,
+  CalendarCheck,
+  CheckSquare,
+  FileText,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -50,6 +58,24 @@ const navSections: NavSection[] = [
       { label: "Customers", href: "/dashboard/customers", icon: ContactRound },
       { label: "Orders", href: "/dashboard/orders", icon: ShoppingCart },
       { label: "Purchase Requests", href: "/dashboard/purchase-requests", icon: ClipboardList },
+      { label: "Returns", href: "/dashboard/returns", icon: Undo2 },
+    ],
+  },
+  {
+    label: "Finance",
+    items: [
+      { label: "Expenses", href: "/dashboard/expenses", icon: Wallet },
+      { label: "Cash Remittances", href: "/dashboard/cash-remittances", icon: Banknote },
+      { label: "Dues", href: "/dashboard/dues", icon: AlertCircle },
+      { label: "Partner Loans", href: "/dashboard/partner-loans", icon: HandCoins },
+    ],
+  },
+  {
+    label: "People",
+    items: [
+      { label: "Attendance", href: "/dashboard/attendance", icon: CalendarCheck },
+      { label: "Tasks", href: "/dashboard/tasks", icon: CheckSquare },
+      { label: "Daily Reports", href: "/dashboard/daily-reports", icon: FileText },
     ],
   },
   {
