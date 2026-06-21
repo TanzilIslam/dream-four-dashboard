@@ -14,6 +14,9 @@ import {
   Receipt,
   Settings2,
   DatabaseZap,
+  ContactRound,
+  ShoppingCart,
+  ClipboardList,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -40,6 +43,14 @@ type NavSection = { label?: string; adminOnly?: boolean; items: NavItem[] };
 const navSections: NavSection[] = [
   {
     items: [{ label: "Overview", href: "/dashboard/overview", icon: LayoutDashboard }],
+  },
+  {
+    label: "Operations",
+    items: [
+      { label: "Customers", href: "/dashboard/customers", icon: ContactRound },
+      { label: "Orders", href: "/dashboard/orders", icon: ShoppingCart },
+      { label: "Purchase Requests", href: "/dashboard/purchase-requests", icon: ClipboardList },
+    ],
   },
   {
     label: "Admin",

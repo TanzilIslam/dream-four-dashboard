@@ -1,9 +1,9 @@
 import { sql } from "@/lib/db";
-import { requireAdmin } from "@/lib/auth";
+import { requireAdmin, requireUser } from "@/lib/auth";
 import { paymentConfigSchema } from "@/lib/schemas/payment-config";
 
 export async function GET() {
-  const auth = await requireAdmin();
+  const auth = await requireUser();
   if ("error" in auth) return auth.error;
 
   let [config] = await sql`SELECT * FROM payment_settings WHERE id = 1`;

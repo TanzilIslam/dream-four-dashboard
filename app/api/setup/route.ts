@@ -332,6 +332,9 @@ export async function GET() {
     )
   `;
 
+  // Add customer_type column if missing
+  await sql`ALTER TABLE customers ADD COLUMN IF NOT EXISTS customer_type TEXT`;
+
   // Migrate legacy role 'user' → 'partner'
   await sql`UPDATE users SET role = 'partner' WHERE role = 'user'`;
 
