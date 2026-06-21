@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { z } from "zod";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
 import { PlusIcon, Pencil, Power } from "lucide-react";
@@ -10,6 +10,7 @@ import { PlusIcon, Pencil, Power } from "lucide-react";
 import { productSchema, type ProductInput } from "@/lib/schemas/product";
 import { formatTaka } from "@/lib/utils";
 import { AdminGuard } from "@/components/admin-guard";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -47,27 +48,33 @@ const emptyForm: ProductInput = {
 function ProductsInner() {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
-  const [showAll, setShowAll] = useState(false);
+  const [showInactive, setShowInactive] = useState(false);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [mode, setMode] = useState<Mode>("create");
   const [editingId, setEditingId] = useState<number | null>(null);
+  const [confirmTarget, setConfirmTarget] = useState<Product | null>(null);
+  const [confirming, setConfirming] = useState(false);
 
   const form = useForm<z.input<typeof productSchema>, unknown, ProductInput>({
     resolver: zodResolver(productSchema),
     defaultValues: emptyForm,
   });
-  const isActive = form.watch("is_active");
+  const isActive = useWatch({ control: form.control, name: "is_active", defaultValue: true });
 
   async function fetchProducts() {
-    const res = await fetch(`/api/settings/products${showAll ? "?all=true" : ""}`);
+    const res = await fetch(`/api/settings/products${showInactive ? "?inactive=true" : ""}`);
     setProducts(await res.json());
     setLoading(false);
   }
 
   useEffect(() => {
-    fetchProducts();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [showAll]);
+    fetch(`/api/settings/products${showInactive ? "?inactive=true" : ""}`)
+      .then((res) => res.json())
+      .then((data) => {
+        setProducts(data);
+        setLoading(false);
+      });
+  }, [showInactive]);
 
   function openCreate() {
     setMode("create");
@@ -90,7 +97,8 @@ function ProductsInner() {
   }
 
   async function onSubmit(data: ProductInput) {
-    const url = mode === "create" ? "/api/settings/products" : `/api/settings/products/${editingId}`;
+    const url =
+      mode === "create" ? "/api/settings/products" : `/api/settings/products/${editingId}`;
     const res = await fetch(url, {
       method: mode === "create" ? "POST" : "PUT",
       headers: { "Content-Type": "application/json" },
@@ -105,14 +113,18 @@ function ProductsInner() {
     }
   }
 
-  async function handleDeactivate(p: Product) {
-    const res = await fetch(`/api/settings/products/${p.id}`, { method: "DELETE" });
+  async function handleDeactivateConfirmed() {
+    if (!confirmTarget) return;
+    setConfirming(true);
+    const res = await fetch(`/api/settings/products/${confirmTarget.id}`, { method: "DELETE" });
     if (res.ok) {
       toast.success("Product deactivated");
+      setConfirmTarget(null);
       fetchProducts();
     } else {
       toast.error("Failed to deactivate");
     }
+    setConfirming(false);
   }
 
   return (
@@ -120,11 +132,13 @@ function ProductsInner() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-xl font-semibold">Products</h1>
-          <p className="text-sm text-muted-foreground">Items you sell, with default price and stock alert level.</p>
+          <p className="text-sm text-muted-foreground">
+            Items you sell, with default price and stock alert level.
+          </p>
         </div>
         <div className="flex items-center gap-3">
           <label className="flex items-center gap-2 text-sm text-muted-foreground">
-            <Switch checked={showAll} onCheckedChange={setShowAll} />
+            <Switch checked={showInactive} onCheckedChange={setShowInactive} />
             Show inactive
           </label>
           <Button size="sm" onClick={openCreate}>
@@ -173,14 +187,19 @@ function ProductsInner() {
                   </TableCell>
                   <TableCell>
                     <div className="flex items-center gap-1">
-                      <Button variant="ghost" size="icon" onClick={() => openEdit(p)} className="size-7 hover:bg-muted">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => openEdit(p)}
+                        className="size-7 hover:bg-muted"
+                      >
                         <Pencil className="size-3.5" />
                       </Button>
                       {p.is_active && (
                         <Button
                           variant="ghost"
                           size="icon"
-                          onClick={() => handleDeactivate(p)}
+                          onClick={() => setConfirmTarget(p)}
                           className="size-7 text-destructive hover:bg-destructive/10 hover:text-destructive"
                         >
                           <Power className="size-3.5" />
@@ -224,7 +243,9 @@ function ProductsInner() {
               <Label>Low Stock Threshold</Label>
               <Input type="number" {...form.register("low_stock_threshold")} />
               {form.formState.errors.low_stock_threshold && (
-                <p className="text-xs text-destructive">{form.formState.errors.low_stock_threshold.message}</p>
+                <p className="text-xs text-destructive">
+                  {form.formState.errors.low_stock_threshold.message}
+                </p>
               )}
             </div>
             <div className="flex items-center justify-between">
@@ -234,15 +255,34 @@ function ProductsInner() {
 
             <div className="flex gap-2 pt-2">
               <Button type="submit" disabled={form.formState.isSubmitting} className="w-1/2">
-                {form.formState.isSubmitting ? "Saving…" : mode === "create" ? "Create" : "Save changes"}
+                {form.formState.isSubmitting
+                  ? "Saving…"
+                  : mode === "create"
+                    ? "Create"
+                    : "Save changes"}
               </Button>
-              <Button type="button" variant="outline" onClick={() => setSheetOpen(false)} className="w-1/2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setSheetOpen(false)}
+                className="w-1/2"
+              >
                 Cancel
               </Button>
             </div>
           </form>
         </SheetContent>
       </Sheet>
+
+      <ConfirmDialog
+        open={confirmTarget !== null}
+        onOpenChange={(open) => !open && setConfirmTarget(null)}
+        title="Deactivate Product"
+        description={`Are you sure you want to deactivate "${confirmTarget?.name}"?`}
+        confirmLabel="Deactivate"
+        loading={confirming}
+        onConfirm={handleDeactivateConfirmed}
+      />
     </div>
   );
 }

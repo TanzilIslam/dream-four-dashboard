@@ -2,13 +2,14 @@
 
 import { useEffect, useState } from "react";
 import { z } from "zod";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
 import { PlusIcon, Pencil, Power, X } from "lucide-react";
 
 import { areaSchema, type AreaInput } from "@/lib/schemas/area";
 import { AdminGuard } from "@/components/admin-guard";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -17,7 +18,13 @@ import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   Table,
   TableBody,
@@ -45,7 +52,7 @@ function AreasInner() {
   const [areas, setAreas] = useState<Area[]>([]);
   const [partners, setPartners] = useState<Partner[]>([]);
   const [loading, setLoading] = useState(true);
-  const [showAll, setShowAll] = useState(false);
+  const [showInactive, setShowInactive] = useState(false);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [mode, setMode] = useState<Mode>("create");
   const [editingId, setEditingId] = useState<number | null>(null);
@@ -54,31 +61,36 @@ function AreasInner() {
   const [selectedPartner, setSelectedPartner] = useState<string>("");
   const [assigning, setAssigning] = useState(false);
 
+  const [confirmDeactivate, setConfirmDeactivate] = useState<Area | null>(null);
+  const [deactivating, setDeactivating] = useState(false);
+  const [confirmRemoveUserId, setConfirmRemoveUserId] = useState<number | null>(null);
+  const [removing, setRemoving] = useState(false);
+
   const form = useForm<z.input<typeof areaSchema>, unknown, AreaInput>({
     resolver: zodResolver(areaSchema),
     defaultValues: { name: "", description: "", is_active: true },
   });
-  const isActive = form.watch("is_active");
+  const isActive = useWatch({ control: form.control, name: "is_active", defaultValue: true });
 
   async function fetchAreas() {
-    const res = await fetch(`/api/settings/areas${showAll ? "?all=true" : ""}`);
+    const res = await fetch(`/api/settings/areas${showInactive ? "?inactive=true" : ""}`);
     setAreas(await res.json());
     setLoading(false);
   }
 
-  async function fetchPartners() {
-    const res = await fetch("/api/users");
-    const users = (await res.json()) as Partner[];
-    setPartners(users.filter((u) => u.role !== "admin"));
-  }
+  useEffect(() => {
+    fetch(`/api/settings/areas${showInactive ? "?inactive=true" : ""}`)
+      .then((res) => res.json())
+      .then((data) => {
+        setAreas(data);
+        setLoading(false);
+      });
+  }, [showInactive]);
 
   useEffect(() => {
-    fetchAreas();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [showAll]);
-
-  useEffect(() => {
-    fetchPartners();
+    fetch("/api/users")
+      .then((res) => res.json())
+      .then((users: Partner[]) => setPartners(users.filter((u) => u.role !== "admin")));
   }, []);
 
   async function fetchMembers(areaId: number) {
@@ -117,7 +129,6 @@ function AreasInner() {
       toast.success(mode === "create" ? "Area added" : "Area updated");
       fetchAreas();
       if (mode === "create") {
-        // Move into edit mode so the partner can be assigned right away.
         setMode("edit");
         setEditingId(saved.id);
         fetchMembers(saved.id);
@@ -148,38 +159,52 @@ function AreasInner() {
     setAssigning(false);
   }
 
-  async function handleRemove(userId: number) {
-    if (!editingId) return;
-    const res = await fetch(`/api/settings/areas/${editingId}/members/${userId}`, { method: "DELETE" });
+  async function handleRemoveConfirmed() {
+    if (!editingId || !confirmRemoveUserId) return;
+    setRemoving(true);
+    const res = await fetch(`/api/settings/areas/${editingId}/members/${confirmRemoveUserId}`, {
+      method: "DELETE",
+    });
     if (res.ok) {
       toast.success("Partner removed");
+      setConfirmRemoveUserId(null);
       fetchMembers(editingId);
       fetchAreas();
     } else {
       toast.error("Failed to remove partner");
     }
+    setRemoving(false);
   }
 
-  async function handleDeactivate(a: Area) {
-    const res = await fetch(`/api/settings/areas/${a.id}`, { method: "DELETE" });
+  async function handleDeactivateConfirmed() {
+    if (!confirmDeactivate) return;
+    setDeactivating(true);
+    const res = await fetch(`/api/settings/areas/${confirmDeactivate.id}`, { method: "DELETE" });
     if (res.ok) {
       toast.success("Area deactivated");
+      setConfirmDeactivate(null);
       fetchAreas();
     } else {
       toast.error("Failed to deactivate");
     }
+    setDeactivating(false);
   }
+
+  const selectedPartnerName = partners.find((p) => String(p.id) === selectedPartner)?.name;
+  const confirmRemoveMember = members.find((m) => m.user_id === confirmRemoveUserId);
 
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-xl font-semibold">Areas</h1>
-          <p className="text-sm text-muted-foreground">Delivery territories and partner assignment.</p>
+          <p className="text-sm text-muted-foreground">
+            Delivery territories and partner assignment.
+          </p>
         </div>
         <div className="flex items-center gap-3">
           <label className="flex items-center gap-2 text-sm text-muted-foreground">
-            <Switch checked={showAll} onCheckedChange={setShowAll} />
+            <Switch checked={showInactive} onCheckedChange={setShowInactive} />
             Show inactive
           </label>
           <Button size="sm" onClick={openCreate}>
@@ -232,14 +257,19 @@ function AreasInner() {
                   </TableCell>
                   <TableCell>
                     <div className="flex items-center gap-1">
-                      <Button variant="ghost" size="icon" onClick={() => openEdit(a)} className="size-7 hover:bg-muted">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => openEdit(a)}
+                        className="size-7 hover:bg-muted"
+                      >
                         <Pencil className="size-3.5" />
                       </Button>
                       {a.is_active && (
                         <Button
                           variant="ghost"
                           size="icon"
-                          onClick={() => handleDeactivate(a)}
+                          onClick={() => setConfirmDeactivate(a)}
                           className="size-7 text-destructive hover:bg-destructive/10 hover:text-destructive"
                         >
                           <Power className="size-3.5" />
@@ -279,9 +309,18 @@ function AreasInner() {
 
             <div className="flex gap-2 pt-2">
               <Button type="submit" disabled={form.formState.isSubmitting} className="w-1/2">
-                {form.formState.isSubmitting ? "Saving…" : mode === "create" ? "Create" : "Save changes"}
+                {form.formState.isSubmitting
+                  ? "Saving…"
+                  : mode === "create"
+                    ? "Create"
+                    : "Save changes"}
               </Button>
-              <Button type="button" variant="outline" onClick={() => setSheetOpen(false)} className="w-1/2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setSheetOpen(false)}
+                className="w-1/2"
+              >
                 {mode === "create" ? "Cancel" : "Close"}
               </Button>
             </div>
@@ -292,7 +331,8 @@ function AreasInner() {
               <Separator className="mb-5" />
               <h3 className="text-sm font-semibold">Partner Assignment</h3>
               <p className="text-xs text-muted-foreground mt-1">
-                Only one partner can be active in an area at a time. Assigning a new partner replaces the current one.
+                Only one partner can be active in an area at a time. Assigning a new partner
+                replaces the current one.
               </p>
 
               <div className="mt-4 space-y-2">
@@ -300,7 +340,10 @@ function AreasInner() {
                   <p className="text-sm text-muted-foreground">No partner assigned.</p>
                 ) : (
                   members.map((m) => (
-                    <div key={m.id} className="flex items-center justify-between rounded-lg border border-border px-3 py-2">
+                    <div
+                      key={m.id}
+                      className="flex items-center justify-between rounded-lg border border-border px-3 py-2"
+                    >
                       <div>
                         <p className="text-sm font-medium">{m.name}</p>
                         <p className="text-xs text-muted-foreground">{m.email}</p>
@@ -308,7 +351,7 @@ function AreasInner() {
                       <Button
                         variant="ghost"
                         size="icon"
-                        onClick={() => handleRemove(m.user_id)}
+                        onClick={() => setConfirmRemoveUserId(m.user_id)}
                         className="size-7 text-destructive hover:bg-destructive/10 hover:text-destructive"
                       >
                         <X className="size-3.5" />
@@ -318,34 +361,67 @@ function AreasInner() {
                 )}
               </div>
 
-              <div className="mt-4 flex items-end gap-2">
-                <div className="flex-1 space-y-1.5">
-                  <Label>Assign Partner</Label>
-                  <Select value={selectedPartner} onValueChange={(v) => setSelectedPartner(v ?? "")}>
-                    <SelectTrigger className="w-full">
-                      <SelectValue placeholder="Select partner" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {partners.length === 0 ? (
-                        <div className="px-2 py-1.5 text-sm text-muted-foreground">No partners available</div>
-                      ) : (
-                        partners.map((p) => (
-                          <SelectItem key={p.id} value={String(p.id)}>
-                            {p.name}
-                          </SelectItem>
-                        ))
-                      )}
-                    </SelectContent>
-                  </Select>
+              <div className="mt-4">
+                <Label className="mb-1.5 block">Assign Partner</Label>
+                <div className="flex items-center gap-2">
+                  <div className="flex-1">
+                    <Select
+                      value={selectedPartner}
+                      onValueChange={(v) => setSelectedPartner(v ?? "")}
+                    >
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder="Select partner">
+                          {selectedPartnerName ?? undefined}
+                        </SelectValue>
+                      </SelectTrigger>
+                      <SelectContent>
+                        {partners.length === 0 ? (
+                          <div className="px-2 py-1.5 text-sm text-muted-foreground">
+                            No partners available
+                          </div>
+                        ) : (
+                          partners.map((p) => (
+                            <SelectItem key={p.id} value={String(p.id)}>
+                              {p.name}
+                            </SelectItem>
+                          ))
+                        )}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <Button
+                    type="button"
+                    onClick={handleAssign}
+                    disabled={!selectedPartner || assigning}
+                  >
+                    Assign
+                  </Button>
                 </div>
-                <Button type="button" onClick={handleAssign} disabled={!selectedPartner || assigning}>
-                  Assign
-                </Button>
               </div>
             </div>
           )}
         </SheetContent>
       </Sheet>
+
+      <ConfirmDialog
+        open={confirmDeactivate !== null}
+        onOpenChange={(open) => !open && setConfirmDeactivate(null)}
+        title="Deactivate Area"
+        description={`Are you sure you want to deactivate "${confirmDeactivate?.name}"?`}
+        confirmLabel="Deactivate"
+        loading={deactivating}
+        onConfirm={handleDeactivateConfirmed}
+      />
+
+      <ConfirmDialog
+        open={confirmRemoveUserId !== null}
+        onOpenChange={(open) => !open && setConfirmRemoveUserId(null)}
+        title="Remove Partner"
+        description={`Remove "${confirmRemoveMember?.name}" from this area?`}
+        confirmLabel="Remove"
+        loading={removing}
+        onConfirm={handleRemoveConfirmed}
+      />
     </div>
   );
 }

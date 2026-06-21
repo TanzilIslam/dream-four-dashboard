@@ -13,6 +13,7 @@ import {
   Tags,
   Receipt,
   Settings2,
+  DatabaseZap,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -38,10 +39,12 @@ type NavSection = { label?: string; adminOnly?: boolean; items: NavItem[] };
 
 const navSections: NavSection[] = [
   {
-    items: [
-      { label: "Overview", href: "/dashboard/overview", icon: LayoutDashboard },
-      { label: "Users", href: "/dashboard/users", icon: Users },
-    ],
+    items: [{ label: "Overview", href: "/dashboard/overview", icon: LayoutDashboard }],
+  },
+  {
+    label: "Admin",
+    adminOnly: true,
+    items: [{ label: "Users", href: "/dashboard/users", icon: Users }],
   },
   {
     label: "Settings",
@@ -51,7 +54,11 @@ const navSections: NavSection[] = [
       { label: "Areas", href: "/dashboard/settings/areas", icon: MapPin },
       { label: "Products", href: "/dashboard/settings/products", icon: Package },
       { label: "Pricing Tiers", href: "/dashboard/settings/pricing-tiers", icon: Tags },
-      { label: "Expense Categories", href: "/dashboard/settings/expense-categories", icon: Receipt },
+      {
+        label: "Expense Categories",
+        href: "/dashboard/settings/expense-categories",
+        icon: Receipt,
+      },
       { label: "Payment Config", href: "/dashboard/settings/payment-config", icon: Settings2 },
     ],
   },
@@ -129,6 +136,17 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           <div className="flex flex-1 items-center justify-between">
             <span className="text-sm font-medium">Dashboard</span>
             <div className="flex items-center gap-1">
+              {process.env.NODE_ENV === "development" && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="size-8 text-muted-foreground hover:text-orange-500"
+                  title="Run /api/setup (dev only)"
+                  onClick={() => fetch("/api/setup").then(() => window.location.reload())}
+                >
+                  <DatabaseZap className="size-4" />
+                </Button>
+              )}
               <Button variant="ghost" size="icon" className="size-8">
                 <Link href="/dashboard/profile">
                   <UserCircle className="size-5" />

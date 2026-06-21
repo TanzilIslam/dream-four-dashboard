@@ -23,12 +23,14 @@ export default function ProfilePage() {
   useEffect(() => {
     fetch("/api/profile")
       .then((r) => r.json())
-      .then((data) => reset({
-        name: data.name ?? "",
-        email: data.email ?? "",
-        phone: data.phone ?? "",
-        whatsapp: data.whatsapp ?? "",
-      }));
+      .then((data) =>
+        reset({
+          name: data.name ?? "",
+          email: data.email ?? "",
+          phone: data.phone ?? "",
+          whatsapp: data.whatsapp ?? "",
+        })
+      );
   }, [reset]);
 
   async function onSubmit(data: ProfileInput) {
@@ -47,7 +49,6 @@ export default function ProfilePage() {
         <CardContent className="p-6">
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-
               <div className="space-y-1.5 sm:col-span-2">
                 <Label>Name</Label>
                 <Input placeholder="Full name" {...register("name")} />
@@ -69,9 +70,10 @@ export default function ProfilePage() {
               <div className="space-y-1.5">
                 <Label>WhatsApp</Label>
                 <Input placeholder="+1 234 567 8900" {...register("whatsapp")} />
-                {errors.whatsapp && <p className="text-xs text-destructive">{errors.whatsapp.message}</p>}
+                {errors.whatsapp && (
+                  <p className="text-xs text-destructive">{errors.whatsapp.message}</p>
+                )}
               </div>
-
             </div>
 
             <Separator />

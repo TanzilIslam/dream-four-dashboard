@@ -9,6 +9,7 @@ import { PlusIcon, Pencil, Trash2 } from "lucide-react";
 
 import { expenseCategorySchema, type ExpenseCategoryInput } from "@/lib/schemas/expense-category";
 import { AdminGuard } from "@/components/admin-guard";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -31,6 +32,8 @@ function ExpenseCategoriesInner() {
   const [sheetOpen, setSheetOpen] = useState(false);
   const [mode, setMode] = useState<Mode>("create");
   const [editingId, setEditingId] = useState<number | null>(null);
+  const [confirmTarget, setConfirmTarget] = useState<Category | null>(null);
+  const [confirming, setConfirming] = useState(false);
 
   const form = useForm<z.input<typeof expenseCategorySchema>, unknown, ExpenseCategoryInput>({
     resolver: zodResolver(expenseCategorySchema),
@@ -67,7 +70,10 @@ function ExpenseCategoriesInner() {
   }
 
   async function onSubmit(data: ExpenseCategoryInput) {
-    const url = mode === "create" ? "/api/settings/expense-categories" : `/api/settings/expense-categories/${editingId}`;
+    const url =
+      mode === "create"
+        ? "/api/settings/expense-categories"
+        : `/api/settings/expense-categories/${editingId}`;
     const res = await fetch(url, {
       method: mode === "create" ? "POST" : "PUT",
       headers: { "Content-Type": "application/json" },
@@ -82,14 +88,21 @@ function ExpenseCategoriesInner() {
     }
   }
 
-  async function handleDelete(c: Category) {
-    const res = await fetch(`/api/settings/expense-categories/${c.id}`, { method: "DELETE" });
+  async function handleDeleteConfirmed() {
+    if (!confirmTarget) return;
+    setConfirming(true);
+    const res = await fetch(`/api/settings/expense-categories/${confirmTarget.id}`, {
+      method: "DELETE",
+    });
     if (res.ok) {
       toast.success("Category deleted");
+      setConfirmTarget(null);
       fetchCategories();
     } else {
-      toast.error("Failed to delete");
+      const json = await res.json().catch(() => ({}));
+      toast.error(json.error ?? "Failed to delete");
     }
+    setConfirming(false);
   }
 
   return (
@@ -97,7 +110,9 @@ function ExpenseCategoriesInner() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-xl font-semibold">Expense Categories</h1>
-          <p className="text-sm text-muted-foreground">Labels partners pick when logging expenses.</p>
+          <p className="text-sm text-muted-foreground">
+            Labels partners pick when logging expenses.
+          </p>
         </div>
         <Button size="sm" onClick={openCreate}>
           <PlusIcon className="size-4" />
@@ -134,13 +149,18 @@ function ExpenseCategoriesInner() {
                   <TableCell className="font-medium">{c.name}</TableCell>
                   <TableCell>
                     <div className="flex items-center gap-1">
-                      <Button variant="ghost" size="icon" onClick={() => openEdit(c)} className="size-7 hover:bg-muted">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => openEdit(c)}
+                        className="size-7 hover:bg-muted"
+                      >
                         <Pencil className="size-3.5" />
                       </Button>
                       <Button
                         variant="ghost"
                         size="icon"
-                        onClick={() => handleDelete(c)}
+                        onClick={() => setConfirmTarget(c)}
                         className="size-7 text-destructive hover:bg-destructive/10 hover:text-destructive"
                       >
                         <Trash2 className="size-3.5" />
@@ -175,15 +195,34 @@ function ExpenseCategoriesInner() {
 
             <div className="flex gap-2 pt-2">
               <Button type="submit" disabled={form.formState.isSubmitting} className="w-1/2">
-                {form.formState.isSubmitting ? "Saving…" : mode === "create" ? "Create" : "Save changes"}
+                {form.formState.isSubmitting
+                  ? "Saving…"
+                  : mode === "create"
+                    ? "Create"
+                    : "Save changes"}
               </Button>
-              <Button type="button" variant="outline" onClick={() => setSheetOpen(false)} className="w-1/2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setSheetOpen(false)}
+                className="w-1/2"
+              >
                 Cancel
               </Button>
             </div>
           </form>
         </SheetContent>
       </Sheet>
+
+      <ConfirmDialog
+        open={confirmTarget !== null}
+        onOpenChange={(open) => !open && setConfirmTarget(null)}
+        title="Delete Category"
+        description={`Delete "${confirmTarget?.name}"? This cannot be undone.`}
+        confirmLabel="Delete"
+        loading={confirming}
+        onConfirm={handleDeleteConfirmed}
+      />
     </div>
   );
 }

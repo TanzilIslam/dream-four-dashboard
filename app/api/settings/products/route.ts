@@ -6,10 +6,10 @@ export async function GET(request: Request) {
   const auth = await requireAdmin();
   if ("error" in auth) return auth.error;
 
-  const includeInactive = new URL(request.url).searchParams.get("all") === "true";
+  const onlyInactive = new URL(request.url).searchParams.get("inactive") === "true";
 
-  const products = includeInactive
-    ? await sql`SELECT * FROM products ORDER BY name ASC`
+  const products = onlyInactive
+    ? await sql`SELECT * FROM products WHERE is_active = false ORDER BY name ASC`
     : await sql`SELECT * FROM products WHERE is_active = true ORDER BY name ASC`;
 
   return Response.json(products);

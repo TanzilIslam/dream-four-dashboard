@@ -6,15 +6,16 @@ export async function GET(request: Request) {
   const auth = await requireAdmin();
   if ("error" in auth) return auth.error;
 
-  const includeInactive = new URL(request.url).searchParams.get("all") === "true";
+  const onlyInactive = new URL(request.url).searchParams.get("inactive") === "true";
 
   // Include the currently assigned (active) partner's name for each area.
-  const areas = includeInactive
+  const areas = onlyInactive
     ? await sql`
         SELECT a.*, u.id AS assigned_partner_id, u.name AS assigned_partner_name
         FROM areas a
         LEFT JOIN user_areas ua ON ua.area_id = a.id AND ua.is_active = true
         LEFT JOIN users u ON u.id = ua.user_id
+        WHERE a.is_active = false
         ORDER BY a.name ASC
       `
     : await sql`

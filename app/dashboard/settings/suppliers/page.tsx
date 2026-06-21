@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { z } from "zod";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
 import { PlusIcon, Pencil, Power } from "lucide-react";
@@ -10,6 +10,7 @@ import { PlusIcon, Pencil, Power } from "lucide-react";
 import { supplierSchema, type SupplierInput } from "@/lib/schemas/supplier";
 import { formatTaka } from "@/lib/utils";
 import { AdminGuard } from "@/components/admin-guard";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -66,27 +67,33 @@ const emptyForm: SupplierInput = {
 function SuppliersInner() {
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [loading, setLoading] = useState(true);
-  const [showAll, setShowAll] = useState(false);
+  const [showInactive, setShowInactive] = useState(false);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [mode, setMode] = useState<Mode>("create");
   const [editingId, setEditingId] = useState<number | null>(null);
+  const [confirmTarget, setConfirmTarget] = useState<Supplier | null>(null);
+  const [confirming, setConfirming] = useState(false);
 
   const form = useForm<z.input<typeof supplierSchema>, unknown, SupplierInput>({
     resolver: zodResolver(supplierSchema),
     defaultValues: emptyForm,
   });
-  const isActive = form.watch("is_active");
+  const isActive = useWatch({ control: form.control, name: "is_active", defaultValue: true });
 
   async function fetchSuppliers() {
-    const res = await fetch(`/api/settings/suppliers${showAll ? "?all=true" : ""}`);
+    const res = await fetch(`/api/settings/suppliers${showInactive ? "?inactive=true" : ""}`);
     setSuppliers(await res.json());
     setLoading(false);
   }
 
   useEffect(() => {
-    fetchSuppliers();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [showAll]);
+    fetch(`/api/settings/suppliers${showInactive ? "?inactive=true" : ""}`)
+      .then((res) => res.json())
+      .then((data) => {
+        setSuppliers(data);
+        setLoading(false);
+      });
+  }, [showInactive]);
 
   function openCreate() {
     setMode("create");
@@ -118,7 +125,8 @@ function SuppliersInner() {
   }
 
   async function onSubmit(data: SupplierInput) {
-    const url = mode === "create" ? "/api/settings/suppliers" : `/api/settings/suppliers/${editingId}`;
+    const url =
+      mode === "create" ? "/api/settings/suppliers" : `/api/settings/suppliers/${editingId}`;
     const res = await fetch(url, {
       method: mode === "create" ? "POST" : "PUT",
       headers: { "Content-Type": "application/json" },
@@ -134,14 +142,18 @@ function SuppliersInner() {
     }
   }
 
-  async function handleDeactivate(s: Supplier) {
-    const res = await fetch(`/api/settings/suppliers/${s.id}`, { method: "DELETE" });
+  async function confirmDeactivate() {
+    if (!confirmTarget) return;
+    setConfirming(true);
+    const res = await fetch(`/api/settings/suppliers/${confirmTarget.id}`, { method: "DELETE" });
     if (res.ok) {
       toast.success("Supplier deactivated");
+      setConfirmTarget(null);
       fetchSuppliers();
     } else {
       toast.error("Failed to deactivate");
     }
+    setConfirming(false);
   }
 
   return (
@@ -153,7 +165,7 @@ function SuppliersInner() {
         </div>
         <div className="flex items-center gap-3">
           <label className="flex items-center gap-2 text-sm text-muted-foreground">
-            <Switch checked={showAll} onCheckedChange={setShowAll} />
+            <Switch checked={showInactive} onCheckedChange={setShowInactive} />
             Show inactive
           </label>
           <Button size="sm" onClick={openCreate}>
@@ -204,14 +216,19 @@ function SuppliersInner() {
                   </TableCell>
                   <TableCell>
                     <div className="flex items-center gap-1">
-                      <Button variant="ghost" size="icon" onClick={() => openEdit(s)} className="size-7 hover:bg-muted">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => openEdit(s)}
+                        className="size-7 hover:bg-muted"
+                      >
                         <Pencil className="size-3.5" />
                       </Button>
                       {s.is_active && (
                         <Button
                           variant="ghost"
                           size="icon"
-                          onClick={() => handleDeactivate(s)}
+                          onClick={() => setConfirmTarget(s)}
                           className="size-7 text-destructive hover:bg-destructive/10 hover:text-destructive"
                         >
                           <Power className="size-3.5" />
@@ -239,14 +256,12 @@ function SuppliersInner() {
             <Field label="Contact Person">
               <Input {...form.register("contact_person")} />
             </Field>
-            <div className="grid grid-cols-2 gap-3">
-              <Field label="Phone">
-                <Input {...form.register("phone")} />
-              </Field>
-              <Field label="WhatsApp">
-                <Input {...form.register("whatsapp")} />
-              </Field>
-            </div>
+            <Field label="Phone">
+              <Input {...form.register("phone")} />
+            </Field>
+            <Field label="WhatsApp">
+              <Input {...form.register("whatsapp")} />
+            </Field>
             <Field label="Email" error={form.formState.errors.email?.message}>
               <Input type="email" {...form.register("email")} />
             </Field>
@@ -256,22 +271,18 @@ function SuppliersInner() {
             <Field label="Area">
               <Input placeholder="Region of the farm" {...form.register("area")} />
             </Field>
-            <div className="grid grid-cols-2 gap-3">
-              <Field label="Bank Name">
-                <Input {...form.register("bank_name")} />
-              </Field>
-              <Field label="Bank Account">
-                <Input {...form.register("bank_account")} />
-              </Field>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <Field label="bKash">
-                <Input {...form.register("bkash")} />
-              </Field>
-              <Field label="Nagad">
-                <Input {...form.register("nagad")} />
-              </Field>
-            </div>
+            <Field label="Bank Name">
+              <Input {...form.register("bank_name")} />
+            </Field>
+            <Field label="Bank Account">
+              <Input {...form.register("bank_account")} />
+            </Field>
+            <Field label="bKash">
+              <Input {...form.register("bkash")} />
+            </Field>
+            <Field label="Nagad">
+              <Input {...form.register("nagad")} />
+            </Field>
             <Field label="Default Price (৳)">
               <Input type="number" step="0.01" {...form.register("default_price")} />
             </Field>
@@ -285,15 +296,34 @@ function SuppliersInner() {
 
             <div className="flex gap-2 pt-2">
               <Button type="submit" disabled={form.formState.isSubmitting} className="w-1/2">
-                {form.formState.isSubmitting ? "Saving…" : mode === "create" ? "Create" : "Save changes"}
+                {form.formState.isSubmitting
+                  ? "Saving…"
+                  : mode === "create"
+                    ? "Create"
+                    : "Save changes"}
               </Button>
-              <Button type="button" variant="outline" onClick={() => setSheetOpen(false)} className="w-1/2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setSheetOpen(false)}
+                className="w-1/2"
+              >
                 Cancel
               </Button>
             </div>
           </form>
         </SheetContent>
       </Sheet>
+
+      <ConfirmDialog
+        open={confirmTarget !== null}
+        onOpenChange={(open) => !open && setConfirmTarget(null)}
+        title="Deactivate Supplier"
+        description={`Are you sure you want to deactivate "${confirmTarget?.name}"? It will be hidden from active lists.`}
+        confirmLabel="Deactivate"
+        loading={confirming}
+        onConfirm={confirmDeactivate}
+      />
     </div>
   );
 }

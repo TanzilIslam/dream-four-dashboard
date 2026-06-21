@@ -2,10 +2,7 @@ import { sql } from "@/lib/db";
 import { requireAdmin } from "@/lib/auth";
 import { expenseCategorySchema } from "@/lib/schemas/expense-category";
 
-export async function PUT(
-  request: Request,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function PUT(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const auth = await requireAdmin();
   if ("error" in auth) return auth.error;
 
@@ -26,14 +23,18 @@ export async function PUT(
   return Response.json(category);
 }
 
-export async function DELETE(
-  _request: Request,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function DELETE(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   const auth = await requireAdmin();
   if ("error" in auth) return auth.error;
 
   const { id } = await params;
+  const inUse = await sql`SELECT 1 FROM expenses WHERE category_id = ${id} LIMIT 1`;
+  if (inUse.length > 0)
+    return Response.json(
+      { error: "This category is used by one or more expenses" },
+      { status: 409 }
+    );
+
   await sql`DELETE FROM expense_categories WHERE id = ${id}`;
   return Response.json({ ok: true });
 }

@@ -310,12 +310,13 @@ CREATE TABLE IF NOT EXISTS daily_report_customers (
 
 All API routes must check session. Apply these rules consistently:
 
-| Role    | Can access                                                         |
-|---------|--------------------------------------------------------------------|
-| admin   | All routes                                                         |
-| partner | Own records only (filter by `partner_id = session.user.id`)        |
+| Role    | Can access                                                  |
+| ------- | ----------------------------------------------------------- |
+| admin   | All routes                                                  |
+| partner | Own records only (filter by `partner_id = session.user.id`) |
 
 Helper pattern in every route:
+
 ```ts
 const session = await getIronSession<AppSession>(req, res, sessionOptions);
 if (!session.user) return Response.json({ error: "Unauthorized" }, { status: 401 });
@@ -332,12 +333,12 @@ const partnerId = session.user.id;
 **Auth:** admin only (all methods)
 **Schema:** `lib/schemas/supplier.ts`
 
-| Method | Path                          | Action                      |
-|--------|-------------------------------|-----------------------------|
-| GET    | /api/settings/suppliers       | List all (active by default)|
-| POST   | /api/settings/suppliers       | Create                      |
-| PUT    | /api/settings/suppliers/[id]  | Update                      |
-| DELETE | /api/settings/suppliers/[id]  | Soft delete (is_active=false)|
+| Method | Path                         | Action                        |
+| ------ | ---------------------------- | ----------------------------- |
+| GET    | /api/settings/suppliers      | List all (active by default)  |
+| POST   | /api/settings/suppliers      | Create                        |
+| PUT    | /api/settings/suppliers/[id] | Update                        |
+| DELETE | /api/settings/suppliers/[id] | Soft delete (is_active=false) |
 
 **Zod fields:** name(required), contact_person, phone, whatsapp, email, address, area, bank_name, bank_account, bkash, nagad, default_price, notes, is_active
 
@@ -350,17 +351,18 @@ const partnerId = session.user.id;
 **File:** `app/api/settings/areas/[id]/members/route.ts`
 **Auth:** admin only
 
-| Method | Path                                  | Action                                    |
-|--------|---------------------------------------|-------------------------------------------|
-| GET    | /api/settings/areas                   | List all areas with assigned partner name |
-| POST   | /api/settings/areas                   | Create area                               |
-| PUT    | /api/settings/areas/[id]              | Update area                               |
-| DELETE | /api/settings/areas/[id]              | Soft delete                               |
-| GET    | /api/settings/areas/[id]/members      | List assigned partners for area           |
-| POST   | /api/settings/areas/[id]/members      | Assign partner { user_id }                |
-| DELETE | /api/settings/areas/[id]/members/[uid]| Remove assignment (set is_active=false)   |
+| Method | Path                                   | Action                                    |
+| ------ | -------------------------------------- | ----------------------------------------- |
+| GET    | /api/settings/areas                    | List all areas with assigned partner name |
+| POST   | /api/settings/areas                    | Create area                               |
+| PUT    | /api/settings/areas/[id]               | Update area                               |
+| DELETE | /api/settings/areas/[id]               | Soft delete                               |
+| GET    | /api/settings/areas/[id]/members       | List assigned partners for area           |
+| POST   | /api/settings/areas/[id]/members       | Assign partner { user_id }                |
+| DELETE | /api/settings/areas/[id]/members/[uid] | Remove assignment (set is_active=false)   |
 
 **Business logic:**
+
 - On assign: check if area already has an active partner. If yes, deactivate old assignment first.
 - GET areas list should include: `assigned_partner_name` (JOIN users via user_areas WHERE is_active=true)
 
@@ -374,12 +376,12 @@ const partnerId = session.user.id;
 **File:** `app/api/settings/products/[id]/route.ts`
 **Auth:** admin only
 
-| Method | Path                         | Action       |
-|--------|------------------------------|--------------|
-| GET    | /api/settings/products       | List all     |
-| POST   | /api/settings/products       | Create       |
-| PUT    | /api/settings/products/[id]  | Update       |
-| DELETE | /api/settings/products/[id]  | Soft delete  |
+| Method | Path                        | Action      |
+| ------ | --------------------------- | ----------- |
+| GET    | /api/settings/products      | List all    |
+| POST   | /api/settings/products      | Create      |
+| PUT    | /api/settings/products/[id] | Update      |
+| DELETE | /api/settings/products/[id] | Soft delete |
 
 **Zod fields:** name(required), unit(required), default_price, low_stock_threshold, is_active
 
@@ -391,12 +393,12 @@ const partnerId = session.user.id;
 **File:** `app/api/settings/pricing-tiers/[id]/route.ts`
 **Auth:** admin only
 
-| Method | Path                              | Action                          |
-|--------|-----------------------------------|---------------------------------|
-| GET    | /api/settings/pricing-tiers       | List all (optionally ?product_id)|
-| POST   | /api/settings/pricing-tiers       | Create                          |
-| PUT    | /api/settings/pricing-tiers/[id]  | Update                          |
-| DELETE | /api/settings/pricing-tiers/[id]  | Delete                          |
+| Method | Path                             | Action                            |
+| ------ | -------------------------------- | --------------------------------- |
+| GET    | /api/settings/pricing-tiers      | List all (optionally ?product_id) |
+| POST   | /api/settings/pricing-tiers      | Create                            |
+| PUT    | /api/settings/pricing-tiers/[id] | Update                            |
+| DELETE | /api/settings/pricing-tiers/[id] | Delete                            |
 
 **Zod fields:** product_id(required), name(required), unit_price(required), min_qty
 
@@ -408,12 +410,12 @@ const partnerId = session.user.id;
 **File:** `app/api/settings/expense-categories/[id]/route.ts`
 **Auth:** admin only
 
-| Method | Path                                    | Action      |
-|--------|-----------------------------------------|-------------|
-| GET    | /api/settings/expense-categories        | List all    |
-| POST   | /api/settings/expense-categories        | Create      |
-| PUT    | /api/settings/expense-categories/[id]   | Update      |
-| DELETE | /api/settings/expense-categories/[id]   | Delete      |
+| Method | Path                                  | Action   |
+| ------ | ------------------------------------- | -------- |
+| GET    | /api/settings/expense-categories      | List all |
+| POST   | /api/settings/expense-categories      | Create   |
+| PUT    | /api/settings/expense-categories/[id] | Update   |
+| DELETE | /api/settings/expense-categories/[id] | Delete   |
 
 **Zod fields:** name(required), icon
 
@@ -424,10 +426,10 @@ const partnerId = session.user.id;
 **File:** `app/api/settings/payment-config/route.ts`
 **Auth:** admin only
 
-| Method | Path                          | Action               |
-|--------|-------------------------------|----------------------|
-| GET    | /api/settings/payment-config  | Get single row (id=1)|
-| PUT    | /api/settings/payment-config  | Update single row    |
+| Method | Path                         | Action                |
+| ------ | ---------------------------- | --------------------- |
+| GET    | /api/settings/payment-config | Get single row (id=1) |
+| PUT    | /api/settings/payment-config | Update single row     |
 
 **Zod fields:** due_allowed, max_due_per_customer, late_punch_threshold, low_stock_default
 
@@ -440,17 +442,18 @@ const partnerId = session.user.id;
 **File:** `app/api/customers/[id]/pause/route.ts`
 **Auth:** partner = own only; admin = all
 
-| Method | Path                         | Action                                    |
-|--------|------------------------------|-------------------------------------------|
-| GET    | /api/customers               | List (partner: own; admin: all or ?partner_id)|
-| POST   | /api/customers               | Create (partner_id from session)          |
-| GET    | /api/customers/[id]          | Single + outstanding due computed         |
-| PUT    | /api/customers/[id]          | Update                                    |
-| DELETE | /api/customers/[id]          | Soft delete (is_active=false)             |
-| POST   | /api/customers/[id]/pause    | Pause { pause_until?, pause_reason }      |
-| POST   | /api/customers/[id]/unpause  | Resume (clear pause fields)               |
+| Method | Path                        | Action                                         |
+| ------ | --------------------------- | ---------------------------------------------- |
+| GET    | /api/customers              | List (partner: own; admin: all or ?partner_id) |
+| POST   | /api/customers              | Create (partner_id from session)               |
+| GET    | /api/customers/[id]         | Single + outstanding due computed              |
+| PUT    | /api/customers/[id]         | Update                                         |
+| DELETE | /api/customers/[id]         | Soft delete (is_active=false)                  |
+| POST   | /api/customers/[id]/pause   | Pause { pause_until?, pause_reason }           |
+| POST   | /api/customers/[id]/unpause | Resume (clear pause fields)                    |
 
 **Business logic:**
+
 - GET single: compute `outstanding_due` = delivered total − paid total − payments total
 - Response includes: customer fields + `outstanding_due` + `next_delivery_date` (computed)
 - `next_delivery_date` = MAX(orders.delivered_at) + delivery_interval (null if no deliveries)
@@ -467,16 +470,17 @@ const partnerId = session.user.id;
 **File:** `app/api/purchase-requests/[id]/reject/route.ts`
 **File:** `app/api/purchase-requests/[id]/complete/route.ts`
 
-| Method | Path                                    | Auth    | Action                                     |
-|--------|-----------------------------------------|---------|--------------------------------------------|
-| GET    | /api/purchase-requests                  | both    | List (partner: own; admin: all)            |
-| POST   | /api/purchase-requests                  | partner | Create request (status=pending)            |
-| GET    | /api/purchase-requests/[id]             | both    | Single request                             |
-| POST   | /api/purchase-requests/[id]/approve     | admin   | Approve { admin_note? }                    |
-| POST   | /api/purchase-requests/[id]/reject      | admin   | Reject { admin_note }                      |
-| POST   | /api/purchase-requests/[id]/complete    | partner | Record actuals { actual_qty, actual_price, purchased_at, payment_method, from_personal, note } |
+| Method | Path                                 | Auth    | Action                                                                                         |
+| ------ | ------------------------------------ | ------- | ---------------------------------------------------------------------------------------------- |
+| GET    | /api/purchase-requests               | both    | List (partner: own; admin: all)                                                                |
+| POST   | /api/purchase-requests               | partner | Create request (status=pending)                                                                |
+| GET    | /api/purchase-requests/[id]          | both    | Single request                                                                                 |
+| POST   | /api/purchase-requests/[id]/approve  | admin   | Approve { admin_note? }                                                                        |
+| POST   | /api/purchase-requests/[id]/reject   | admin   | Reject { admin_note }                                                                          |
+| POST   | /api/purchase-requests/[id]/complete | partner | Record actuals { actual_qty, actual_price, purchased_at, payment_method, from_personal, note } |
 
 **Business logic on complete:**
+
 1. Set status = completed, actual_total = actual_qty × actual_price
 2. Add actual_qty to central stock pool (stock is computed, not stored — no action needed; query will include it)
 3. If from_personal = true → INSERT into partner_loans (amount=actual_total, source_id=request.id)
@@ -493,15 +497,16 @@ const partnerId = session.user.id;
 **File:** `app/api/orders/[id]/deliver/route.ts`
 **File:** `app/api/orders/[id]/cancel/route.ts`
 
-| Method | Path                        | Auth    | Action                                            |
-|--------|-----------------------------|---------|---------------------------------------------------|
-| GET    | /api/orders                 | both    | List (partner: own; admin: all; filter: ?date, ?customer_id, ?status) |
-| POST   | /api/orders                 | partner | Create order (reserve stock, check due limit)     |
-| GET    | /api/orders/[id]            | both    | Single order                                      |
-| POST   | /api/orders/[id]/deliver    | partner | Mark delivered + record payment                   |
-| POST   | /api/orders/[id]/cancel     | partner | Cancel + release reserved stock                   |
+| Method | Path                     | Auth    | Action                                                                |
+| ------ | ------------------------ | ------- | --------------------------------------------------------------------- |
+| GET    | /api/orders              | both    | List (partner: own; admin: all; filter: ?date, ?customer_id, ?status) |
+| POST   | /api/orders              | partner | Create order (reserve stock, check due limit)                         |
+| GET    | /api/orders/[id]         | both    | Single order                                                          |
+| POST   | /api/orders/[id]/deliver | partner | Mark delivered + record payment                                       |
+| POST   | /api/orders/[id]/cancel  | partner | Cancel + release reserved stock                                       |
 
 **Business logic on create:**
+
 1. Compute customer outstanding due
 2. If due ≥ customer.max_due → return 422 with `{ error: "Due limit exceeded", current_due: X, max_due: Y }`
 3. Check available stock: `purchased_completed − delivered − pending_orders ≥ requested_qty`
@@ -509,10 +514,12 @@ const partnerId = session.user.id;
 5. Insert order (status=pending) — stock is now reserved (pending count increases)
 
 **Business logic on deliver:**
+
 - Body: `{ paid_amount, payment_method, promised_payment_date? }`
 - Set status=delivered, delivered_at=NOW(), due_amount = total_amount − paid_amount
 
 **Business logic on cancel:**
+
 - Body: `{ cancellation_reason }`
 - Set status=cancelled — reserved stock automatically released (pending count decreases)
 
@@ -527,11 +534,11 @@ const partnerId = session.user.id;
 **File:** `app/api/returns/route.ts`
 **File:** `app/api/returns/[id]/route.ts`
 
-| Method | Path            | Auth    | Action                          |
-|--------|-----------------|---------|---------------------------------|
-| GET    | /api/returns    | both    | List (partner: own; admin: all) |
-| POST   | /api/returns    | partner | Create return                   |
-| DELETE | /api/returns/[id] | partner | Delete (same day only)        |
+| Method | Path              | Auth    | Action                          |
+| ------ | ----------------- | ------- | ------------------------------- |
+| GET    | /api/returns      | both    | List (partner: own; admin: all) |
+| POST   | /api/returns      | partner | Create return                   |
+| DELETE | /api/returns/[id] | partner | Delete (same day only)          |
 
 **Business logic:** Returned qty counted in stock formula automatically (no extra step needed).
 
@@ -544,8 +551,8 @@ const partnerId = session.user.id;
 **File:** `app/api/payments/route.ts`
 **File:** `app/api/payments/[id]/route.ts`
 
-| Method | Path              | Auth    | Action                          |
-|--------|--------------------|---------|----------------------------------|
+| Method | Path               | Auth    | Action                          |
+| ------ | ------------------ | ------- | ------------------------------- |
 | GET    | /api/payments      | both    | List (partner: own; admin: all) |
 | POST   | /api/payments      | partner | Record due collection           |
 | DELETE | /api/payments/[id] | partner | Delete (same day only)          |
@@ -560,7 +567,7 @@ const partnerId = session.user.id;
 **File:** `app/api/expenses/[id]/route.ts`
 
 | Method | Path               | Auth    | Action                          |
-|--------|--------------------|---------|----------------------------------|
+| ------ | ------------------ | ------- | ------------------------------- |
 | GET    | /api/expenses      | both    | List (partner: own; admin: all) |
 | POST   | /api/expenses      | partner | Create expense                  |
 | PUT    | /api/expenses/[id] | partner | Edit (same day only)            |
@@ -576,11 +583,11 @@ const partnerId = session.user.id;
 **File:** `app/api/remittances/[id]/route.ts`
 **File:** `app/api/remittances/[id]/acknowledge/route.ts`
 
-| Method | Path                                | Auth    | Action                                        |
-|--------|-------------------------------------|---------|-----------------------------------------------|
-| GET    | /api/remittances                    | both    | Partner: own; Admin: all (filter ?status)     |
-| POST   | /api/remittances                    | partner | Submit remittance (status=pending)            |
-| POST   | /api/remittances/[id]/acknowledge   | admin   | Acknowledge { admin_note? }                   |
+| Method | Path                              | Auth    | Action                                    |
+| ------ | --------------------------------- | ------- | ----------------------------------------- |
+| GET    | /api/remittances                  | both    | Partner: own; Admin: all (filter ?status) |
+| POST   | /api/remittances                  | partner | Submit remittance (status=pending)        |
+| POST   | /api/remittances/[id]/acknowledge | admin   | Acknowledge { admin_note? }               |
 
 **Zod fields (submit):** amount(required, >0), payment_method(required), note
 **Zod fields (acknowledge):** admin_note
@@ -593,13 +600,14 @@ const partnerId = session.user.id;
 **File:** `app/api/loans/[id]/route.ts`
 **File:** `app/api/loans/[id]/repay/route.ts`
 
-| Method | Path                     | Auth  | Action                                         |
-|--------|--------------------------|-------|------------------------------------------------|
-| GET    | /api/loans               | both  | Partner: own; Admin: all                       |
-| POST   | /api/loans               | both  | Manual loan creation (admin for any, partner for self) |
-| POST   | /api/loans/[id]/repay    | admin | Add repayment { amount, method, note }         |
+| Method | Path                  | Auth  | Action                                                 |
+| ------ | --------------------- | ----- | ------------------------------------------------------ |
+| GET    | /api/loans            | both  | Partner: own; Admin: all                               |
+| POST   | /api/loans            | both  | Manual loan creation (admin for any, partner for self) |
+| POST   | /api/loans/[id]/repay | admin | Add repayment { amount, method, note }                 |
 
 **Business logic:**
+
 - After repayment: recalculate loan status (outstanding/partially_repaid/repaid)
 - Auto-created loans come from purchase_requests/complete — no manual creation needed there
 
@@ -613,13 +621,14 @@ const partnerId = session.user.id;
 **File:** `app/api/attendance/route.ts`
 **File:** `app/api/attendance/[id]/route.ts`
 
-| Method | Path                   | Auth    | Action                                                |
-|--------|------------------------|---------|-------------------------------------------------------|
-| GET    | /api/attendance        | both    | Partner: own (default today); Admin: all (?date, ?partner_id) |
-| POST   | /api/attendance        | partner | Punch activity { activity, note?, location? }         |
-| PUT    | /api/attendance/[id]   | partner | Self-correct { punched_at } — sets is_corrected=true, saves original_time |
+| Method | Path                 | Auth    | Action                                                                    |
+| ------ | -------------------- | ------- | ------------------------------------------------------------------------- |
+| GET    | /api/attendance      | both    | Partner: own (default today); Admin: all (?date, ?partner_id)             |
+| POST   | /api/attendance      | partner | Punch activity { activity, note?, location? }                             |
+| PUT    | /api/attendance/[id] | partner | Self-correct { punched_at } — sets is_corrected=true, saves original_time |
 
 **Computed fields on GET (admin daily view):**
+
 ```
 punch_in, punch_out, total_minutes, lunch_minutes, net_minutes, is_late, is_absent
 ```
@@ -635,15 +644,16 @@ punch_in, punch_out, total_minutes, lunch_minutes, net_minutes, is_late, is_abse
 **File:** `app/api/tasks/[id]/route.ts`
 **File:** `app/api/tasks/[id]/status/route.ts`
 
-| Method | Path                     | Auth    | Action                                                        |
-|--------|--------------------------|---------|---------------------------------------------------------------|
-| GET    | /api/tasks               | both    | Partner: own tasks; Admin: all (?date, ?partner_id, ?status)  |
-| POST   | /api/tasks               | both    | Admin: assign to anyone; Partner: self-task only (is_self_task=true) |
-| PUT    | /api/tasks/[id]          | admin   | Edit task details                                             |
-| DELETE | /api/tasks/[id]          | admin   | Delete task                                                   |
-| POST   | /api/tasks/[id]/status   | partner | Update status + note { status, note? }                        |
+| Method | Path                   | Auth    | Action                                                               |
+| ------ | ---------------------- | ------- | -------------------------------------------------------------------- |
+| GET    | /api/tasks             | both    | Partner: own tasks; Admin: all (?date, ?partner_id, ?status)         |
+| POST   | /api/tasks             | both    | Admin: assign to anyone; Partner: self-task only (is_self_task=true) |
+| PUT    | /api/tasks/[id]        | admin   | Edit task details                                                    |
+| DELETE | /api/tasks/[id]        | admin   | Delete task                                                          |
+| POST   | /api/tasks/[id]/status | partner | Update status + note { status, note? }                               |
 
 **Business logic — recurring tasks:**
+
 - When creating with type=daily_recurring, a cron-style check runs on GET:
   if today's instance doesn't exist for a recurring task → auto-generate it
   (alternative: generate on first GET of the day via a helper function)
@@ -661,15 +671,16 @@ punch_in, punch_out, total_minutes, lunch_minutes, net_minutes, is_late, is_abse
 **File:** `app/api/daily-reports/[id]/submit/route.ts`
 **File:** `app/api/daily-reports/[id]/review/route.ts`
 
-| Method | Path                              | Auth    | Action                                           |
-|--------|-----------------------------------|---------|--------------------------------------------------|
-| GET    | /api/daily-reports                | both    | Partner: own list; Admin: all (?date)            |
-| GET    | /api/daily-reports/preview        | partner | Auto-build report for ?date from actual data     |
-| GET    | /api/daily-reports/[id]           | both    | Single report with customer snapshot             |
-| POST   | /api/daily-reports/[id]/submit    | partner | Submit { member_note } — saves snapshot          |
-| POST   | /api/daily-reports/[id]/review    | admin   | Mark reviewed { admin_note }                     |
+| Method | Path                           | Auth    | Action                                       |
+| ------ | ------------------------------ | ------- | -------------------------------------------- |
+| GET    | /api/daily-reports             | both    | Partner: own list; Admin: all (?date)        |
+| GET    | /api/daily-reports/preview     | partner | Auto-build report for ?date from actual data |
+| GET    | /api/daily-reports/[id]        | both    | Single report with customer snapshot         |
+| POST   | /api/daily-reports/[id]/submit | partner | Submit { member_note } — saves snapshot      |
+| POST   | /api/daily-reports/[id]/review | admin   | Mark reviewed { admin_note }                 |
 
 **Business logic on preview:**
+
 ```
 eggs_delivered  = SUM(orders.quantity WHERE status=delivered AND partner_id=X AND date=Y)
 cash_collected  = SUM(orders.paid_amount WHERE delivered AND date=Y) + SUM(payments WHERE date=Y)
@@ -680,6 +691,7 @@ customers:      per-customer due balance snapshot
 ```
 
 **Business logic on submit:**
+
 1. Upsert daily_report row (status=submitted, submitted_at=NOW())
 2. Compute and INSERT daily_report_customers snapshot
 3. If report already submitted → reject (cannot re-submit)
@@ -690,21 +702,21 @@ customers:      per-customer due balance snapshot
 
 These are aggregation-only GET endpoints. No mutations.
 
-| Path                          | Description                                                       |
-|-------------------------------|-------------------------------------------------------------------|
-| GET /api/analytics/overview   | Admin daily pulse — orders, cash, due, expenses today vs yday     |
-| GET /api/analytics/stock      | Central stock per product (purchased/delivered/reserved/available)|
-| GET /api/analytics/partners   | Per partner today: orders, sold, collected, due, expenses         |
-| GET /api/analytics/reminders  | Delivery + payment due reminders (partner: own; admin: all)       |
-| GET /api/analytics/attendance | Today's attendance summary (admin: all partners)                  |
-| GET /api/analytics/due        | All customers with outstanding due, filter by partner/area        |
-| GET /api/analytics/investment | All completed purchase_requests ledger                            |
-| GET /api/analytics/expenses   | All expenses ledger, filter by partner/area/category/date         |
-| GET /api/analytics/cashflow   | Per partner: invested, expenses, collected, in-hand, remitted     |
-| GET /api/analytics/loans      | All loans + repayments + outstanding                              |
-| GET /api/analytics/pnl        | Period P&L: revenue, cost, expenses, net, shares                  |
-| GET /api/analytics/area       | Sales, revenue, due per area                                      |
-| GET /api/analytics/supplier   | Purchase history per supplier                                     |
+| Path                          | Description                                                        |
+| ----------------------------- | ------------------------------------------------------------------ |
+| GET /api/analytics/overview   | Admin daily pulse — orders, cash, due, expenses today vs yday      |
+| GET /api/analytics/stock      | Central stock per product (purchased/delivered/reserved/available) |
+| GET /api/analytics/partners   | Per partner today: orders, sold, collected, due, expenses          |
+| GET /api/analytics/reminders  | Delivery + payment due reminders (partner: own; admin: all)        |
+| GET /api/analytics/attendance | Today's attendance summary (admin: all partners)                   |
+| GET /api/analytics/due        | All customers with outstanding due, filter by partner/area         |
+| GET /api/analytics/investment | All completed purchase_requests ledger                             |
+| GET /api/analytics/expenses   | All expenses ledger, filter by partner/area/category/date          |
+| GET /api/analytics/cashflow   | Per partner: invested, expenses, collected, in-hand, remitted      |
+| GET /api/analytics/loans      | All loans + repayments + outstanding                               |
+| GET /api/analytics/pnl        | Period P&L: revenue, cost, expenses, net, shares                   |
+| GET /api/analytics/area       | Sales, revenue, due per area                                       |
+| GET /api/analytics/supplier   | Purchase history per supplier                                      |
 
 All accept query params: `?from=YYYY-MM-DD&to=YYYY-MM-DD` (default: current month)
 
@@ -749,6 +761,7 @@ All accept query params: `?from=YYYY-MM-DD&to=YYYY-MM-DD` (default: current mont
 ```
 
 **Sidebar sections (add to layout.tsx):**
+
 ```
 Overview
 ── Overview
@@ -795,7 +808,8 @@ Settings (admin only)
 
 **Table columns:** Name, Contact, Phone, bKash, Default Price, Active, Actions (Edit, Deactivate)
 **Sheet form fields:**
-- Name* (Input)
+
+- Name\* (Input)
 - Contact Person (Input)
 - Phone (Input), WhatsApp (Input)
 - Email (Input)
@@ -818,9 +832,10 @@ Settings (admin only)
 **Components:** Table + Sheet form + inline partner assignment panel
 
 **Table columns:** Name, Description, Assigned Partner, Active, Actions
-**Sheet form fields:** Name*, Description, Is Active
+**Sheet form fields:** Name\*, Description, Is Active
 
 **Partner Assignment (below form or separate tab in sheet):**
+
 - Shows list of active partners (users with role=partner)
 - Select partner → assign to this area
 - Current assignment shown with "Remove" button
@@ -843,7 +858,7 @@ Settings (admin only)
 **Auth:** admin only
 **Table columns:** Product, Tier Name, Unit Price, Min Qty, Actions
 **Filter:** Product dropdown at top of page
-**Form fields:** Product* (Select), Tier Name*, Unit Price*, Min Qty
+**Form fields:** Product* (Select), Tier Name*, Unit Price\*, Min Qty
 
 ---
 
@@ -852,7 +867,7 @@ Settings (admin only)
 **Route:** `/dashboard/settings/expense-categories`
 **Auth:** admin only
 **Table columns:** Icon, Name, Actions
-**Form fields:** Name*, Icon (Input — emoji or short label)
+**Form fields:** Name\*, Icon (Input — emoji or short label)
 
 ---
 
@@ -862,6 +877,7 @@ Settings (admin only)
 **Auth:** admin only
 **Layout:** Single card form (no table — single row config)
 **Form fields:**
+
 - Due Allowed (Switch)
 - Max Due Per Customer (Input number, ৳)
 - Late Punch Threshold (Input time, e.g. "09:30")
@@ -876,8 +892,9 @@ Settings (admin only)
 **Auth:** partner (own) + admin (all, with partner filter)
 **Table columns:** Name, Area, Phone, Delivery Schedule, Outstanding Due, Next Delivery, Status (Paused badge), Actions
 **Form fields:**
-- Area* (Select — partner only sees their assigned areas)
-- Name*, Phone, WhatsApp, Address (Textarea)
+
+- Area\* (Select — partner only sees their assigned areas)
+- Name\*, Phone, WhatsApp, Address (Textarea)
 - Pricing Tier (Select)
 - Due Allowed (Switch), Max Due (Input, shown if due_allowed=true)
 - Delivery Frequency (Select: daily/every_2_days/weekly/custom)
@@ -885,6 +902,7 @@ Settings (admin only)
 - Notes (Textarea)
 
 **Pause action:**
+
 - Action button "Pause" opens a small dialog
 - Fields: Pause Until (DatePicker, optional), Pause Reason
 - "Resume" button shown on paused customers
@@ -901,6 +919,7 @@ Settings (admin only)
 **Two views:**
 
 **Partner view:**
+
 - Table: Supplier, Product, Requested Qty, Estimated Total, Status badge, Date, Actions
 - Status badges: Pending (yellow), Approved (green), Rejected (red), Completed (gray)
 - "New Request" button → Sheet form
@@ -908,6 +927,7 @@ Settings (admin only)
 - Complete sheet fields: Actual Qty*, Actual Price*, Purchase Date*, Payment Method*, From Personal (Switch), Note
 
 **Admin view:**
+
 - Same table + partner name column
 - On Pending row: "Approve" / "Reject" buttons → small dialog with note field
 - Approve dialog: optional note → confirm
@@ -926,13 +946,15 @@ Settings (admin only)
 **Filter bar:** Status (All/Pending/Delivered/Cancelled), Date range, Customer search
 
 **New Order button → Sheet form:**
-- Customer* (searchable Select — shows only active, non-paused, within due limit)
-- Product* (Select)
+
+- Customer\* (searchable Select — shows only active, non-paused, within due limit)
+- Product\* (Select)
 - Qty*, Unit Price* (auto-filled from customer's pricing tier, editable)
 - Total (computed, read-only)
 - Note
 
 **Pending row actions:**
+
 - "Deliver" button → dialog: Paid Amount (Input), Payment Method (Select), Promised Date (DatePicker, shown if paid < total)
 - "Cancel" button → dialog: Cancellation Reason (required)
 
@@ -954,7 +976,7 @@ Settings (admin only)
 **Route:** `/dashboard/payments`
 **Auth:** partner (own) + admin (all)
 **Table columns:** Customer, Amount, Method, Date, Linked Order, Promised Date, Note
-**Form fields:** Customer* (Select — shows outstanding due next to name), Amount*, Payment Method*, Linked Order (optional), Promised Payment Date (if partial), Note
+**Form fields:** Customer* (Select — shows outstanding due next to name), Amount*, Payment Method\*, Linked Order (optional), Promised Payment Date (if partial), Note
 
 ---
 
@@ -973,10 +995,12 @@ Settings (admin only)
 **Auth:** partner (own) + admin (all)
 
 **Partner view:**
+
 - Table: Amount, Method, Date, Status (Pending/Acknowledged), Admin Note
 - "Submit Remittance" button → Sheet form: Amount*, Payment Method*, Note
 
 **Admin view:**
+
 - Table + partner column
 - Pending rows show "Acknowledge" button → dialog with optional admin note
 
@@ -990,6 +1014,7 @@ Settings (admin only)
 **Table columns:** Partner (admin), Amount, Reason, Date, Repaid, Outstanding, Status badge, Actions
 
 **Admin actions:**
+
 - "Add Repayment" button on each outstanding loan → dialog: Amount*, Method*, Note
 - "Create Loan" button (manual loan for any partner)
 
@@ -1002,12 +1027,14 @@ Settings (admin only)
 **Route:** `/dashboard/attendance`
 
 **Partner view — Today's Timeline:**
+
 - Visual timeline showing punched activities in chronological order
 - Each event: time, activity label, duration (for paired events)
 - Large punch buttons for current valid activity (context-aware: if punched_in but not out for lunch → show "Lunch Break" button)
 - "Correct a Punch" link → opens list of today's punches, select one, edit time
 
 **Admin view:**
+
 - Date picker at top (default today)
 - Table: Partner, Punch In, Punch Out, Total Hrs, Lunch, Net Hrs, Status (On Time/Late/Absent)
 - Click partner row → see their full timeline for that day
@@ -1019,6 +1046,7 @@ Settings (admin only)
 **Route:** `/dashboard/tasks`
 
 **Partner view:**
+
 - Two tabs: "My Tasks Today" | "Upcoming"
 - Task card: priority badge, title, description, due date, status
 - "Mark Done" button → dialog to add completion note
@@ -1026,6 +1054,7 @@ Settings (admin only)
 - Self-tasks: "Add Task" button → simple form (title, description, due_date, priority)
 
 **Admin view:**
+
 - Filter: partner, status, date, priority
 - Table: Partner, Task, Priority badge, Type, Due Date, Status badge
 - "Assign Task" button → Sheet form: Partner* (Select), Title*, Description, Due Date, Priority, Type (one_time/daily_recurring)
@@ -1037,6 +1066,7 @@ Settings (admin only)
 **Route:** `/dashboard/daily-report`
 
 **Partner view:**
+
 - Date selector (default today)
 - Auto-generated summary cards: Eggs Delivered, Cash Collected, Due Added, Returns, Expenses
 - Customer due table (per-customer snapshot)
@@ -1045,6 +1075,7 @@ Settings (admin only)
 - Status badge: Draft / Submitted / Reviewed
 
 **Admin view:**
+
 - List of partners + today's report status
 - Unreviewed = orange badge
 - Click → view full report → "Mark Reviewed" button + admin note input
@@ -1057,6 +1088,7 @@ Settings (admin only)
 **Auth:** admin only (partner sees their own summary instead)
 
 **Sections:**
+
 1. Business Pulse cards (4 KPIs: sold, cash, due, expenses — today vs yesterday)
 2. Central Stock table (per product)
 3. Partner Performance table (today)
@@ -1066,6 +1098,7 @@ Settings (admin only)
 7. Low stock alerts
 
 **Partner overview (when role=partner):**
+
 - My Tasks Today (count: pending/done)
 - Delivery Reminders (call today list)
 - Payment Due Today (promised payment list)
@@ -1077,19 +1110,20 @@ Settings (admin only)
 ### Modules 21–28 — Reports Pages
 
 All report pages share the same layout pattern:
+
 - Date range filter at top (Today / This Week / This Month / Custom)
 - Summary stat cards
 - Detailed data table with export hint
 
-| Route                        | Key Content                                              |
-|------------------------------|----------------------------------------------------------|
-| /dashboard/reports/due       | Customer due table, filter by partner/area, overdue days |
-| /dashboard/reports/stock     | Per product: purchased/delivered/reserved/available      |
-| /dashboard/reports/attendance| Daily hours table, late/absent badges, activity breakdown|
-| /dashboard/reports/loans     | Loan table, repayments, outstanding per partner          |
-| /dashboard/reports/area      | Sales, revenue, due per area                             |
-| /dashboard/reports/partner-pl| Per partner: invested, revenue, collected, due, net      |
-| /dashboard/reports/settlement| P&L summary, tech share, per-partner payout calculation  |
+| Route                         | Key Content                                               |
+| ----------------------------- | --------------------------------------------------------- |
+| /dashboard/reports/due        | Customer due table, filter by partner/area, overdue days  |
+| /dashboard/reports/stock      | Per product: purchased/delivered/reserved/available       |
+| /dashboard/reports/attendance | Daily hours table, late/absent badges, activity breakdown |
+| /dashboard/reports/loans      | Loan table, repayments, outstanding per partner           |
+| /dashboard/reports/area       | Sales, revenue, due per area                              |
+| /dashboard/reports/partner-pl | Per partner: invested, revenue, collected, due, net       |
+| /dashboard/reports/settlement | P&L summary, tech share, per-partner payout calculation   |
 
 ---
 
@@ -1099,41 +1133,41 @@ All report pages share the same layout pattern:
 
 For each module, check off as completed. Build in order — later modules depend on earlier ones.
 
-| Step | Module                   | DB Table | /api/setup | API Routes | Zod Schema | Page | Form | Tested |
-|------|--------------------------|----------|------------|------------|------------|------|------|--------|
-| 1    | Suppliers                | ☐        | ☐          | ☐          | ☐          | ☐    | ☐    | ☐      |
-| 2    | Areas + Assignment       | ☐        | ☐          | ☐          | ☐          | ☐    | ☐    | ☐      |
-| 3    | Products                 | ☐        | ☐          | ☐          | ☐          | ☐    | ☐    | ☐      |
-| 4    | Pricing Tiers            | ☐        | ☐          | ☐          | ☐          | ☐    | ☐    | ☐      |
-| 5    | Expense Categories       | ☐        | ☐          | ☐          | ☐          | ☐    | ☐    | ☐      |
-| 6    | Payment Config           | ☐        | ☐          | ☐          | ☐          | ☐    | ☐    | ☐      |
-| 7    | Customers                | ☐        | ☐          | ☐          | ☐          | ☐    | ☐    | ☐      |
-| 8    | Purchase Requests        | ☐        | ☐          | ☐          | ☐          | ☐    | ☐    | ☐      |
-| 9    | Orders                   | ☐        | ☐          | ☐          | ☐          | ☐    | ☐    | ☐      |
-| 10   | Returns                  | ☐        | ☐          | ☐          | ☐          | ☐    | ☐    | ☐      |
-| 11   | Payments                 | ☐        | ☐          | ☐          | ☐          | ☐    | ☐    | ☐      |
-| 12   | Expenses                 | ☐        | ☐          | ☐          | ☐          | ☐    | ☐    | ☐      |
-| 13   | Cash Remittances         | ☐        | ☐          | ☐          | ☐          | ☐    | ☐    | ☐      |
-| 14   | Partner Loans            | ☐        | ☐          | ☐          | ☐          | ☐    | ☐    | ☐      |
-| 15   | Attendance               | ☐        | ☐          | ☐          | ☐          | ☐    | ☐    | ☐      |
-| 16   | Tasks                    | ☐        | ☐          | ☐          | ☐          | ☐    | ☐    | ☐      |
-| 17   | Daily Report             | ☐        | ☐          | ☐          | ☐          | ☐    | ☐    | ☐      |
-| 18   | Reminders                | —        | —          | ☐          | —          | ☐    | —    | ☐      |
-| 19   | Partner Daily Summary    | —        | —          | ☐          | —          | ☐    | —    | ☐      |
-| 20   | Admin Overview           | —        | —          | ☐          | —          | ☐    | —    | ☐      |
-| 21   | Investment Ledger        | —        | —          | ☐          | —          | ☐    | —    | ☐      |
-| 22   | Expense Ledger           | —        | —          | ☐          | —          | ☐    | —    | ☐      |
-| 23   | Cash Flow Report         | —        | —          | ☐          | —          | ☐    | —    | ☐      |
-| 24   | Due Report               | —        | —          | ☐          | —          | ☐    | —    | ☐      |
-| 25   | Attendance Report        | —        | —          | ☐          | —          | ☐    | —    | ☐      |
-| 26   | Loan Report              | —        | —          | ☐          | —          | ☐    | —    | ☐      |
-| 27   | Area + Partner P&L       | —        | —          | ☐          | —          | ☐    | —    | ☐      |
-| 28   | Profit Settlement        | —        | —          | ☐          | —          | ☐    | —    | ☐      |
+| Step | Module                | DB Table | /api/setup | API Routes | Zod Schema | Page | Form | Tested |
+| ---- | --------------------- | -------- | ---------- | ---------- | ---------- | ---- | ---- | ------ |
+| 1    | Suppliers             | ☐        | ☐          | ☐          | ☐          | ☐    | ☐    | ☐      |
+| 2    | Areas + Assignment    | ☐        | ☐          | ☐          | ☐          | ☐    | ☐    | ☐      |
+| 3    | Products              | ☐        | ☐          | ☐          | ☐          | ☐    | ☐    | ☐      |
+| 4    | Pricing Tiers         | ☐        | ☐          | ☐          | ☐          | ☐    | ☐    | ☐      |
+| 5    | Expense Categories    | ☐        | ☐          | ☐          | ☐          | ☐    | ☐    | ☐      |
+| 6    | Payment Config        | ☐        | ☐          | ☐          | ☐          | ☐    | ☐    | ☐      |
+| 7    | Customers             | ☐        | ☐          | ☐          | ☐          | ☐    | ☐    | ☐      |
+| 8    | Purchase Requests     | ☐        | ☐          | ☐          | ☐          | ☐    | ☐    | ☐      |
+| 9    | Orders                | ☐        | ☐          | ☐          | ☐          | ☐    | ☐    | ☐      |
+| 10   | Returns               | ☐        | ☐          | ☐          | ☐          | ☐    | ☐    | ☐      |
+| 11   | Payments              | ☐        | ☐          | ☐          | ☐          | ☐    | ☐    | ☐      |
+| 12   | Expenses              | ☐        | ☐          | ☐          | ☐          | ☐    | ☐    | ☐      |
+| 13   | Cash Remittances      | ☐        | ☐          | ☐          | ☐          | ☐    | ☐    | ☐      |
+| 14   | Partner Loans         | ☐        | ☐          | ☐          | ☐          | ☐    | ☐    | ☐      |
+| 15   | Attendance            | ☐        | ☐          | ☐          | ☐          | ☐    | ☐    | ☐      |
+| 16   | Tasks                 | ☐        | ☐          | ☐          | ☐          | ☐    | ☐    | ☐      |
+| 17   | Daily Report          | ☐        | ☐          | ☐          | ☐          | ☐    | ☐    | ☐      |
+| 18   | Reminders             | —        | —          | ☐          | —          | ☐    | —    | ☐      |
+| 19   | Partner Daily Summary | —        | —          | ☐          | —          | ☐    | —    | ☐      |
+| 20   | Admin Overview        | —        | —          | ☐          | —          | ☐    | —    | ☐      |
+| 21   | Investment Ledger     | —        | —          | ☐          | —          | ☐    | —    | ☐      |
+| 22   | Expense Ledger        | —        | —          | ☐          | —          | ☐    | —    | ☐      |
+| 23   | Cash Flow Report      | —        | —          | ☐          | —          | ☐    | —    | ☐      |
+| 24   | Due Report            | —        | —          | ☐          | —          | ☐    | —    | ☐      |
+| 25   | Attendance Report     | —        | —          | ☐          | —          | ☐    | —    | ☐      |
+| 26   | Loan Report           | —        | —          | ☐          | —          | ☐    | —    | ☐      |
+| 27   | Area + Partner P&L    | —        | —          | ☐          | —          | ☐    | —    | ☐      |
+| 28   | Profit Settlement     | —        | —          | ☐          | —          | ☐    | —    | ☐      |
 
 **Cross-cutting items (done once, used everywhere):**
 
 | Item                              | Done |
-|-----------------------------------|------|
+| --------------------------------- | ---- |
 | Sidebar nav with all sections     | ☐    |
 | Role-based nav (admin vs partner) | ☐    |
 | Auth guard on admin-only pages    | ☐    |

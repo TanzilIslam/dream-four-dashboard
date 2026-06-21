@@ -2,10 +2,7 @@ import { sql } from "@/lib/db";
 import { requireAdmin } from "@/lib/auth";
 import { supplierSchema } from "@/lib/schemas/supplier";
 
-export async function PUT(
-  request: Request,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function PUT(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const auth = await requireAdmin();
   if ("error" in auth) return auth.error;
 
@@ -33,10 +30,7 @@ export async function PUT(
   return Response.json(supplier);
 }
 
-export async function DELETE(
-  _request: Request,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function DELETE(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   const auth = await requireAdmin();
   if ("error" in auth) return auth.error;
 

@@ -10,11 +10,15 @@ const profileSchema = z.object({
   phone: z.string().optional(),
   whatsapp: z.string().optional(),
   avatar_url: z.string().optional(),
-  documents: z.array(z.object({
-    type: z.string(),
-    name: z.string(),
-    url: z.string(),
-  })).optional(),
+  documents: z
+    .array(
+      z.object({
+        type: z.string(),
+        name: z.string(),
+        url: z.string(),
+      })
+    )
+    .optional(),
 });
 
 export async function GET() {

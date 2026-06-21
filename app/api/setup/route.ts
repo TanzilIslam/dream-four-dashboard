@@ -3,20 +3,12 @@ import bcrypt from "bcryptjs";
 
 export async function GET() {
   await sql`
-    CREATE TABLE IF NOT EXISTS entries (
-      id         SERIAL PRIMARY KEY,
-      content    TEXT NOT NULL,
-      created_at TIMESTAMPTZ DEFAULT NOW()
-    )
-  `;
-
-  await sql`
     CREATE TABLE IF NOT EXISTS users (
       id            SERIAL PRIMARY KEY,
       email         TEXT UNIQUE NOT NULL,
       password_hash TEXT NOT NULL,
       name          TEXT,
-      role          TEXT NOT NULL DEFAULT 'user',
+      role          TEXT NOT NULL DEFAULT 'partner',
       permissions   JSONB NOT NULL DEFAULT '[]',
       created_at    TIMESTAMPTZ DEFAULT NOW(),
       updated_at    TIMESTAMPTZ DEFAULT NOW()
@@ -339,6 +331,9 @@ export async function GET() {
       due_balance    NUMERIC(12,2) DEFAULT 0
     )
   `;
+
+  // Migrate legacy role 'user' → 'partner'
+  await sql`UPDATE users SET role = 'partner' WHERE role = 'user'`;
 
   const existing = await sql`SELECT id FROM users WHERE email = 'admin@example.com'`;
   if (existing.length === 0) {

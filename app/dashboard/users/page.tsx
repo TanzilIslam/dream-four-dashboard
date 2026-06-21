@@ -7,13 +7,25 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
 import { PlusIcon, Pencil, Trash2, LogIn } from "lucide-react";
 
-import { createUserSchema, updateUserSchema, type CreateUserInput, type UpdateUserInput } from "@/lib/schemas/user";
+import {
+  createUserSchema,
+  updateUserSchema,
+  type CreateUserInput,
+  type UpdateUserInput,
+} from "@/lib/schemas/user";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   Table,
   TableBody,
@@ -27,7 +39,7 @@ type User = {
   id: number;
   name: string;
   email: string;
-  role: "admin" | "user";
+  role: "admin" | "partner";
   created_at: string;
 };
 
@@ -39,8 +51,9 @@ export default function UsersPage() {
   const [sheetOpen, setSheetOpen] = useState(false);
   const [mode, setMode] = useState<Mode>("create");
   const [editingUser, setEditingUser] = useState<User | null>(null);
-  const [deletingId, setDeletingId] = useState<number | null>(null);
   const [impersonatingId, setImpersonatingId] = useState<number | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState<User | null>(null);
+  const [deleting, setDeleting] = useState(false);
   const router = useRouter();
 
   async function handleImpersonate(id: number) {
@@ -64,12 +77,6 @@ export default function UsersPage() {
 
   const activeForm = mode === "create" ? createForm : editForm;
 
-  async function fetchUsers() {
-    const res = await fetch("/api/users");
-    setUsers(await res.json());
-    setLoading(false);
-  }
-
   useEffect(() => {
     fetch("/api/users")
       .then((res) => res.json())
@@ -79,10 +86,15 @@ export default function UsersPage() {
       });
   }, []);
 
+  async function refreshUsers() {
+    const res = await fetch("/api/users");
+    setUsers(await res.json());
+  }
+
   function openCreate() {
     setMode("create");
     setEditingUser(null);
-    createForm.reset({ name: "", email: "", password: "", role: "user" });
+    createForm.reset({ name: "", email: "", password: "", role: "partner" });
     setSheetOpen(true);
   }
 
@@ -106,7 +118,7 @@ export default function UsersPage() {
     if (res.ok) {
       toast.success(mode === "create" ? "User created" : "User updated");
       setSheetOpen(false);
-      fetchUsers();
+      refreshUsers();
     } else {
       const json = await res.json();
       const errors = json.error as Record<string, string[]>;
@@ -117,16 +129,18 @@ export default function UsersPage() {
     }
   }
 
-  async function handleDelete(id: number) {
-    setDeletingId(id);
-    const res = await fetch(`/api/users/${id}`, { method: "DELETE" });
+  async function handleDeleteConfirmed() {
+    if (!confirmDelete) return;
+    setDeleting(true);
+    const res = await fetch(`/api/users/${confirmDelete.id}`, { method: "DELETE" });
     if (res.ok) {
       toast.success("User deleted");
-      fetchUsers();
+      setConfirmDelete(null);
+      refreshUsers();
     } else {
       toast.error("Failed to delete user");
     }
-    setDeletingId(null);
+    setDeleting(false);
   }
 
   const form = mode === "create" ? createForm : editForm;
@@ -201,8 +215,7 @@ export default function UsersPage() {
                         <Button
                           variant="ghost"
                           size="icon"
-                          disabled={deletingId === user.id}
-                          onClick={() => handleDelete(user.id)}
+                          onClick={() => setConfirmDelete(user)}
                           className="size-7 text-destructive hover:bg-destructive/10 hover:text-destructive"
                         >
                           <Trash2 className="size-3.5" />
@@ -237,7 +250,12 @@ export default function UsersPage() {
             {/* Email */}
             <div className="space-y-1.5">
               <Label htmlFor="email">Email</Label>
-              <Input id="email" type="email" placeholder="john@example.com" {...form.register("email")} />
+              <Input
+                id="email"
+                type="email"
+                placeholder="john@example.com"
+                {...form.register("email")}
+              />
               {form.formState.errors.email && (
                 <p className="text-xs text-destructive">{form.formState.errors.email.message}</p>
               )}
@@ -246,9 +264,19 @@ export default function UsersPage() {
             {/* Password */}
             <div className="space-y-1.5">
               <Label htmlFor="password">
-                Password {mode === "edit" && <span className="text-muted-foreground text-xs">(leave blank to keep current)</span>}
+                Password{" "}
+                {mode === "edit" && (
+                  <span className="text-muted-foreground text-xs">
+                    (leave blank to keep current)
+                  </span>
+                )}
               </Label>
-              <Input id="password" type="password" placeholder="••••••••" {...form.register("password")} />
+              <Input
+                id="password"
+                type="password"
+                placeholder="••••••••"
+                {...form.register("password")}
+              />
               {form.formState.errors.password && (
                 <p className="text-xs text-destructive">{form.formState.errors.password.message}</p>
               )}
@@ -258,15 +286,14 @@ export default function UsersPage() {
             <div className="space-y-1.5">
               <Label>Role</Label>
               <Select
-                defaultValue={mode === "edit" ? editingUser?.role : "user"}
-                onValueChange={(val) => form.setValue("role", val as "admin" | "user")}
+                defaultValue={mode === "edit" ? editingUser?.role : "partner"}
+                onValueChange={(val) => form.setValue("role", val as "admin" | "partner")}
               >
-
                 <SelectTrigger className="w-full">
                   <SelectValue placeholder="Select role" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="user">User</SelectItem>
+                  <SelectItem value="partner">Partner</SelectItem>
                   <SelectItem value="admin">Admin</SelectItem>
                 </SelectContent>
               </Select>
@@ -277,15 +304,34 @@ export default function UsersPage() {
 
             <div className="flex gap-2 pt-2">
               <Button type="submit" disabled={form.formState.isSubmitting} className="w-1/2">
-                {form.formState.isSubmitting ? "Saving..." : mode === "create" ? "Create" : "Save changes"}
+                {form.formState.isSubmitting
+                  ? "Saving..."
+                  : mode === "create"
+                    ? "Create"
+                    : "Save changes"}
               </Button>
-              <Button type="button" variant="outline" onClick={() => setSheetOpen(false)} className="w-1/2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setSheetOpen(false)}
+                className="w-1/2"
+              >
                 Cancel
               </Button>
             </div>
           </form>
         </SheetContent>
       </Sheet>
+
+      <ConfirmDialog
+        open={confirmDelete !== null}
+        onOpenChange={(open) => !open && setConfirmDelete(null)}
+        title="Delete User"
+        description={`Are you sure you want to delete "${confirmDelete?.name}"? This cannot be undone.`}
+        confirmLabel="Delete"
+        loading={deleting}
+        onConfirm={handleDeleteConfirmed}
+      />
     </div>
   );
 }

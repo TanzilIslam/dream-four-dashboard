@@ -21,6 +21,7 @@ export async function requireUser(): Promise<AuthResult> {
 export async function requireAdmin(): Promise<AuthResult> {
   const user = await getSessionUser();
   if (!user) return { error: Response.json({ error: "Unauthorized" }, { status: 401 }) };
-  if (user.role !== "admin") return { error: Response.json({ error: "Forbidden" }, { status: 403 }) };
+  if (user.role !== "admin")
+    return { error: Response.json({ error: "Forbidden" }, { status: 403 }) };
   return { user };
 }
