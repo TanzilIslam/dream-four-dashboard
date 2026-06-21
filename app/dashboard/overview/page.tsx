@@ -1,8 +1,546 @@
-export default function OverviewPage() {
+"use client";
+
+import { useEffect, useState } from "react";
+import Link from "next/link";
+import {
+  TrendingUp,
+  TrendingDown,
+  Minus,
+  AlertTriangle,
+  Phone,
+  Calendar,
+  CheckSquare,
+  Clock,
+} from "lucide-react";
+
+import { Badge } from "@/components/ui/badge";
+
+// ─── Types ────────────────────────────────────────────────────────────────────
+
+type AdminData = {
+  kpi: {
+    today: { eggs_sold: string; cash_in: string; new_due: string; expenses: string };
+    yesterday: { eggs_sold: string; cash_in: string; new_due: string; expenses: string };
+  };
+  stock: {
+    id: number;
+    name: string;
+    unit: string;
+    low_stock_threshold: number;
+    purchased_qty: string;
+    delivered_qty: string;
+    reserved_qty: string;
+    returned_qty: string;
+  }[];
+  partners: {
+    id: number;
+    name: string;
+    eggs_delivered: string;
+    cash_collected: string;
+    expenses: string;
+    punch_in_at: string | null;
+  }[];
+  pending: {
+    purchase_requests: string;
+    remittances: string;
+    reports: string;
+  };
+  dues: {
+    summary: { debtor_count: string; total_due: string };
+    topDebtors: { name: string; total_due: string }[];
+  };
+};
+
+type PartnerData = {
+  stats: {
+    eggs_delivered: string;
+    cash_collected: string;
+    due_added: string;
+    expenses: string;
+    pending_tasks: string;
+    completed_tasks: string;
+  };
+};
+
+type Reminder = {
+  callToday: {
+    id: number;
+    name: string;
+    phone: string | null;
+    area_name: string | null;
+    outstanding_due: string;
+  }[];
+  paymentsDue: {
+    order_id: number;
+    customer_name: string;
+    customer_phone: string | null;
+    promised_payment_date: string;
+    due_amount: string;
+  }[];
+};
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+function delta(today: number, yesterday: number) {
+  if (yesterday === 0) return null;
+  return ((today - yesterday) / yesterday) * 100;
+}
+
+function DeltaBadge({ pct }: { pct: number | null }) {
+  if (pct === null) return null;
+  if (Math.abs(pct) < 0.5) return <Minus className="size-3 text-muted-foreground" />;
+  if (pct > 0)
+    return (
+      <span className="flex items-center gap-0.5 text-xs text-green-600">
+        <TrendingUp className="size-3" />
+        {pct.toFixed(0)}%
+      </span>
+    );
   return (
-    <div>
-      <h1 className="text-xl font-semibold">Overview</h1>
-      <p className="mt-2 text-sm text-muted-foreground">Welcome to the dashboard.</p>
+    <span className="flex items-center gap-0.5 text-xs text-red-500">
+      <TrendingDown className="size-3" />
+      {Math.abs(pct).toFixed(0)}%
+    </span>
+  );
+}
+
+function KpiCard({
+  label,
+  value,
+  yesterday,
+  prefix = "",
+}: {
+  label: string;
+  value: number;
+  yesterday: number;
+  prefix?: string;
+}) {
+  const pct = delta(value, yesterday);
+  return (
+    <div className="rounded-lg border border-border p-4 space-y-1">
+      <p className="text-xs text-muted-foreground">{label}</p>
+      <p className="text-2xl font-bold">
+        {prefix}
+        {value.toLocaleString()}
+      </p>
+      <div className="flex items-center gap-1">
+        <DeltaBadge pct={pct} />
+        <span className="text-xs text-muted-foreground">vs yesterday</span>
+      </div>
+    </div>
+  );
+}
+
+function StatCard({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-lg border border-border p-4">
+      <p className="text-xs text-muted-foreground mb-1">{label}</p>
+      <p className="text-xl font-bold">{value}</p>
+    </div>
+  );
+}
+
+// ─── Page ─────────────────────────────────────────────────────────────────────
+
+export default function OverviewPage() {
+  const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
+  const [adminData, setAdminData] = useState<AdminData | null>(null);
+  const [partnerData, setPartnerData] = useState<PartnerData | null>(null);
+  const [reminders, setReminders] = useState<Reminder | null>(null);
+
+  useEffect(() => {
+    fetch("/api/auth/me")
+      .then((res) => (res.ok ? res.json() : { user: null }))
+      .then((data) => {
+        const admin = data.user?.role === "admin";
+        setIsAdmin(admin);
+        fetch("/api/analytics/overview")
+          .then((r) => r.json())
+          .then((d) => {
+            if (admin) setAdminData(d);
+            else setPartnerData(d);
+          });
+        if (!admin) {
+          fetch("/api/analytics/reminders")
+            .then((r) => r.json())
+            .then(setReminders);
+        }
+      })
+      .catch(() => setIsAdmin(false));
+  }, []);
+
+  if (isAdmin === null) {
+    return <p className="text-sm text-muted-foreground">Loading…</p>;
+  }
+
+  if (!isAdmin) return <PartnerDashboard data={partnerData} reminders={reminders} />;
+  return <AdminDashboard data={adminData} />;
+}
+
+// ─── Partner Dashboard ────────────────────────────────────────────────────────
+
+function PartnerDashboard({
+  data,
+  reminders,
+}: {
+  data: PartnerData | null;
+  reminders: Reminder | null;
+}) {
+  const today = new Date().toLocaleDateString(undefined, {
+    weekday: "long",
+    month: "short",
+    day: "numeric",
+  });
+  const s = data?.stats;
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-xl font-semibold">My Dashboard</h1>
+        <p className="text-sm text-muted-foreground">{today}</p>
+      </div>
+
+      {/* Quick stats */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+        <StatCard label="Eggs Delivered" value={s ? String(s.eggs_delivered) : "—"} />
+        <StatCard
+          label="Cash Collected"
+          value={s ? `৳${Number(s.cash_collected).toFixed(2)}` : "—"}
+        />
+        <StatCard label="Due Added" value={s ? `৳${Number(s.due_added).toFixed(2)}` : "—"} />
+        <StatCard label="Expenses" value={s ? `৳${Number(s.expenses).toFixed(2)}` : "—"} />
+        <StatCard
+          label="Tasks"
+          value={
+            s
+              ? `${s.completed_tasks} / ${Number(s.completed_tasks) + Number(s.pending_tasks)}`
+              : "—"
+          }
+        />
+      </div>
+
+      {/* Quick actions */}
+      <div className="flex flex-wrap gap-2">
+        {[
+          { label: "New Order", href: "/dashboard/orders" },
+          { label: "Record Punch", href: "/dashboard/attendance" },
+          { label: "Log Expense", href: "/dashboard/expenses" },
+          { label: "Daily Report", href: "/dashboard/daily-reports" },
+        ].map((a) => (
+          <Link
+            key={a.href}
+            href={a.href}
+            className="inline-flex items-center justify-center rounded-md border border-border bg-background px-3 py-1.5 text-sm font-medium hover:bg-accent hover:text-accent-foreground transition-colors"
+          >
+            {a.label}
+          </Link>
+        ))}
+      </div>
+
+      {/* Call today */}
+      {reminders && reminders.callToday.length > 0 && (
+        <section className="space-y-2">
+          <h2 className="text-sm font-semibold flex items-center gap-1.5">
+            <Calendar className="size-4 text-blue-500" />
+            Deliver Today ({reminders.callToday.length})
+          </h2>
+          <div className="rounded-lg border border-border divide-y divide-border">
+            {reminders.callToday.map((c) => (
+              <div key={c.id} className="flex items-center justify-between px-4 py-3">
+                <div>
+                  <p className="text-sm font-medium">{c.name}</p>
+                  <p className="text-xs text-muted-foreground">{c.area_name ?? "—"}</p>
+                </div>
+                <div className="flex items-center gap-3">
+                  {Number(c.outstanding_due) > 0 && (
+                    <span className="text-xs font-medium text-red-600">
+                      Due: ৳{Number(c.outstanding_due).toFixed(0)}
+                    </span>
+                  )}
+                  {c.phone && (
+                    <a
+                      href={`tel:${c.phone}`}
+                      className="inline-flex items-center gap-1 text-xs text-blue-600 hover:underline"
+                    >
+                      <Phone className="size-3" />
+                      {c.phone}
+                    </a>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* Payment promises overdue */}
+      {reminders && reminders.paymentsDue.length > 0 && (
+        <section className="space-y-2">
+          <h2 className="text-sm font-semibold flex items-center gap-1.5">
+            <AlertTriangle className="size-4 text-orange-500" />
+            Payment Promises Overdue ({reminders.paymentsDue.length})
+          </h2>
+          <div className="rounded-lg border border-border divide-y divide-border">
+            {reminders.paymentsDue.map((p) => (
+              <div key={p.order_id} className="flex items-center justify-between px-4 py-3">
+                <div>
+                  <p className="text-sm font-medium">{p.customer_name}</p>
+                  <p className="text-xs text-muted-foreground">
+                    Promised: {new Date(p.promised_payment_date).toLocaleDateString()}
+                  </p>
+                </div>
+                <div className="flex items-center gap-3">
+                  <span className="text-sm font-semibold text-red-600">
+                    ৳{Number(p.due_amount).toFixed(2)}
+                  </span>
+                  {p.customer_phone && (
+                    <a
+                      href={`tel:${p.customer_phone}`}
+                      className="text-xs text-blue-600 hover:underline"
+                    >
+                      <Phone className="size-3" />
+                    </a>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+    </div>
+  );
+}
+
+// ─── Admin Dashboard ──────────────────────────────────────────────────────────
+
+function AdminDashboard({ data }: { data: AdminData | null }) {
+  const today = new Date().toLocaleDateString(undefined, {
+    weekday: "long",
+    month: "short",
+    day: "numeric",
+  });
+
+  if (!data) {
+    return (
+      <div className="space-y-4">
+        <h1 className="text-xl font-semibold">Overview</h1>
+        <p className="text-sm text-muted-foreground">Loading…</p>
+      </div>
+    );
+  }
+
+  const t = data.kpi.today;
+  const y = data.kpi.yesterday;
+
+  const pendingCount =
+    Number(data.pending.purchase_requests) +
+    Number(data.pending.remittances) +
+    Number(data.pending.reports);
+
+  return (
+    <div className="space-y-8">
+      <div>
+        <h1 className="text-xl font-semibold">Overview</h1>
+        <p className="text-sm text-muted-foreground">{today}</p>
+      </div>
+
+      {/* KPI cards */}
+      <section className="space-y-2">
+        <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+          Today
+        </h2>
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          <KpiCard label="Eggs Sold" value={Number(t.eggs_sold)} yesterday={Number(y.eggs_sold)} />
+          <KpiCard
+            label="Cash In"
+            prefix="৳"
+            value={Number(t.cash_in)}
+            yesterday={Number(y.cash_in)}
+          />
+          <KpiCard
+            label="New Due"
+            prefix="৳"
+            value={Number(t.new_due)}
+            yesterday={Number(y.new_due)}
+          />
+          <KpiCard
+            label="Expenses"
+            prefix="৳"
+            value={Number(t.expenses)}
+            yesterday={Number(y.expenses)}
+          />
+        </div>
+      </section>
+
+      {/* Pending actions alert */}
+      {pendingCount > 0 && (
+        <section className="rounded-lg border border-orange-200 bg-orange-50 p-4 space-y-2">
+          <h2 className="text-sm font-semibold text-orange-800 flex items-center gap-1.5">
+            <AlertTriangle className="size-4" />
+            Pending Actions ({pendingCount})
+          </h2>
+          <div className="flex flex-wrap gap-2">
+            {Number(data.pending.purchase_requests) > 0 && (
+              <Link href="/dashboard/purchase-requests">
+                <Badge variant="secondary">
+                  {data.pending.purchase_requests} Purchase Request(s)
+                </Badge>
+              </Link>
+            )}
+            {Number(data.pending.remittances) > 0 && (
+              <Link href="/dashboard/cash-remittances">
+                <Badge variant="secondary">{data.pending.remittances} Remittance(s)</Badge>
+              </Link>
+            )}
+            {Number(data.pending.reports) > 0 && (
+              <Link href="/dashboard/daily-reports">
+                <Badge variant="secondary">{data.pending.reports} Report(s) to Review</Badge>
+              </Link>
+            )}
+          </div>
+        </section>
+      )}
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Stock */}
+        <section className="space-y-2">
+          <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            Stock
+          </h2>
+          <div className="rounded-lg border border-border divide-y divide-border">
+            {data.stock.map((p) => {
+              const available =
+                Number(p.purchased_qty) -
+                Number(p.delivered_qty) -
+                Number(p.reserved_qty) +
+                Number(p.returned_qty);
+              const low = available <= p.low_stock_threshold;
+              return (
+                <div key={p.id} className="flex items-center justify-between px-4 py-3">
+                  <div>
+                    <p className="text-sm font-medium">{p.name}</p>
+                    <p className="text-xs text-muted-foreground">{p.unit}</p>
+                  </div>
+                  <div className="text-right">
+                    <p className={`text-lg font-bold ${low ? "text-red-600" : ""}`}>
+                      {available.toLocaleString()}
+                    </p>
+                    {low && (
+                      <p className="text-xs text-red-500 flex items-center gap-0.5 justify-end">
+                        <AlertTriangle className="size-3" /> Low stock
+                      </p>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+            {data.stock.length === 0 && (
+              <p className="px-4 py-6 text-sm text-muted-foreground text-center">No products</p>
+            )}
+          </div>
+        </section>
+
+        {/* Outstanding dues */}
+        <section className="space-y-2">
+          <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            Outstanding Dues
+          </h2>
+          <div className="rounded-lg border border-border divide-y divide-border">
+            <div className="flex items-center justify-between px-4 py-3 bg-muted/30">
+              <p className="text-sm text-muted-foreground">
+                {data.dues.summary.debtor_count} customer(s)
+              </p>
+              <p className="font-bold text-red-600">
+                ৳{Number(data.dues.summary.total_due).toFixed(2)}
+              </p>
+            </div>
+            {data.dues.topDebtors.map((d) => (
+              <div key={d.name} className="flex items-center justify-between px-4 py-2.5">
+                <p className="text-sm">{d.name}</p>
+                <p className="text-sm font-medium text-red-600">
+                  ৳{Number(d.total_due).toFixed(2)}
+                </p>
+              </div>
+            ))}
+            {data.dues.topDebtors.length === 0 && (
+              <p className="px-4 py-4 text-sm text-muted-foreground text-center">
+                No outstanding dues
+              </p>
+            )}
+          </div>
+        </section>
+      </div>
+
+      {/* Partner table */}
+      <section className="space-y-2">
+        <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+          Partners Today
+        </h2>
+        <div className="rounded-lg border border-border overflow-hidden">
+          <table className="w-full text-sm">
+            <thead className="bg-muted/50">
+              <tr>
+                <th className="text-left px-4 py-2.5 font-medium text-muted-foreground">Partner</th>
+                <th className="text-left px-4 py-2.5 font-medium text-muted-foreground">
+                  Punch In
+                </th>
+                <th className="text-right px-4 py-2.5 font-medium text-muted-foreground">Eggs</th>
+                <th className="text-right px-4 py-2.5 font-medium text-muted-foreground">Cash</th>
+                <th className="text-right px-4 py-2.5 font-medium text-muted-foreground">
+                  Expenses
+                </th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border">
+              {data.partners.map((p) => (
+                <tr key={p.id}>
+                  <td className="px-4 py-3 font-medium">{p.name}</td>
+                  <td className="px-4 py-3 text-muted-foreground">
+                    {p.punch_in_at ? (
+                      <span className="flex items-center gap-1 text-green-600">
+                        <Clock className="size-3" />
+                        {new Date(p.punch_in_at).toLocaleTimeString([], {
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })}
+                      </span>
+                    ) : (
+                      <Badge variant="outline" className="text-xs">
+                        Absent
+                      </Badge>
+                    )}
+                  </td>
+                  <td className="px-4 py-3 text-right">
+                    {Number(p.eggs_delivered).toLocaleString()}
+                  </td>
+                  <td className="px-4 py-3 text-right">৳{Number(p.cash_collected).toFixed(2)}</td>
+                  <td className="px-4 py-3 text-right text-muted-foreground">
+                    ৳{Number(p.expenses).toFixed(2)}
+                  </td>
+                </tr>
+              ))}
+              {data.partners.length === 0 && (
+                <tr>
+                  <td colSpan={5} className="px-4 py-6 text-center text-muted-foreground">
+                    No partners
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      {/* Tasks shortcut */}
+      <div className="flex items-center gap-2">
+        <CheckSquare className="size-4 text-muted-foreground" />
+        <Link href="/dashboard/tasks" className="text-sm text-blue-600 hover:underline">
+          View all tasks →
+        </Link>
+        <Link href="/dashboard/dues" className="text-sm text-blue-600 hover:underline ml-4">
+          View all dues →
+        </Link>
+      </div>
     </div>
   );
 }

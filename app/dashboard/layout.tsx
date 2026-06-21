@@ -25,6 +25,7 @@ import {
   CalendarCheck,
   CheckSquare,
   FileText,
+  BarChart3,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -77,6 +78,10 @@ const navSections: NavSection[] = [
       { label: "Tasks", href: "/dashboard/tasks", icon: CheckSquare },
       { label: "Daily Reports", href: "/dashboard/daily-reports", icon: FileText },
     ],
+  },
+  {
+    label: "Reports",
+    items: [{ label: "Reports", href: "/dashboard/reports", icon: BarChart3 }],
   },
   {
     label: "Admin",
