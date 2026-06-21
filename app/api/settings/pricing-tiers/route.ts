@@ -1,9 +1,9 @@
 import { sql } from "@/lib/db";
-import { requireAdmin } from "@/lib/auth";
+import { requireAdmin, requireUser } from "@/lib/auth";
 import { pricingTierSchema } from "@/lib/schemas/pricing-tier";
 
 export async function GET(request: Request) {
-  const auth = await requireAdmin();
+  const auth = await requireUser();
   if ("error" in auth) return auth.error;
 
   const productId = new URL(request.url).searchParams.get("product_id");

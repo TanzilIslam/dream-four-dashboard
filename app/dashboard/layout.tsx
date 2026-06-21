@@ -26,6 +26,7 @@ import {
   CheckSquare,
   FileText,
   BarChart3,
+  Boxes,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -59,6 +60,7 @@ const navSections: NavSection[] = [
       { label: "Customers", href: "/dashboard/customers", icon: ContactRound },
       { label: "Orders", href: "/dashboard/orders", icon: ShoppingCart },
       { label: "Purchase Requests", href: "/dashboard/purchase-requests", icon: ClipboardList },
+      { label: "Stock", href: "/dashboard/stock", icon: Boxes },
       { label: "Returns", href: "/dashboard/returns", icon: Undo2 },
     ],
   },

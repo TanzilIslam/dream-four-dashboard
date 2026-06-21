@@ -1,9 +1,9 @@
 import { sql } from "@/lib/db";
-import { requireAdmin } from "@/lib/auth";
+import { requireAdmin, requireUser } from "@/lib/auth";
 import { expenseCategorySchema } from "@/lib/schemas/expense-category";
 
 export async function GET() {
-  const auth = await requireAdmin();
+  const auth = await requireUser();
   if ("error" in auth) return auth.error;
 
   const categories = await sql`SELECT * FROM expense_categories ORDER BY name ASC`;

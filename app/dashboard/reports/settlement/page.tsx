@@ -36,18 +36,24 @@ export default function SettlementPage() {
   const [settlement, setSettlement] = useState<PartnerRow[]>([]);
   const [summary, setSummary] = useState<Summary | null>(null);
   const [loading, setLoading] = useState(true);
+  const [forbidden, setForbidden] = useState(false);
 
   useEffect(() => {
     const p = new URLSearchParams();
     if (from) p.set("from", from);
     if (to) p.set("to", to);
-    fetch(`/api/reports/settlement?${p}`)
-      .then((r) => r.json())
-      .then((d) => {
+    fetch(`/api/reports/settlement?${p}`).then((r) => {
+      if (r.status === 403) {
+        setForbidden(true);
+        setLoading(false);
+        return;
+      }
+      r.json().then((d) => {
         setSettlement(d.settlement);
         setSummary(d.summary);
         setLoading(false);
       });
+    });
   }, [from, to]);
 
   return (
@@ -58,6 +64,12 @@ export default function SettlementPage() {
           Period P&amp;L → tech share → partner payout.
         </p>
       </div>
+      {forbidden ? (
+        <p className="text-sm text-muted-foreground py-10 text-center">
+          This report is only available to admins.
+        </p>
+      ) : (
+        <>
       <DateRangeFilter from={from} to={to} onFromChange={setFrom} onToChange={setTo} />
 
       {/* Summary */}
@@ -138,6 +150,8 @@ export default function SettlementPage() {
           </TableBody>
         </Table>
       </div>
+        </>
+      )}
     </div>
   );
 }
