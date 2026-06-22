@@ -9,10 +9,10 @@ export const createOrderSchema = z
     paid_amount: z.number().min(0, "Paid amount must be non-negative").default(0),
     note: z.string().optional().or(z.literal("")),
   })
-  .refine(
-    (d) => d.paid_amount <= d.unit_price * d.quantity,
-    { message: "Paid amount cannot exceed order total", path: ["paid_amount"] }
-  );
+  .refine((d) => d.paid_amount <= d.unit_price * d.quantity, {
+    message: "Paid amount cannot exceed order total",
+    path: ["paid_amount"],
+  });
 
 export const deliverOrderSchema = z.object({
   delivered_at: z.string().optional(),

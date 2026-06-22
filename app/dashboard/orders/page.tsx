@@ -7,6 +7,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
 import { PlusIcon, Truck, BanknoteIcon, XCircle, ChevronsUpDown, Check } from "lucide-react";
 
+import { z } from "zod";
 import {
   createOrderSchema,
   payOrderSchema,
@@ -105,7 +106,7 @@ export default function OrdersPage() {
   const [deliverTarget, setDeliverTarget] = useState<Order | null>(null);
   const [delivering, setDelivering] = useState(false);
 
-  const createForm = useForm<CreateOrderInput>({
+  const createForm = useForm<z.input<typeof createOrderSchema>, unknown, CreateOrderInput>({
     resolver: zodResolver(createOrderSchema),
     defaultValues: {
       customer_id: 0,
@@ -138,12 +139,23 @@ export default function OrdersPage() {
     defaultValue: 0,
   });
   const productId = useWatch({ control: createForm.control, name: "product_id", defaultValue: 0 });
-  const watchQuantity = useWatch({ control: createForm.control, name: "quantity", defaultValue: 1 });
-  const watchUnitPrice = useWatch({ control: createForm.control, name: "unit_price", defaultValue: 0 });
-  const watchPaidAmount = useWatch({ control: createForm.control, name: "paid_amount", defaultValue: 0 });
+  const watchQuantity = useWatch({
+    control: createForm.control,
+    name: "quantity",
+    defaultValue: 1,
+  });
+  const watchUnitPrice = useWatch({
+    control: createForm.control,
+    name: "unit_price",
+    defaultValue: 0,
+  });
+  const watchPaidAmount = useWatch({
+    control: createForm.control,
+    name: "paid_amount",
+    defaultValue: 0,
+  });
   const orderTotal = (watchQuantity || 0) * (watchUnitPrice || 0);
   const orderDue = Math.max(0, orderTotal - (watchPaidAmount || 0));
-  const selectedCustomerName = customers.find((c) => c.id === customerId)?.name;
   const selectedProductName = products.find((p) => p.id === productId)?.name;
 
   // Auto-fill unit price based on customer's pricing tier or product default
@@ -200,7 +212,14 @@ export default function OrdersPage() {
   }
 
   function openCreate() {
-    createForm.reset({ customer_id: 0, product_id: 0, quantity: 1, unit_price: 0, paid_amount: 0, note: "" });
+    createForm.reset({
+      customer_id: 0,
+      product_id: 0,
+      quantity: 1,
+      unit_price: 0,
+      paid_amount: 0,
+      note: "",
+    });
     setCreateOpen(true);
   }
 
@@ -458,9 +477,7 @@ export default function OrdersPage() {
               <CustomerSearch
                 customers={customers}
                 value={customerId}
-                onChange={(id) =>
-                  createForm.setValue("customer_id", id, { shouldValidate: true })
-                }
+                onChange={(id) => createForm.setValue("customer_id", id, { shouldValidate: true })}
               />
             </Field>
 
@@ -671,9 +688,7 @@ function CustomerSearch({
   const [search, setSearch] = useState("");
   const containerRef = useRef<HTMLDivElement>(null);
 
-  const filtered = customers.filter((c) =>
-    c.name.toLowerCase().includes(search.toLowerCase())
-  );
+  const filtered = customers.filter((c) => c.name.toLowerCase().includes(search.toLowerCase()));
   const selected = customers.find((c) => c.id === value);
 
   useEffect(() => {

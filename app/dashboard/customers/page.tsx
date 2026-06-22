@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
-import { PlusIcon, Pencil, Power, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
+import { PlusIcon, Pencil, Power, ArrowUp, ArrowDown } from "lucide-react";
 
 import {
   createCustomerSchema,

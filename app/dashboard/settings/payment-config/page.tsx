@@ -129,7 +129,8 @@ function PaymentConfigInner() {
                   </p>
                 )}
                 <p className="text-xs text-muted-foreground">
-                  "Apply to All" will overwrite every customer's individual max due limit.
+                  &ldquo;Apply to All&rdquo; will overwrite every customer&apos;s individual max due
+                  limit.
                 </p>
               </div>
 
