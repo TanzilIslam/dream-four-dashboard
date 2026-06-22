@@ -355,6 +355,7 @@ export default function OrdersPage() {
               <TableHead>Product</TableHead>
               <TableHead>Qty</TableHead>
               <TableHead>Total</TableHead>
+              <TableHead>Paid</TableHead>
               <TableHead>Due</TableHead>
               <TableHead>Status</TableHead>
               <TableHead className="w-[100px]" />
@@ -364,7 +365,7 @@ export default function OrdersPage() {
             {loading ? (
               <TableRow>
                 <TableCell
-                  colSpan={isAdmin ? 8 : 7}
+                  colSpan={isAdmin ? 9 : 8}
                   className="text-center text-muted-foreground py-10"
                 >
                   Loading…
@@ -373,7 +374,7 @@ export default function OrdersPage() {
             ) : orders.length === 0 ? (
               <TableRow>
                 <TableCell
-                  colSpan={isAdmin ? 8 : 7}
+                  colSpan={isAdmin ? 9 : 8}
                   className="text-center text-muted-foreground py-10"
                 >
                   No orders
@@ -392,6 +393,13 @@ export default function OrdersPage() {
                   </TableCell>
                   <TableCell>{o.quantity}</TableCell>
                   <TableCell>৳{Number(o.total_amount).toFixed(2)}</TableCell>
+                  <TableCell>
+                    {Number(o.paid_amount) > 0 ? (
+                      <span className="text-green-600">৳{Number(o.paid_amount).toFixed(2)}</span>
+                    ) : (
+                      <span className="text-muted-foreground">—</span>
+                    )}
+                  </TableCell>
                   <TableCell>
                     {Number(o.due_amount) > 0 ? (
                       <span className="text-destructive">৳{Number(o.due_amount).toFixed(2)}</span>
