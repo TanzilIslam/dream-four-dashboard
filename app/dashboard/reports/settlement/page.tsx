@@ -70,86 +70,86 @@ export default function SettlementPage() {
         </p>
       ) : (
         <>
-      <DateRangeFilter from={from} to={to} onFromChange={setFrom} onToChange={setTo} />
+          <DateRangeFilter from={from} to={to} onFromChange={setFrom} onToChange={setTo} />
 
-      {/* Summary */}
-      {summary && (
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          {[
-            {
-              label: "Net Profit",
-              value: summary.total_net,
-              color: summary.total_net >= 0 ? "" : "text-red-600",
-            },
-            { label: "Tech Share (7.5%)", value: summary.tech_share, color: "text-orange-600" },
-            { label: "Partner Pool", value: summary.partner_pool, color: "" },
-            {
-              label: `Per Partner (÷${summary.partner_count})`,
-              value: summary.per_partner,
-              color: "text-green-600 font-bold",
-            },
-          ].map((c) => (
-            <div key={c.label} className="rounded-lg border border-border p-4">
-              <p className="text-xs text-muted-foreground mb-1">{c.label}</p>
-              <p className={`text-xl font-semibold ${c.color}`}>৳{c.value.toFixed(2)}</p>
+          {/* Summary */}
+          {summary && (
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              {[
+                {
+                  label: "Net Profit",
+                  value: summary.total_net,
+                  color: summary.total_net >= 0 ? "" : "text-red-600",
+                },
+                { label: "Tech Share (7.5%)", value: summary.tech_share, color: "text-orange-600" },
+                { label: "Partner Pool", value: summary.partner_pool, color: "" },
+                {
+                  label: `Per Partner (÷${summary.partner_count})`,
+                  value: summary.per_partner,
+                  color: "text-green-600 font-bold",
+                },
+              ].map((c) => (
+                <div key={c.label} className="rounded-lg border border-border p-4">
+                  <p className="text-xs text-muted-foreground mb-1">{c.label}</p>
+                  <p className={`text-xl font-semibold ${c.color}`}>৳{c.value.toFixed(2)}</p>
+                </div>
+              ))}
             </div>
-          ))}
-        </div>
-      )}
+          )}
 
-      {/* Per-partner breakdown */}
-      <div className="rounded-lg border border-border overflow-hidden">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Partner</TableHead>
-              <TableHead className="text-right">Revenue</TableHead>
-              <TableHead className="text-right">Stock Cost</TableHead>
-              <TableHead className="text-right">Expenses</TableHead>
-              <TableHead className="text-right">Net</TableHead>
-              <TableHead className="text-right">Payout</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {loading ? (
-              <TableRow>
-                <TableCell colSpan={6} className="text-center py-10 text-muted-foreground">
-                  Loading…
-                </TableCell>
-              </TableRow>
-            ) : settlement.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={6} className="text-center py-10 text-muted-foreground">
-                  No data
-                </TableCell>
-              </TableRow>
-            ) : (
-              settlement.map((p) => (
-                <TableRow key={p.partner_id}>
-                  <TableCell className="font-medium">{p.partner_name}</TableCell>
-                  <TableCell className="text-right text-green-600">
-                    ৳{p.revenue.toFixed(2)}
-                  </TableCell>
-                  <TableCell className="text-right text-muted-foreground">
-                    ৳{p.stock_cost.toFixed(2)}
-                  </TableCell>
-                  <TableCell className="text-right text-muted-foreground">
-                    ৳{p.expenses.toFixed(2)}
-                  </TableCell>
-                  <TableCell
-                    className={`text-right font-medium ${p.net < 0 ? "text-red-600" : ""}`}
-                  >
-                    ৳{p.net.toFixed(2)}
-                  </TableCell>
-                  <TableCell className="text-right font-bold text-green-700">
-                    ৳{p.payout.toFixed(2)}
-                  </TableCell>
+          {/* Per-partner breakdown */}
+          <div className="rounded-lg border border-border overflow-hidden">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Partner</TableHead>
+                  <TableHead className="text-right">Revenue</TableHead>
+                  <TableHead className="text-right">Stock Cost</TableHead>
+                  <TableHead className="text-right">Expenses</TableHead>
+                  <TableHead className="text-right">Net</TableHead>
+                  <TableHead className="text-right">Payout</TableHead>
                 </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
-      </div>
+              </TableHeader>
+              <TableBody>
+                {loading ? (
+                  <TableRow>
+                    <TableCell colSpan={6} className="text-center py-10 text-muted-foreground">
+                      Loading…
+                    </TableCell>
+                  </TableRow>
+                ) : settlement.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={6} className="text-center py-10 text-muted-foreground">
+                      No data
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  settlement.map((p) => (
+                    <TableRow key={p.partner_id}>
+                      <TableCell className="font-medium">{p.partner_name}</TableCell>
+                      <TableCell className="text-right text-green-600">
+                        ৳{p.revenue.toFixed(2)}
+                      </TableCell>
+                      <TableCell className="text-right text-muted-foreground">
+                        ৳{p.stock_cost.toFixed(2)}
+                      </TableCell>
+                      <TableCell className="text-right text-muted-foreground">
+                        ৳{p.expenses.toFixed(2)}
+                      </TableCell>
+                      <TableCell
+                        className={`text-right font-medium ${p.net < 0 ? "text-red-600" : ""}`}
+                      >
+                        ৳{p.net.toFixed(2)}
+                      </TableCell>
+                      <TableCell className="text-right font-bold text-green-700">
+                        ৳{p.payout.toFixed(2)}
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </div>
         </>
       )}
     </div>

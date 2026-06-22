@@ -15,23 +15,31 @@ export async function GET(request: Request) {
     user.role === "admin"
       ? await sql`
           SELECT c.*,
-                 a.name  AS area_name,
-                 pt.name AS tier_name,
-                 u.name  AS partner_name
+                 a.name        AS area_name,
+                 pt.name       AS tier_name,
+                 pt.unit_price AS tier_unit_price,
+                 pt.min_qty    AS tier_min_qty,
+                 p.unit        AS tier_product_unit,
+                 u.name        AS partner_name
           FROM customers c
-          LEFT JOIN areas a         ON a.id = c.area_id
+          LEFT JOIN areas a          ON a.id = c.area_id
           LEFT JOIN pricing_tiers pt ON pt.id = c.pricing_tier_id
+          LEFT JOIN products p       ON p.id = pt.product_id
           LEFT JOIN users u          ON u.id = c.partner_id
           WHERE ${activeFilter}
           ORDER BY c.name ASC
         `
       : await sql`
           SELECT c.*,
-                 a.name  AS area_name,
-                 pt.name AS tier_name
+                 a.name        AS area_name,
+                 pt.name       AS tier_name,
+                 pt.unit_price AS tier_unit_price,
+                 pt.min_qty    AS tier_min_qty,
+                 p.unit        AS tier_product_unit
           FROM customers c
           LEFT JOIN areas a          ON a.id = c.area_id
           LEFT JOIN pricing_tiers pt ON pt.id = c.pricing_tier_id
+          LEFT JOIN products p       ON p.id = pt.product_id
           WHERE c.partner_id = ${user.id} AND ${activeFilter}
           ORDER BY c.name ASC
         `;

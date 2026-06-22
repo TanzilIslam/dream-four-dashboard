@@ -46,6 +46,9 @@ type Customer = {
   area_name: string | null;
   pricing_tier_id: number | null;
   tier_name: string | null;
+  tier_unit_price: string | null;
+  tier_min_qty: number | null;
+  tier_product_unit: string | null;
   partner_name: string | null;
   due_allowed: boolean;
   max_due: string;
@@ -57,7 +60,7 @@ type Customer = {
 };
 
 type Area = { id: number; name: string };
-type Tier = { id: number; name: string; product_name: string };
+type Tier = { id: number; name: string; unit_price: string; min_qty: number; product_unit: string };
 
 type Mode = "create" | "edit";
 
@@ -170,7 +173,10 @@ export default function CustomersPage() {
   const customerType = mode === "create" ? createCustomerType : editCustomerType;
 
   const selectedAreaName = areas.find((a) => a.id === areaId)?.name;
-  const selectedTierName = tiers.find((t) => t.id === selectedTierId)?.name;
+  const selectedTier = tiers.find((t) => t.id === selectedTierId);
+  const selectedTierLabel = selectedTier
+    ? `${selectedTier.name}-${selectedTier.unit_price}tk-${selectedTier.min_qty}${selectedTier.product_unit}`
+    : null;
 
   useEffect(() => {
     fetch(`/api/customers${showInactive ? "?inactive=true" : ""}`)
@@ -252,8 +258,8 @@ export default function CustomersPage() {
       setSheetOpen(false);
       refreshCustomers();
     } else {
-      const json = await res.json();
-      toast.error(json.error ?? "Please fix the errors");
+      const json = await res.json().catch(() => null);
+      toast.error(json?.error ?? "Something went wrong");
     }
   }
 
@@ -331,7 +337,11 @@ export default function CustomersPage() {
                     )}
                   </TableCell>
                   <TableCell>{c.area_name ?? "—"}</TableCell>
-                  <TableCell>{c.tier_name ?? "—"}</TableCell>
+                  <TableCell>
+                    {c.tier_name
+                      ? `${c.tier_name}-${c.tier_unit_price}tk-${c.tier_min_qty}${c.tier_product_unit}`
+                      : "—"}
+                  </TableCell>
                   <TableCell>{c.phone ?? "—"}</TableCell>
                   <TableCell>
                     <Badge variant={c.due_allowed ? "secondary" : "outline"}>
@@ -418,14 +428,15 @@ export default function CustomersPage() {
               >
                 <SelectTrigger className="w-full">
                   <SelectValue placeholder="No tier">
-                    {selectedTierId ? selectedTierName : "No tier"}
+                    {selectedTierId ? selectedTierLabel : "No tier"}
                   </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="none">No tier</SelectItem>
                   {tiers.map((t) => (
                     <SelectItem key={t.id} value={String(t.id)}>
-                      {t.product_name} — {t.name}
+                      {t.name}-{t.unit_price}tk-{t.min_qty}
+                      {t.product_unit}
                     </SelectItem>
                   ))}
                 </SelectContent>

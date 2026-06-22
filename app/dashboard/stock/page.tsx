@@ -23,7 +23,10 @@ type StockRow = {
   available_qty: number;
 };
 
-function stockStatus(row: StockRow): { label: string; variant: "default" | "secondary" | "destructive" } {
+function stockStatus(row: StockRow): {
+  label: string;
+  variant: "default" | "secondary" | "destructive";
+} {
   if (row.available_qty <= 0) return { label: "Out of stock", variant: "destructive" };
   if (row.low_stock_threshold != null && row.available_qty <= row.low_stock_threshold)
     return { label: "Low stock", variant: "secondary" };
@@ -38,14 +41,16 @@ export default function StockPage() {
     fetch("/api/stock")
       .then((r) => r.json())
       .then((d) => {
-        setStock(d.map((row: StockRow) => ({
-          ...row,
-          purchased_qty: Number(row.purchased_qty),
-          reserved_qty: Number(row.reserved_qty),
-          delivered_qty: Number(row.delivered_qty),
-          returned_qty: Number(row.returned_qty),
-          available_qty: Number(row.available_qty),
-        })));
+        setStock(
+          d.map((row: StockRow) => ({
+            ...row,
+            purchased_qty: Number(row.purchased_qty),
+            reserved_qty: Number(row.reserved_qty),
+            delivered_qty: Number(row.delivered_qty),
+            returned_qty: Number(row.returned_qty),
+            available_qty: Number(row.available_qty),
+          }))
+        );
         setLoading(false);
       });
   }, []);
@@ -54,7 +59,9 @@ export default function StockPage() {
     <div className="space-y-4">
       <div>
         <h1 className="text-xl font-semibold">Stock</h1>
-        <p className="text-sm text-muted-foreground">Current inventory levels across all products.</p>
+        <p className="text-sm text-muted-foreground">
+          Current inventory levels across all products.
+        </p>
       </div>
 
       <div className="rounded-lg border border-border overflow-hidden">
@@ -92,17 +99,26 @@ export default function StockPage() {
                       {row.name}
                       <span className="ml-1.5 text-xs text-muted-foreground">({row.unit})</span>
                     </TableCell>
-                    <TableCell className="text-right text-muted-foreground">{row.purchased_qty}</TableCell>
-                    <TableCell className="text-right text-muted-foreground">{row.reserved_qty}</TableCell>
-                    <TableCell className="text-right text-muted-foreground">{row.delivered_qty}</TableCell>
-                    <TableCell className="text-right text-muted-foreground">{row.returned_qty}</TableCell>
+                    <TableCell className="text-right text-muted-foreground">
+                      {row.purchased_qty}
+                    </TableCell>
+                    <TableCell className="text-right text-muted-foreground">
+                      {row.reserved_qty}
+                    </TableCell>
+                    <TableCell className="text-right text-muted-foreground">
+                      {row.delivered_qty}
+                    </TableCell>
+                    <TableCell className="text-right text-muted-foreground">
+                      {row.returned_qty}
+                    </TableCell>
                     <TableCell
                       className={`text-right font-semibold ${
                         row.available_qty <= 0
                           ? "text-red-600"
-                          : row.low_stock_threshold != null && row.available_qty <= row.low_stock_threshold
-                          ? "text-yellow-600"
-                          : "text-green-600"
+                          : row.low_stock_threshold != null &&
+                              row.available_qty <= row.low_stock_threshold
+                            ? "text-yellow-600"
+                            : "text-green-600"
                       }`}
                     >
                       {row.available_qty}

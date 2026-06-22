@@ -1,8 +1,12 @@
 import { sql } from "@/lib/db";
+import { requireAdmin } from "@/lib/auth";
 import { createUserSchema } from "@/lib/schemas/user";
 import bcrypt from "bcryptjs";
 
 export async function GET() {
+  const auth = await requireAdmin();
+  if ("error" in auth) return auth.error;
+
   const users = await sql`
     SELECT id, name, email, role, permissions, created_at
     FROM users ORDER BY created_at DESC
@@ -11,6 +15,9 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
+  const auth = await requireAdmin();
+  if ("error" in auth) return auth.error;
+
   const body = await request.json();
   const parsed = createUserSchema.safeParse(body);
 

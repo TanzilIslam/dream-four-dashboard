@@ -66,7 +66,7 @@ export default function UsersPage() {
     });
     if (res.ok) {
       toast.success("Switched account");
-      window.location.href = "/dashboard/overview";
+      router.push("/dashboard/overview");
     } else {
       toast.error("Failed to switch account");
     }
