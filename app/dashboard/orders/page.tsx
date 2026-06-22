@@ -112,6 +112,7 @@ export default function OrdersPage() {
       product_id: 0,
       quantity: 1,
       unit_price: 0,
+      paid_amount: 0,
       note: "",
     },
   });
@@ -137,6 +138,11 @@ export default function OrdersPage() {
     defaultValue: 0,
   });
   const productId = useWatch({ control: createForm.control, name: "product_id", defaultValue: 0 });
+  const watchQuantity = useWatch({ control: createForm.control, name: "quantity", defaultValue: 1 });
+  const watchUnitPrice = useWatch({ control: createForm.control, name: "unit_price", defaultValue: 0 });
+  const watchPaidAmount = useWatch({ control: createForm.control, name: "paid_amount", defaultValue: 0 });
+  const orderTotal = (watchQuantity || 0) * (watchUnitPrice || 0);
+  const orderDue = Math.max(0, orderTotal - (watchPaidAmount || 0));
   const selectedCustomerName = customers.find((c) => c.id === customerId)?.name;
   const selectedProductName = products.find((p) => p.id === productId)?.name;
 
@@ -194,7 +200,7 @@ export default function OrdersPage() {
   }
 
   function openCreate() {
-    createForm.reset({ customer_id: 0, product_id: 0, quantity: 1, unit_price: 0, note: "" });
+    createForm.reset({ customer_id: 0, product_id: 0, quantity: 1, unit_price: 0, paid_amount: 0, note: "" });
     setCreateOpen(true);
   }
 
@@ -513,6 +519,36 @@ export default function OrdersPage() {
                 {...createForm.register("unit_price", { valueAsNumber: true })}
               />
             </Field>
+
+            <Field
+              label="Paid Now (৳)"
+              error={
+                (createForm.formState.errors as Record<string, { message?: string }>).paid_amount
+                  ?.message
+              }
+            >
+              <Input
+                type="number"
+                step="0.01"
+                min={0}
+                {...createForm.register("paid_amount", { valueAsNumber: true })}
+              />
+            </Field>
+
+            {orderTotal > 0 && (
+              <div className="rounded-md bg-muted/50 px-3 py-2 text-sm space-y-1">
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Order total</span>
+                  <span>৳{orderTotal.toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between font-medium">
+                  <span className="text-muted-foreground">Due after payment</span>
+                  <span className={orderDue > 0 ? "text-destructive" : "text-green-600"}>
+                    ৳{orderDue.toFixed(2)}
+                  </span>
+                </div>
+              </div>
+            )}
 
             <Field label="Note">
               <Textarea placeholder="Optional note…" {...createForm.register("note")} />

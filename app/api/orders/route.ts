@@ -62,6 +62,8 @@ export async function POST(request: Request) {
 
   const d = parsed.data;
   const total_amount = d.unit_price * d.quantity;
+  const paid_amount = d.paid_amount ?? 0;
+  const due_amount = total_amount - paid_amount;
 
   // Fetch customer to get area_id and check due limit
   const [customer] = await sql`SELECT * FROM customers WHERE id = ${d.customer_id}`;
@@ -69,27 +71,29 @@ export async function POST(request: Request) {
     return Response.json({ error: "Customer not found" }, { status: 404 });
   }
 
-  // Due limit check
-  if (!customer.due_allowed) {
-    return Response.json(
-      { error: "This customer is not allowed to carry a balance. Collect payment first." },
-      { status: 400 }
-    );
-  }
-  const [dueRow] = await sql`
-    SELECT COALESCE(SUM(due_amount), 0) AS current_due
-    FROM orders
-    WHERE customer_id = ${d.customer_id} AND status NOT IN ('cancelled', 'paid')
-  `;
-  const currentDue = Number(dueRow.current_due);
-  const maxDue = Number(customer.max_due);
-  if (currentDue + total_amount > maxDue) {
-    return Response.json(
-      {
-        error: `Due limit exceeded. Current outstanding: ৳${currentDue.toFixed(2)}, limit: ৳${maxDue.toFixed(2)}.`,
-      },
-      { status: 400 }
-    );
+  // Due limit check (only applies if this order carries a balance)
+  if (due_amount > 0) {
+    if (!customer.due_allowed) {
+      return Response.json(
+        { error: "This customer is not allowed to carry a balance. Collect full payment upfront." },
+        { status: 400 }
+      );
+    }
+    const [dueRow] = await sql`
+      SELECT COALESCE(SUM(due_amount), 0) AS current_due
+      FROM orders
+      WHERE customer_id = ${d.customer_id} AND status NOT IN ('cancelled', 'paid')
+    `;
+    const currentDue = Number(dueRow.current_due);
+    const maxDue = Number(customer.max_due);
+    if (currentDue + due_amount > maxDue) {
+      return Response.json(
+        {
+          error: `Due limit exceeded. Current outstanding: ৳${currentDue.toFixed(2)}, new due: ৳${due_amount.toFixed(2)}, total would be: ৳${(currentDue + due_amount).toFixed(2)}, limit: ৳${maxDue.toFixed(2)}.`,
+        },
+        { status: 400 }
+      );
+    }
   }
 
   // Stock availability check
@@ -112,11 +116,11 @@ export async function POST(request: Request) {
     INSERT INTO orders (
       partner_id, customer_id, area_id, product_id,
       quantity, unit_price, total_amount,
-      due_amount, status, note
+      paid_amount, due_amount, status, note
     ) VALUES (
       ${user.id}, ${d.customer_id}, ${customer.area_id}, ${d.product_id},
       ${d.quantity}, ${d.unit_price}, ${total_amount},
-      ${total_amount}, 'pending', ${d.note || null}
+      ${paid_amount}, ${due_amount}, 'pending', ${d.note || null}
     )
     RETURNING *
   `;

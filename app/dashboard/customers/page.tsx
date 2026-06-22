@@ -307,19 +307,20 @@ export default function CustomersPage() {
               <TableHead>Phone</TableHead>
               <TableHead>Due Allowed</TableHead>
               <TableHead>Status</TableHead>
+              <TableHead>Created By</TableHead>
               <TableHead className="w-[80px]" />
             </TableRow>
           </TableHeader>
           <TableBody>
             {loading ? (
               <TableRow>
-                <TableCell colSpan={8} className="text-center text-muted-foreground py-10">
+                <TableCell colSpan={9} className="text-center text-muted-foreground py-10">
                   Loading…
                 </TableCell>
               </TableRow>
             ) : customers.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={8} className="text-center text-muted-foreground py-10">
+                <TableCell colSpan={9} className="text-center text-muted-foreground py-10">
                   No customers yet
                 </TableCell>
               </TableRow>
@@ -352,6 +353,9 @@ export default function CustomersPage() {
                     <Badge variant={c.is_active ? "default" : "secondary"}>
                       {c.is_active ? "Active" : "Inactive"}
                     </Badge>
+                  </TableCell>
+                  <TableCell className="text-muted-foreground text-sm">
+                    {c.partner_name ?? "—"}
                   </TableCell>
                   <TableCell>
                     <div className="flex items-center gap-1">

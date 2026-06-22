@@ -1,12 +1,18 @@
 import { z } from "zod";
 
-export const createOrderSchema = z.object({
-  customer_id: z.number({ error: "Customer is required" }).min(1, "Customer is required"),
-  product_id: z.number({ error: "Product is required" }).min(1, "Product is required"),
-  quantity: z.number().int().min(1, "Quantity must be at least 1"),
-  unit_price: z.number().min(0, "Price must be non-negative"),
-  note: z.string().optional().or(z.literal("")),
-});
+export const createOrderSchema = z
+  .object({
+    customer_id: z.number({ error: "Customer is required" }).min(1, "Customer is required"),
+    product_id: z.number({ error: "Product is required" }).min(1, "Product is required"),
+    quantity: z.number().int().min(1, "Quantity must be at least 1"),
+    unit_price: z.number().min(0, "Price must be non-negative"),
+    paid_amount: z.number().min(0, "Paid amount must be non-negative").default(0),
+    note: z.string().optional().or(z.literal("")),
+  })
+  .refine(
+    (d) => d.paid_amount <= d.unit_price * d.quantity,
+    { message: "Paid amount cannot exceed order total", path: ["paid_amount"] }
+  );
 
 export const deliverOrderSchema = z.object({
   delivered_at: z.string().optional(),
