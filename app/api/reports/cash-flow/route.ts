@@ -19,7 +19,7 @@ export async function GET(request: Request) {
       -- Stock invested (personal money)
       COALESCE((
         SELECT SUM(actual_total) FROM purchase_requests pr
-        WHERE pr.partner_id = u.id AND pr.status = 'completed' AND pr.from_personal = true
+        WHERE pr.partner_id = u.id AND pr.status = 'purchased' AND pr.from_personal = true
           AND (${from}::date IS NULL OR pr.purchased_at >= ${from ?? null})
           AND (${to}::date IS NULL   OR pr.purchased_at <= ${to ?? null})
       ), 0) AS personal_invested,
@@ -27,7 +27,7 @@ export async function GET(request: Request) {
       -- Total stock cost
       COALESCE((
         SELECT SUM(actual_total) FROM purchase_requests pr
-        WHERE pr.partner_id = u.id AND pr.status = 'completed'
+        WHERE pr.partner_id = u.id AND pr.status = 'purchased'
           AND (${from}::date IS NULL OR pr.purchased_at >= ${from ?? null})
           AND (${to}::date IS NULL   OR pr.purchased_at <= ${to ?? null})
       ), 0) AS total_invested,

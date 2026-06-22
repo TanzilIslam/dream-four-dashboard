@@ -38,7 +38,7 @@ export async function GET(request: Request) {
     LEFT JOIN products  p ON p.id = pr.product_id
     LEFT JOIN suppliers s ON s.id = pr.supplier_id
     LEFT JOIN users     u ON u.id = pr.partner_id
-    WHERE pr.status = 'completed'
+    WHERE pr.status = 'purchased'
       ${fromFilter} ${toFilter} ${partnerFilter}
     ORDER BY pr.purchased_at DESC
   `;
@@ -49,7 +49,7 @@ export async function GET(request: Request) {
       COALESCE(SUM(actual_total) FILTER (WHERE from_personal = true), 0) AS personal_total,
       COALESCE(SUM(actual_qty), 0)                                     AS total_qty
     FROM purchase_requests pr
-    WHERE pr.status = 'completed'
+    WHERE pr.status = 'purchased'
       ${fromFilter} ${toFilter} ${partnerFilter}
   `;
 

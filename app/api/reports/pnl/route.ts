@@ -27,7 +27,7 @@ export async function GET(request: Request) {
       COALESCE((
         SELECT SUM(pr.actual_total)
         FROM purchase_requests pr
-        WHERE pr.partner_id = u.id AND pr.status = 'completed'
+        WHERE pr.partner_id = u.id AND pr.status = 'purchased'
           AND (${from ?? null}::date IS NULL OR pr.purchased_at >= ${from ?? null})
           AND (${to ?? null}::date   IS NULL OR pr.purchased_at <= ${to ?? null})
       ), 0) AS stock_cost,

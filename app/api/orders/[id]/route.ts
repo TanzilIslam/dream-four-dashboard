@@ -37,7 +37,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     const [updated] = await sql`
       UPDATE orders SET
         status       = 'delivered',
-        delivered_at = ${parsed.data.delivered_at ?? null} :: TIMESTAMPTZ
+        delivered_at = COALESCE(${parsed.data.delivered_at ?? null} :: TIMESTAMPTZ, NOW())
       WHERE id = ${id}
       RETURNING *
     `;

@@ -40,16 +40,32 @@ export async function GET() {
         p.name,
         p.unit,
         p.low_stock_threshold,
-        COALESCE(SUM(pr.actual_qty) FILTER (WHERE pr.status = 'completed'), 0)                AS purchased_qty,
-        COALESCE(SUM(o.quantity)    FILTER (WHERE o.status IN ('delivered','paid')), 0)        AS delivered_qty,
-        COALESCE(SUM(o.quantity)    FILTER (WHERE o.status = 'pending'), 0)                    AS reserved_qty,
-        COALESCE(SUM(r.quantity), 0)                                                           AS returned_qty
+        COALESCE(purchased.qty, 0)  AS purchased_qty,
+        COALESCE(delivered.qty, 0)  AS delivered_qty,
+        COALESCE(reserved.qty, 0)   AS reserved_qty,
+        COALESCE(returned.qty, 0)   AS returned_qty
       FROM products p
-      LEFT JOIN purchase_requests pr ON pr.product_id = p.id
-      LEFT JOIN orders o             ON o.product_id = p.id
-      LEFT JOIN returns r            ON r.product_id = p.id
+      LEFT JOIN (
+        SELECT product_id, SUM(actual_qty) AS qty
+        FROM purchase_requests WHERE status = 'purchased'
+        GROUP BY product_id
+      ) purchased ON purchased.product_id = p.id
+      LEFT JOIN (
+        SELECT product_id, SUM(quantity) AS qty
+        FROM orders WHERE status IN ('delivered', 'paid')
+        GROUP BY product_id
+      ) delivered ON delivered.product_id = p.id
+      LEFT JOIN (
+        SELECT product_id, SUM(quantity) AS qty
+        FROM orders WHERE status = 'pending'
+        GROUP BY product_id
+      ) reserved ON reserved.product_id = p.id
+      LEFT JOIN (
+        SELECT product_id, SUM(quantity) AS qty
+        FROM returns GROUP BY product_id
+      ) returned ON returned.product_id = p.id
       WHERE p.is_active = true
-      GROUP BY p.id, p.name, p.unit, p.low_stock_threshold
+      ORDER BY p.name ASC
     `;
 
     // ── Partner performance table (today) ─────────────────────────
