@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
-import { PlusIcon, Pencil, Power } from "lucide-react";
+import { PlusIcon, Pencil, Power, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
 
 import {
   createCustomerSchema,
@@ -79,6 +79,7 @@ export default function CustomersPage() {
   const [editingId, setEditingId] = useState<number | null>(null);
   const [confirmTarget, setConfirmTarget] = useState<Customer | null>(null);
   const [confirming, setConfirming] = useState(false);
+  const [nameSortDir, setNameSortDir] = useState<"asc" | "desc">("asc");
 
   const createForm = useForm<CreateCustomerInput>({
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -171,6 +172,10 @@ export default function CustomersPage() {
     defaultValue: null,
   });
   const customerType = mode === "create" ? createCustomerType : editCustomerType;
+
+  const sortedCustomers = [...customers].sort((a, b) =>
+    nameSortDir === "asc" ? a.name.localeCompare(b.name) : b.name.localeCompare(a.name)
+  );
 
   const selectedAreaName = areas.find((a) => a.id === areaId)?.name;
   const selectedTier = tiers.find((t) => t.id === selectedTierId);
@@ -282,7 +287,12 @@ export default function CustomersPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-xl font-semibold">Customers</h1>
-          <p className="text-sm text-muted-foreground">Manage your delivery customers.</p>
+          <p className="text-sm text-muted-foreground">
+            Manage your delivery customers.
+            {!loading && (
+              <span className="ml-1 font-medium text-foreground">{customers.length} total</span>
+            )}
+          </p>
         </div>
         <div className="flex items-center gap-3">
           <label className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -300,7 +310,19 @@ export default function CustomersPage() {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Name</TableHead>
+              <TableHead>
+                <button
+                  className="flex items-center gap-1 hover:text-foreground text-inherit"
+                  onClick={() => setNameSortDir((d) => (d === "asc" ? "desc" : "asc"))}
+                >
+                  Name
+                  {nameSortDir === "asc" ? (
+                    <ArrowUp className="size-3" />
+                  ) : (
+                    <ArrowDown className="size-3" />
+                  )}
+                </button>
+              </TableHead>
               <TableHead>Type</TableHead>
               <TableHead>Area</TableHead>
               <TableHead>Pricing Tier</TableHead>
@@ -325,7 +347,7 @@ export default function CustomersPage() {
                 </TableCell>
               </TableRow>
             ) : (
-              customers.map((c) => (
+              sortedCustomers.map((c) => (
                 <TableRow key={c.id}>
                   <TableCell className="font-medium">{c.name}</TableCell>
                   <TableCell>

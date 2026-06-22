@@ -1,11 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
-import { PlusIcon, Truck, BanknoteIcon, XCircle } from "lucide-react";
+import { PlusIcon, Truck, BanknoteIcon, XCircle, ChevronsUpDown, Check } from "lucide-react";
 
 import {
   createOrderSchema,
@@ -455,25 +455,13 @@ export default function OrdersPage() {
                   ?.message
               }
             >
-              <Select
-                value={customerId ? String(customerId) : ""}
-                onValueChange={(v) =>
-                  createForm.setValue("customer_id", Number(v), { shouldValidate: true })
+              <CustomerSearch
+                customers={customers}
+                value={customerId}
+                onChange={(id) =>
+                  createForm.setValue("customer_id", id, { shouldValidate: true })
                 }
-              >
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Select customer">
-                    {selectedCustomerName ?? undefined}
-                  </SelectValue>
-                </SelectTrigger>
-                <SelectContent>
-                  {customers.map((c) => (
-                    <SelectItem key={c.id} value={String(c.id)}>
-                      {c.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              />
             </Field>
 
             <Field
@@ -666,6 +654,91 @@ export default function OrdersPage() {
           </form>
         </SheetContent>
       </Sheet>
+    </div>
+  );
+}
+
+function CustomerSearch({
+  customers,
+  value,
+  onChange,
+}: {
+  customers: Customer[];
+  value: number;
+  onChange: (id: number) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState("");
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  const filtered = customers.filter((c) =>
+    c.name.toLowerCase().includes(search.toLowerCase())
+  );
+  const selected = customers.find((c) => c.id === value);
+
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, []);
+
+  return (
+    <div ref={containerRef} className="relative">
+      <button
+        type="button"
+        className="flex items-center justify-between w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+        onClick={() => {
+          setOpen((o) => !o);
+          setSearch("");
+        }}
+      >
+        <span className={selected ? "" : "text-muted-foreground"}>
+          {selected ? selected.name : "Select customer"}
+        </span>
+        <ChevronsUpDown className="size-4 shrink-0 opacity-50" />
+      </button>
+      {open && (
+        <div className="absolute z-50 mt-1 w-full rounded-md border bg-popover shadow-md">
+          <div className="p-2">
+            <input
+              autoFocus
+              className="w-full rounded-sm border border-input bg-background px-2 py-1 text-sm outline-none placeholder:text-muted-foreground"
+              placeholder="Search customer…"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+          </div>
+          <ul className="max-h-48 overflow-y-auto py-1">
+            {filtered.length === 0 ? (
+              <li className="px-3 py-2 text-sm text-muted-foreground">No customers found</li>
+            ) : (
+              filtered.map((c) => (
+                <li
+                  key={c.id}
+                  className="flex items-center gap-2 px-3 py-2 text-sm cursor-pointer hover:bg-accent hover:text-accent-foreground"
+                  onMouseDown={() => {
+                    onChange(c.id);
+                    setOpen(false);
+                    setSearch("");
+                  }}
+                >
+                  <Check
+                    className={`size-3.5 shrink-0 ${c.id === value ? "opacity-100" : "opacity-0"}`}
+                  />
+                  {c.name}
+                  {c.area_name && (
+                    <span className="ml-auto text-xs text-muted-foreground">{c.area_name}</span>
+                  )}
+                </li>
+              ))
+            )}
+          </ul>
+        </div>
+      )}
     </div>
   );
 }

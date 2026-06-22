@@ -16,6 +16,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 function PaymentConfigInner() {
   const [loading, setLoading] = useState(true);
+  const [applyingToAll, setApplyingToAll] = useState(false);
 
   const form = useForm<z.input<typeof paymentConfigSchema>, unknown, PaymentConfigInput>({
     resolver: zodResolver(paymentConfigSchema),
@@ -46,6 +47,22 @@ function PaymentConfigInner() {
       });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  async function applyToAll() {
+    const max_due = form.getValues("max_due_per_customer");
+    setApplyingToAll(true);
+    const res = await fetch("/api/customers/apply-max-due", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ max_due }),
+    });
+    setApplyingToAll(false);
+    if (res.ok) {
+      toast.success("Max due applied to all customers");
+    } else {
+      toast.error("Failed to apply to all customers");
+    }
+  }
 
   async function onSubmit(data: PaymentConfigInput) {
     const res = await fetch("/api/settings/payment-config", {
@@ -93,12 +110,27 @@ function PaymentConfigInner() {
 
               <div className="space-y-1.5">
                 <Label>Max Due Per Customer (৳)</Label>
-                <Input type="number" step="0.01" {...form.register("max_due_per_customer")} />
+                <div className="flex gap-2">
+                  <Input type="number" step="0.01" {...form.register("max_due_per_customer")} />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled={applyingToAll}
+                    onClick={applyToAll}
+                    className="shrink-0"
+                  >
+                    {applyingToAll ? "Applying…" : "Apply to All"}
+                  </Button>
+                </div>
                 {form.formState.errors.max_due_per_customer && (
                   <p className="text-xs text-destructive">
                     {form.formState.errors.max_due_per_customer.message}
                   </p>
                 )}
+                <p className="text-xs text-muted-foreground">
+                  "Apply to All" will overwrite every customer's individual max due limit.
+                </p>
               </div>
 
               <div className="space-y-1.5">
