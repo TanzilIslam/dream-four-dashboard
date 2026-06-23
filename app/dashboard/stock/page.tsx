@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
+import { useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
 import { PlusIcon, Trash2Icon } from "lucide-react";
@@ -78,7 +79,6 @@ export default function StockPage() {
   const [isAdmin, setIsAdmin] = useState(false);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [adjType, setAdjType] = useState<"deduct" | "add">("deduct");
-  const [submitting, setSubmitting] = useState(false);
 
   const form = useForm<CreateStockAdjustmentInput>({
     resolver: zodResolver(createStockAdjustmentSchema),
@@ -91,20 +91,25 @@ export default function StockPage() {
     },
   });
 
+  const productId = useWatch({ control: form.control, name: "product_id", defaultValue: 0 });
+  const selectedProductName = products.find((p) => p.id === productId)?.name;
+
+  function parseStock(data: StockRow[]) {
+    return data.map((row) => ({
+      ...row,
+      purchased_qty: Number(row.purchased_qty),
+      reserved_qty: Number(row.reserved_qty),
+      delivered_qty: Number(row.delivered_qty),
+      returned_qty: Number(row.returned_qty),
+      adjusted_qty: Number(row.adjusted_qty),
+      available_qty: Number(row.available_qty),
+    }));
+  }
+
   async function loadStock() {
     const res = await fetch("/api/stock");
     const data = await res.json();
-    setStock(
-      data.map((row: StockRow) => ({
-        ...row,
-        purchased_qty: Number(row.purchased_qty),
-        reserved_qty: Number(row.reserved_qty),
-        delivered_qty: Number(row.delivered_qty),
-        returned_qty: Number(row.returned_qty),
-        adjusted_qty: Number(row.adjusted_qty),
-        available_qty: Number(row.available_qty),
-      }))
-    );
+    setStock(parseStock(data));
   }
 
   async function loadAdjustments() {
@@ -113,7 +118,12 @@ export default function StockPage() {
   }
 
   useEffect(() => {
-    Promise.all([loadStock()]).then(() => setLoading(false));
+    fetch("/api/stock")
+      .then((r) => r.json())
+      .then((data) => {
+        setStock(parseStock(data));
+        setLoading(false);
+      });
 
     fetch("/api/auth/me")
       .then((r) => (r.ok ? r.json() : { user: null }))
@@ -127,7 +137,7 @@ export default function StockPage() {
 
     fetch("/api/settings/products")
       .then((r) => r.json())
-      .then((data: Product[]) => setProducts(data.filter((p) => p)));
+      .then((data: Product[]) => setProducts(data));
   }, []);
 
   function openSheet() {
@@ -143,7 +153,6 @@ export default function StockPage() {
   }
 
   async function onSubmit(values: CreateStockAdjustmentInput) {
-    setSubmitting(true);
     const payload = {
       ...values,
       quantity: adjType === "deduct" ? -Math.abs(values.quantity) : Math.abs(values.quantity),
@@ -153,7 +162,6 @@ export default function StockPage() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
     });
-    setSubmitting(false);
     if (!res.ok) {
       const err = await res.json();
       toast.error(err.error ?? "Failed to save adjustment");
@@ -175,8 +183,8 @@ export default function StockPage() {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-start justify-between">
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
         <div>
           <h1 className="text-xl font-semibold">Stock</h1>
           <p className="text-sm text-muted-foreground">
@@ -185,7 +193,7 @@ export default function StockPage() {
         </div>
         {isAdmin && (
           <Button size="sm" onClick={openSheet}>
-            <PlusIcon className="mr-1.5 h-4 w-4" />
+            <PlusIcon className="size-4" />
             Log Adjustment
           </Button>
         )}
@@ -247,12 +255,12 @@ export default function StockPage() {
                     </TableCell>
                     {isAdmin && (
                       <TableCell
-                        className={`text-right text-muted-foreground ${
-                          row.adjusted_qty !== 0
-                            ? row.adjusted_qty < 0
-                              ? "text-red-500"
-                              : "text-blue-500"
-                            : ""
+                        className={`text-right ${
+                          row.adjusted_qty < 0
+                            ? "text-red-500"
+                            : row.adjusted_qty > 0
+                              ? "text-blue-500"
+                              : "text-muted-foreground"
                         }`}
                       >
                         {row.adjusted_qty !== 0
@@ -322,10 +330,10 @@ export default function StockPage() {
                       {adj.quantity > 0 ? `+${adj.quantity}` : adj.quantity}
                     </TableCell>
                     <TableCell>{adj.reason}</TableCell>
-                    <TableCell className="text-muted-foreground">{adj.date.slice(0, 10)}</TableCell>
-                    <TableCell className="text-muted-foreground text-sm">
-                      {adj.note ?? "—"}
+                    <TableCell className="text-muted-foreground">
+                      {new Date(adj.date).toLocaleDateString()}
                     </TableCell>
+                    <TableCell className="text-muted-foreground">{adj.note ?? "—"}</TableCell>
                     <TableCell>
                       <Button
                         variant="ghost"
@@ -346,23 +354,28 @@ export default function StockPage() {
 
       {/* Log Adjustment Sheet */}
       <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
-        <SheetContent>
+        <SheetContent className="w-full sm:max-w-md overflow-y-auto">
           <SheetHeader>
-            <SheetTitle>Log Stock Adjustment</SheetTitle>
+            <SheetTitle>Log Stock Adjustmentss</SheetTitle>
           </SheetHeader>
 
-          <form onSubmit={form.handleSubmit(onSubmit)} className="mt-6 space-y-4">
-            {/* Product */}
-            <div className="space-y-1.5">
-              <Label>Product</Label>
+          <form onSubmit={form.handleSubmit(onSubmit)} className="mt-6 space-y-5 px-4 pb-8">
+            <Field
+              label="Product"
+              error={
+                (form.formState.errors as Record<string, { message?: string }>).product_id?.message
+              }
+            >
               <Select
-                value={form.watch("product_id") ? String(form.watch("product_id")) : ""}
+                value={productId ? String(productId) : ""}
                 onValueChange={(v) =>
                   form.setValue("product_id", Number(v), { shouldValidate: true })
                 }
               >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select product" />
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Select product">
+                    {selectedProductName ?? undefined}
+                  </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   {products.map((p) => (
@@ -372,23 +385,16 @@ export default function StockPage() {
                   ))}
                 </SelectContent>
               </Select>
-              {form.formState.errors.product_id && (
-                <p className="text-xs text-destructive">
-                  {form.formState.errors.product_id.message}
-                </p>
-              )}
-            </div>
+            </Field>
 
-            {/* Type toggle */}
-            <div className="space-y-1.5">
-              <Label>Type</Label>
+            <Field label="Type">
               <div className="flex rounded-md border border-border overflow-hidden">
                 <button
                   type="button"
                   onClick={() => setAdjType("deduct")}
-                  className={`flex-1 py-2 text-sm transition-colors ${
+                  className={`flex-1 py-1 text-sm transition-colors ${
                     adjType === "deduct"
-                      ? "bg-destructive text-destructive-foreground"
+                      ? "bg-destructive text-white"
                       : "bg-background text-muted-foreground hover:bg-muted"
                   }`}
                 >
@@ -397,7 +403,7 @@ export default function StockPage() {
                 <button
                   type="button"
                   onClick={() => setAdjType("add")}
-                  className={`flex-1 py-2 text-sm transition-colors ${
+                  className={`flex-1 py-1 text-sm transition-colors ${
                     adjType === "add"
                       ? "bg-primary text-primary-foreground"
                       : "bg-background text-muted-foreground hover:bg-muted"
@@ -406,54 +412,65 @@ export default function StockPage() {
                   Add (correction)
                 </button>
               </div>
-            </div>
+            </Field>
 
-            {/* Quantity */}
-            <div className="space-y-1.5">
-              <Label>Quantity</Label>
+            <Field label="Quantity" error={form.formState.errors.quantity?.message}>
               <Input
                 type="number"
                 min={1}
                 {...form.register("quantity", { valueAsNumber: true })}
               />
-              {form.formState.errors.quantity && (
-                <p className="text-xs text-destructive">{form.formState.errors.quantity.message}</p>
-              )}
-            </div>
+            </Field>
 
-            {/* Reason */}
-            <div className="space-y-1.5">
-              <Label>Reason</Label>
+            <Field label="Reason" error={form.formState.errors.reason?.message}>
               <Input
                 placeholder='e.g. "broken", "expired", "recount"'
                 {...form.register("reason")}
               />
-              {form.formState.errors.reason && (
-                <p className="text-xs text-destructive">{form.formState.errors.reason.message}</p>
-              )}
-            </div>
+            </Field>
 
-            {/* Date */}
-            <div className="space-y-1.5">
-              <Label>Date</Label>
+            <Field label="Date" error={form.formState.errors.date?.message}>
               <Input type="date" {...form.register("date")} />
-              {form.formState.errors.date && (
-                <p className="text-xs text-destructive">{form.formState.errors.date.message}</p>
-              )}
-            </div>
+            </Field>
 
-            {/* Note */}
-            <div className="space-y-1.5">
-              <Label>Note (optional)</Label>
+            <Field label="Note (optional)">
               <Textarea rows={2} {...form.register("note")} />
-            </div>
+            </Field>
 
-            <Button type="submit" className="w-full" disabled={submitting}>
-              {submitting ? "Saving…" : "Save Adjustment"}
-            </Button>
+            <div className="flex gap-2 pt-2">
+              <Button type="submit" disabled={form.formState.isSubmitting} className="w-1/2">
+                {form.formState.isSubmitting ? "Saving…" : "Save Adjustment"}
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setSheetOpen(false)}
+                className="w-1/2"
+              >
+                Cancel
+              </Button>
+            </div>
           </form>
         </SheetContent>
       </Sheet>
+    </div>
+  );
+}
+
+function Field({
+  label,
+  error,
+  children,
+}: {
+  label: string;
+  error?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="space-y-1.5">
+      <Label>{label}</Label>
+      {children}
+      {error && <p className="text-xs text-destructive">{error}</p>}
     </div>
   );
 }
