@@ -10,8 +10,7 @@ export async function GET(request: Request) {
   const url = new URL(request.url);
   const status = url.searchParams.get("status"); // pending | approved | rejected | purchased | all
 
-  const statusFilter =
-    status && status !== "all" ? sql`AND pr.status = ${status}` : sql`AND pr.status != 'purchased'`;
+  const statusFilter = status && status !== "all" ? sql`AND pr.status = ${status}` : sql``;
 
   const requests =
     user.role === "admin"

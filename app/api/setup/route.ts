@@ -332,6 +332,19 @@ export async function GET() {
     )
   `;
 
+  await sql`
+    CREATE TABLE IF NOT EXISTS stock_adjustments (
+      id          SERIAL PRIMARY KEY,
+      product_id  INTEGER NOT NULL REFERENCES products(id),
+      quantity    INTEGER NOT NULL,
+      reason      TEXT    NOT NULL,
+      date        DATE    NOT NULL,
+      note        TEXT,
+      created_by  INTEGER REFERENCES users(id),
+      created_at  TIMESTAMPTZ DEFAULT NOW()
+    )
+  `;
+
   // Add customer_type column if missing
   await sql`ALTER TABLE customers ADD COLUMN IF NOT EXISTS customer_type TEXT`;
 

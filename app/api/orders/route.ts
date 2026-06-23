@@ -102,6 +102,7 @@ export async function POST(request: Request) {
       COALESCE((SELECT SUM(actual_qty) FROM purchase_requests WHERE product_id = ${d.product_id} AND status = 'purchased'), 0)
       - COALESCE((SELECT SUM(quantity) FROM orders WHERE product_id = ${d.product_id} AND status IN ('pending', 'delivered')), 0)
       + COALESCE((SELECT SUM(quantity) FROM returns WHERE product_id = ${d.product_id}), 0)
+      + COALESCE((SELECT SUM(quantity) FROM stock_adjustments WHERE product_id = ${d.product_id}), 0)
       AS available
   `;
   const available = Number(stockRow.available);

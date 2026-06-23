@@ -409,10 +409,29 @@ function AdminDashboard({ data }: { data: AdminData | null }) {
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
           {viewMode === "today" ? (
             <>
-              <KpiCard label="Eggs Sold" value={Number(t.eggs_sold)} yesterday={Number(y.eggs_sold)} />
-              <KpiCard label="Cash In" prefix="৳" value={Number(t.cash_in)} yesterday={Number(y.cash_in)} />
-              <KpiCard label="New Due" prefix="৳" value={Number(t.new_due)} yesterday={Number(y.new_due)} />
-              <KpiCard label="Expenses" prefix="৳" value={Number(t.expenses)} yesterday={Number(y.expenses)} />
+              <KpiCard
+                label="Eggs Sold"
+                value={Number(t.eggs_sold)}
+                yesterday={Number(y.eggs_sold)}
+              />
+              <KpiCard
+                label="Cash In"
+                prefix="৳"
+                value={Number(t.cash_in)}
+                yesterday={Number(y.cash_in)}
+              />
+              <KpiCard
+                label="New Due"
+                prefix="৳"
+                value={Number(t.new_due)}
+                yesterday={Number(y.new_due)}
+              />
+              <KpiCard
+                label="Expenses"
+                prefix="৳"
+                value={Number(t.expenses)}
+                yesterday={Number(y.expenses)}
+              />
             </>
           ) : (
             <>

@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
-import { PlusIcon, Trash2, CheckCircle2, XCircle, ShoppingBag } from "lucide-react";
+import { PlusIcon, Trash2, CheckCircle2, XCircle, ShoppingBag, Eye } from "lucide-react";
 import { useWatch } from "react-hook-form";
 
 import {
@@ -89,6 +89,7 @@ export default function PurchaseRequestsPage() {
   const [rejectTarget, setRejectTarget] = useState<PurchaseRequest | null>(null);
   const [rejecting, setRejecting] = useState(false);
   const [purchaseTarget, setPurchaseTarget] = useState<PurchaseRequest | null>(null);
+  const [detailsTarget, setDetailsTarget] = useState<PurchaseRequest | null>(null);
 
   const createForm = useForm<CreatePurchaseRequestInput>({
     resolver: zodResolver(createPurchaseRequestSchema),
@@ -270,7 +271,7 @@ export default function PurchaseRequestsPage() {
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">All active</SelectItem>
+            <SelectItem value="all">All</SelectItem>
             <SelectItem value="pending">Pending</SelectItem>
             <SelectItem value="approved">Approved</SelectItem>
             <SelectItem value="rejected">Rejected</SelectItem>
@@ -395,6 +396,18 @@ export default function PurchaseRequestsPage() {
                           title="Mark as purchased"
                         >
                           <ShoppingBag className="size-3.5" />
+                        </Button>
+                      )}
+                      {/* View details for purchased items */}
+                      {r.status === "purchased" && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => setDetailsTarget(r)}
+                          className="size-7 text-muted-foreground hover:text-foreground"
+                          title="View details"
+                        >
+                          <Eye className="size-3.5" />
                         </Button>
                       )}
                     </div>
@@ -628,6 +641,101 @@ export default function PurchaseRequestsPage() {
         loading={rejecting}
         onConfirm={handleReject}
       />
+
+      {/* Purchase details sidebar */}
+      <Sheet open={detailsTarget !== null} onOpenChange={(open) => !open && setDetailsTarget(null)}>
+        <SheetContent className="w-full sm:max-w-md overflow-y-auto">
+          <SheetHeader>
+            <SheetTitle>Purchase Details</SheetTitle>
+          </SheetHeader>
+          {detailsTarget && (
+            <div className="mt-6 px-4 pb-8 space-y-6">
+              {/* Request info */}
+              <section className="space-y-3">
+                <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  Request
+                </h3>
+                <dl className="space-y-2">
+                  {isAdmin && detailsTarget.partner_name && (
+                    <DetailRow label="Partner" value={detailsTarget.partner_name} />
+                  )}
+                  <DetailRow
+                    label="Product"
+                    value={`${detailsTarget.product_name ?? "—"} ${detailsTarget.product_unit ? `(${detailsTarget.product_unit})` : ""}`}
+                  />
+                  <DetailRow label="Supplier" value={detailsTarget.supplier_name ?? "—"} />
+                  <DetailRow label="Requested Qty" value={String(detailsTarget.requested_qty)} />
+                  <DetailRow
+                    label="Est. Price / Unit"
+                    value={
+                      detailsTarget.estimated_price
+                        ? `৳${Number(detailsTarget.estimated_price).toFixed(2)}`
+                        : "—"
+                    }
+                  />
+                  <DetailRow
+                    label="Est. Total"
+                    value={
+                      detailsTarget.estimated_total
+                        ? `৳${Number(detailsTarget.estimated_total).toFixed(2)}`
+                        : "—"
+                    }
+                  />
+                  {detailsTarget.note && <DetailRow label="Note" value={detailsTarget.note} />}
+                  <DetailRow
+                    label="Submitted"
+                    value={new Date(detailsTarget.created_at).toLocaleDateString()}
+                  />
+                </dl>
+              </section>
+
+              <div className="border-t border-border" />
+
+              {/* Purchase info */}
+              <section className="space-y-3">
+                <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  Purchase
+                </h3>
+                <dl className="space-y-2">
+                  <DetailRow label="Actual Qty" value={String(detailsTarget.actual_qty ?? "—")} />
+                  <DetailRow
+                    label="Actual Price / Unit"
+                    value={
+                      detailsTarget.actual_price
+                        ? `৳${Number(detailsTarget.actual_price).toFixed(2)}`
+                        : "—"
+                    }
+                  />
+                  <DetailRow
+                    label="Actual Total"
+                    value={
+                      detailsTarget.actual_total
+                        ? `৳${Number(detailsTarget.actual_total).toFixed(2)}`
+                        : "—"
+                    }
+                  />
+                  <DetailRow
+                    label="Purchase Date"
+                    value={
+                      detailsTarget.purchased_at
+                        ? new Date(detailsTarget.purchased_at).toLocaleDateString()
+                        : "—"
+                    }
+                  />
+                  <DetailRow label="Payment Method" value={detailsTarget.payment_method || "—"} />
+                  <DetailRow
+                    label="From Personal Funds"
+                    value={detailsTarget.from_personal ? "Yes" : "No"}
+                  />
+                  {detailsTarget.admin_note && (
+                    <DetailRow label="Admin Note" value={detailsTarget.admin_note} />
+                  )}
+                </dl>
+              </section>
+            </div>
+          )}
+        </SheetContent>
+      </Sheet>
     </div>
   );
 }
@@ -646,6 +754,15 @@ function Field({
       <Label>{label}</Label>
       {children}
       {error && <p className="text-xs text-destructive">{error}</p>}
+    </div>
+  );
+}
+
+function DetailRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-start justify-between gap-4">
+      <dt className="text-sm text-muted-foreground shrink-0">{label}</dt>
+      <dd className="text-sm font-medium text-right">{value}</dd>
     </div>
   );
 }

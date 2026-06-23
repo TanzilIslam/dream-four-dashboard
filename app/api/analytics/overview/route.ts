@@ -54,7 +54,13 @@ export async function GET() {
         COALESCE(purchased.qty, 0)  AS purchased_qty,
         COALESCE(delivered.qty, 0)  AS delivered_qty,
         COALESCE(reserved.qty, 0)   AS reserved_qty,
-        COALESCE(returned.qty, 0)   AS returned_qty
+        COALESCE(returned.qty, 0)   AS returned_qty,
+        COALESCE(adjusted.qty, 0)   AS adjusted_qty,
+        COALESCE(purchased.qty, 0)
+          - COALESCE(reserved.qty, 0)
+          - COALESCE(delivered.qty, 0)
+          + COALESCE(returned.qty, 0)
+          + COALESCE(adjusted.qty, 0) AS available_qty
       FROM products p
       LEFT JOIN (
         SELECT product_id, SUM(actual_qty) AS qty
@@ -75,6 +81,11 @@ export async function GET() {
         SELECT product_id, SUM(quantity) AS qty
         FROM returns GROUP BY product_id
       ) returned ON returned.product_id = p.id
+      LEFT JOIN (
+        SELECT product_id, COALESCE(SUM(quantity), 0) AS qty
+        FROM stock_adjustments
+        GROUP BY product_id
+      ) adjusted ON adjusted.product_id = p.id
       WHERE p.is_active = true
       ORDER BY p.name ASC
     `;
