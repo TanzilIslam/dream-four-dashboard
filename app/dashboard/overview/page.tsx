@@ -17,10 +17,13 @@ import { Badge } from "@/components/ui/badge";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
+type KpiRow = { eggs_sold: string; cash_in: string; new_due: string; expenses: string };
+
 type AdminData = {
   kpi: {
-    today: { eggs_sold: string; cash_in: string; new_due: string; expenses: string };
-    yesterday: { eggs_sold: string; cash_in: string; new_due: string; expenses: string };
+    today: KpiRow;
+    yesterday: KpiRow;
+    allTime: KpiRow;
   };
   stock: {
     id: number;
@@ -51,15 +54,18 @@ type AdminData = {
   };
 };
 
+type PartnerStatsRow = {
+  eggs_delivered: string;
+  cash_collected: string;
+  due_added: string;
+  expenses: string;
+  pending_tasks: string;
+  completed_tasks: string;
+};
+
 type PartnerData = {
-  stats: {
-    eggs_delivered: string;
-    cash_collected: string;
-    due_added: string;
-    expenses: string;
-    pending_tasks: string;
-    completed_tasks: string;
-  };
+  stats: PartnerStatsRow;
+  allTimeStats: PartnerStatsRow;
 };
 
 type Reminder = {
@@ -112,10 +118,10 @@ function KpiCard({
 }: {
   label: string;
   value: number;
-  yesterday: number;
+  yesterday?: number;
   prefix?: string;
 }) {
-  const pct = delta(value, yesterday);
+  const pct = yesterday !== undefined ? delta(value, yesterday) : null;
   return (
     <div className="rounded-lg border border-border p-4 space-y-1">
       <p className="text-xs text-muted-foreground">{label}</p>
@@ -123,10 +129,12 @@ function KpiCard({
         {prefix}
         {value.toLocaleString()}
       </p>
-      <div className="flex items-center gap-1">
-        <DeltaBadge pct={pct} />
-        <span className="text-xs text-muted-foreground">vs yesterday</span>
-      </div>
+      {yesterday !== undefined && (
+        <div className="flex items-center gap-1">
+          <DeltaBadge pct={pct} />
+          <span className="text-xs text-muted-foreground">vs yesterday</span>
+        </div>
+      )}
     </div>
   );
 }
@@ -186,12 +194,14 @@ function PartnerDashboard({
   data: PartnerData | null;
   reminders: Reminder | null;
 }) {
+  const [viewMode, setViewMode] = useState<"today" | "alltime">("today");
+
   const today = new Date().toLocaleDateString(undefined, {
     weekday: "long",
     month: "short",
     day: "numeric",
   });
-  const s = data?.stats;
+  const s = viewMode === "today" ? data?.stats : data?.allTimeStats;
 
   return (
     <div className="space-y-6">
@@ -201,6 +211,12 @@ function PartnerDashboard({
       </div>
 
       {/* Quick stats */}
+      <div className="flex items-center justify-between mb-2">
+        <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+          {viewMode === "today" ? "Today" : "All Time"}
+        </h2>
+        <ViewToggle value={viewMode} onChange={setViewMode} />
+      </div>
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
         <StatCard label="Eggs Delivered" value={s ? String(s.eggs_delivered) : "—"} />
         <StatCard
@@ -311,9 +327,46 @@ function PartnerDashboard({
   );
 }
 
+// ─── Toggle ───────────────────────────────────────────────────────────────────
+
+function ViewToggle({
+  value,
+  onChange,
+}: {
+  value: "today" | "alltime";
+  onChange: (v: "today" | "alltime") => void;
+}) {
+  return (
+    <div className="flex rounded-md border border-border overflow-hidden text-xs font-medium">
+      <button
+        onClick={() => onChange("today")}
+        className={`px-3 py-1 transition-colors ${
+          value === "today"
+            ? "bg-foreground text-background"
+            : "bg-background text-muted-foreground hover:text-foreground"
+        }`}
+      >
+        Today
+      </button>
+      <button
+        onClick={() => onChange("alltime")}
+        className={`px-3 py-1 transition-colors ${
+          value === "alltime"
+            ? "bg-foreground text-background"
+            : "bg-background text-muted-foreground hover:text-foreground"
+        }`}
+      >
+        All Time
+      </button>
+    </div>
+  );
+}
+
 // ─── Admin Dashboard ──────────────────────────────────────────────────────────
 
 function AdminDashboard({ data }: { data: AdminData | null }) {
+  const [viewMode, setViewMode] = useState<"today" | "alltime">("today");
+
   const today = new Date().toLocaleDateString(undefined, {
     weekday: "long",
     month: "short",
@@ -331,6 +384,7 @@ function AdminDashboard({ data }: { data: AdminData | null }) {
 
   const t = data.kpi.today;
   const y = data.kpi.yesterday;
+  const at = data.kpi.allTime;
 
   const pendingCount =
     Number(data.pending.purchase_requests) +
@@ -346,29 +400,28 @@ function AdminDashboard({ data }: { data: AdminData | null }) {
 
       {/* KPI cards */}
       <section className="space-y-2">
-        <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-          Today
-        </h2>
+        <div className="flex items-center justify-between">
+          <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            {viewMode === "today" ? "Today" : "All Time"}
+          </h2>
+          <ViewToggle value={viewMode} onChange={setViewMode} />
+        </div>
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-          <KpiCard label="Eggs Sold" value={Number(t.eggs_sold)} yesterday={Number(y.eggs_sold)} />
-          <KpiCard
-            label="Cash In"
-            prefix="৳"
-            value={Number(t.cash_in)}
-            yesterday={Number(y.cash_in)}
-          />
-          <KpiCard
-            label="New Due"
-            prefix="৳"
-            value={Number(t.new_due)}
-            yesterday={Number(y.new_due)}
-          />
-          <KpiCard
-            label="Expenses"
-            prefix="৳"
-            value={Number(t.expenses)}
-            yesterday={Number(y.expenses)}
-          />
+          {viewMode === "today" ? (
+            <>
+              <KpiCard label="Eggs Sold" value={Number(t.eggs_sold)} yesterday={Number(y.eggs_sold)} />
+              <KpiCard label="Cash In" prefix="৳" value={Number(t.cash_in)} yesterday={Number(y.cash_in)} />
+              <KpiCard label="New Due" prefix="৳" value={Number(t.new_due)} yesterday={Number(y.new_due)} />
+              <KpiCard label="Expenses" prefix="৳" value={Number(t.expenses)} yesterday={Number(y.expenses)} />
+            </>
+          ) : (
+            <>
+              <KpiCard label="Eggs Sold" value={Number(at.eggs_sold)} />
+              <KpiCard label="Cash In" prefix="৳" value={Number(at.cash_in)} />
+              <KpiCard label="Total Due Added" prefix="৳" value={Number(at.new_due)} />
+              <KpiCard label="Expenses" prefix="৳" value={Number(at.expenses)} />
+            </>
+          )}
         </div>
       </section>
 

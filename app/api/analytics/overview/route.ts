@@ -33,6 +33,17 @@ export async function GET() {
       WHERE o.status IN ('delivered', 'paid')
     `;
 
+    // ── KPI cards: all time ───────────────────────────────────────
+    const [allTimeKpi] = await sql`
+      SELECT
+        COALESCE(SUM(o.quantity), 0)    AS eggs_sold,
+        COALESCE(SUM(o.paid_amount), 0) AS cash_in,
+        COALESCE(SUM(o.due_amount), 0)  AS new_due,
+        COALESCE((SELECT SUM(amount) FROM expenses), 0) AS expenses
+      FROM orders o
+      WHERE o.status IN ('delivered', 'paid')
+    `;
+
     // ── Stock per product ─────────────────────────────────────────
     const stock = await sql`
       SELECT
@@ -114,7 +125,7 @@ export async function GET() {
     `;
 
     return Response.json({
-      kpi: { today: todayKpi, yesterday: ydayKpi },
+      kpi: { today: todayKpi, yesterday: ydayKpi, allTime: allTimeKpi },
       stock,
       partners,
       pending,
@@ -136,5 +147,18 @@ export async function GET() {
     WHERE o.partner_id = ${user.id} AND o.status IN ('delivered','paid')
   `;
 
-  return Response.json({ stats: myStats });
+  // ── Partner all-time summary ──────────────────────────────────
+  const [myAllTimeStats] = await sql`
+    SELECT
+      COALESCE(SUM(o.quantity), 0)    AS eggs_delivered,
+      COALESCE(SUM(o.paid_amount), 0) AS cash_collected,
+      COALESCE(SUM(o.due_amount), 0)  AS due_added,
+      (SELECT COALESCE(SUM(amount), 0) FROM expenses WHERE partner_id = ${user.id}) AS expenses,
+      (SELECT COUNT(*) FROM tasks WHERE assigned_to = ${user.id} AND status = 'pending')   AS pending_tasks,
+      (SELECT COUNT(*) FROM tasks WHERE assigned_to = ${user.id} AND status = 'completed') AS completed_tasks
+    FROM orders o
+    WHERE o.partner_id = ${user.id} AND o.status IN ('delivered','paid')
+  `;
+
+  return Response.json({ stats: myStats, allTimeStats: myAllTimeStats });
 }
