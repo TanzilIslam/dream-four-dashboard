@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
-import { PlusIcon, Pencil, Power, ArrowUp, ArrowDown } from "lucide-react";
+import { PlusIcon, Pencil, Power, ArrowUp, ArrowDown, SlidersHorizontal, X } from "lucide-react";
 
 import {
   createCustomerSchema,
@@ -64,6 +64,26 @@ type Tier = { id: number; name: string; unit_price: string; min_qty: number; pro
 
 type Mode = "create" | "edit";
 
+type Filters = {
+  search: string;
+  area_id: string;
+  customer_type: string;
+  pricing_tier_id: string;
+  due_allowed: string;
+  status: string;
+  delivery_frequency: string;
+};
+
+const DEFAULT_FILTERS: Filters = {
+  search: "",
+  area_id: "all",
+  customer_type: "all",
+  pricing_tier_id: "all",
+  due_allowed: "all",
+  status: "active",
+  delivery_frequency: "all",
+};
+
 export default function CustomersPage() {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [areas, setAreas] = useState<Area[]>([]);
@@ -73,13 +93,17 @@ export default function CustomersPage() {
     max_due_per_customer: string;
   } | null>(null);
   const [loading, setLoading] = useState(true);
-  const [showInactive, setShowInactive] = useState(false);
   const [sheetOpen, setSheetOpen] = useState(false);
+  const [filterOpen, setFilterOpen] = useState(false);
+  const [filters, setFilters] = useState<Filters>(DEFAULT_FILTERS);
   const [mode, setMode] = useState<Mode>("create");
   const [editingId, setEditingId] = useState<number | null>(null);
   const [confirmTarget, setConfirmTarget] = useState<Customer | null>(null);
   const [confirming, setConfirming] = useState(false);
   const [nameSortDir, setNameSortDir] = useState<"asc" | "desc">("asc");
+
+  // Fetch inactive from API when status filter requires it
+  const showInactive = filters.status !== "active";
 
   const createForm = useForm<CreateCustomerInput>({
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -107,7 +131,6 @@ export default function CustomersPage() {
 
   const form = mode === "create" ? createForm : editForm;
 
-  // Watch both forms separately to avoid union-type issues with useWatch
   const createAreaId = useWatch({ control: createForm.control, name: "area_id", defaultValue: 0 });
   const editAreaId = useWatch({ control: editForm.control, name: "area_id", defaultValue: 0 });
   const areaId = mode === "create" ? createAreaId : editAreaId;
@@ -173,15 +196,56 @@ export default function CustomersPage() {
   });
   const customerType = mode === "create" ? createCustomerType : editCustomerType;
 
-  const sortedCustomers = [...customers].sort((a, b) =>
-    nameSortDir === "asc" ? a.name.localeCompare(b.name) : b.name.localeCompare(a.name)
-  );
-
   const selectedAreaName = areas.find((a) => a.id === areaId)?.name;
   const selectedTier = tiers.find((t) => t.id === selectedTierId);
   const selectedTierLabel = selectedTier
     ? `${selectedTier.name}-${selectedTier.unit_price}tk-${selectedTier.min_qty}${selectedTier.product_unit}`
     : null;
+
+  // Active filter count (excludes defaults)
+  const activeFilterCount = [
+    filters.search !== "",
+    filters.area_id !== "all",
+    filters.customer_type !== "all",
+    filters.pricing_tier_id !== "all",
+    filters.due_allowed !== "all",
+    filters.status !== "active",
+    filters.delivery_frequency !== "all",
+  ].filter(Boolean).length;
+
+  // Frontend filtering + sorting
+  const filteredCustomers = [...customers]
+    .filter((c) => {
+      if (
+        filters.search &&
+        !c.name.toLowerCase().includes(filters.search.toLowerCase()) &&
+        !(c.phone ?? "").includes(filters.search)
+      )
+        return false;
+      if (filters.area_id !== "all" && String(c.area_id) !== filters.area_id) return false;
+      if (filters.customer_type !== "all" && (c.customer_type ?? "none") !== filters.customer_type)
+        return false;
+      if (
+        filters.pricing_tier_id !== "all" &&
+        String(c.pricing_tier_id ?? "none") !== filters.pricing_tier_id
+      )
+        return false;
+      if (filters.due_allowed !== "all") {
+        if (filters.due_allowed === "yes" && !c.due_allowed) return false;
+        if (filters.due_allowed === "no" && c.due_allowed) return false;
+      }
+      if (filters.status === "active" && !c.is_active) return false;
+      if (filters.status === "inactive" && c.is_active) return false;
+      if (
+        filters.delivery_frequency !== "all" &&
+        c.delivery_frequency !== filters.delivery_frequency
+      )
+        return false;
+      return true;
+    })
+    .sort((a, b) =>
+      nameSortDir === "asc" ? a.name.localeCompare(b.name) : b.name.localeCompare(a.name)
+    );
 
   useEffect(() => {
     fetch(`/api/customers${showInactive ? "?inactive=true" : ""}`)
@@ -282,6 +346,10 @@ export default function CustomersPage() {
     setConfirming(false);
   }
 
+  function setFilter<K extends keyof Filters>(key: K, value: Filters[K]) {
+    setFilters((prev) => ({ ...prev, [key]: value }));
+  }
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
@@ -290,15 +358,31 @@ export default function CustomersPage() {
           <p className="text-sm text-muted-foreground">
             Manage your delivery customers.
             {!loading && (
-              <span className="ml-1 font-medium text-foreground">{customers.length} total</span>
+              <span className="ml-1 font-medium text-foreground">
+                {filteredCustomers.length}
+                {filteredCustomers.length !== customers.length
+                  ? ` of ${customers.length}`
+                  : ""}{" "}
+                total
+              </span>
             )}
           </p>
         </div>
-        <div className="flex items-center gap-3">
-          <label className="flex items-center gap-2 text-sm text-muted-foreground">
-            <Switch checked={showInactive} onCheckedChange={setShowInactive} />
-            Show inactive
-          </label>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setFilterOpen(true)}
+            className="relative"
+          >
+            <SlidersHorizontal className="size-4" />
+            Filters
+            {activeFilterCount > 0 && (
+              <span className="absolute -top-1.5 -right-1.5 size-4 rounded-full bg-foreground text-background text-[10px] font-bold flex items-center justify-center leading-none">
+                {activeFilterCount}
+              </span>
+            )}
+          </Button>
           <Button size="sm" onClick={openCreate}>
             <PlusIcon className="size-4" />
             Add Customer
@@ -340,14 +424,14 @@ export default function CustomersPage() {
                   Loading…
                 </TableCell>
               </TableRow>
-            ) : customers.length === 0 ? (
+            ) : filteredCustomers.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={9} className="text-center text-muted-foreground py-10">
-                  No customers yet
+                  {activeFilterCount > 0 ? "No customers match your filters" : "No customers yet"}
                 </TableCell>
               </TableRow>
             ) : (
-              sortedCustomers.map((c) => (
+              filteredCustomers.map((c) => (
                 <TableRow key={c.id}>
                   <TableCell className="font-medium">{c.name}</TableCell>
                   <TableCell>
@@ -408,6 +492,148 @@ export default function CustomersPage() {
         </Table>
       </div>
 
+      {/* ── Filter Sheet ──────────────────────────────────────────── */}
+      <Sheet open={filterOpen} onOpenChange={setFilterOpen}>
+        <SheetContent className="w-full sm:max-w-sm overflow-y-auto">
+          <SheetHeader>
+            <SheetTitle>Filters</SheetTitle>
+          </SheetHeader>
+
+          <div className="mt-6 px-4 pb-8 space-y-6">
+            {/* Search */}
+            <FilterSection label="Search">
+              <Input
+                placeholder="Name or phone…"
+                value={filters.search}
+                onChange={(e) => setFilter("search", e.target.value)}
+              />
+            </FilterSection>
+
+            {/* Status */}
+            <FilterSection label="Status">
+              <FilterPills
+                options={[
+                  { label: "Active", value: "active" },
+                  { label: "Inactive", value: "inactive" },
+                ]}
+                value={filters.status}
+                onChange={(v) => setFilter("status", v)}
+              />
+            </FilterSection>
+
+            {/* Customer Type */}
+            <FilterSection label="Customer Type">
+              <FilterPills
+                options={[
+                  { label: "All", value: "all" },
+                  { label: "Home", value: "home" },
+                  { label: "Confectionery", value: "confectionery" },
+                  { label: "Hotel", value: "hotel" },
+                  { label: "Restaurant", value: "restaurant" },
+                  { label: "Not set", value: "none" },
+                ]}
+                value={filters.customer_type}
+                onChange={(v) => setFilter("customer_type", v)}
+              />
+            </FilterSection>
+
+            {/* Area */}
+            <FilterSection label="Area">
+              <Select
+                value={filters.area_id}
+                onValueChange={(v) => setFilter("area_id", v ?? "all")}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue>
+                    {filters.area_id === "all"
+                      ? "All areas"
+                      : (areas.find((a) => String(a.id) === filters.area_id)?.name ?? "All areas")}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All areas</SelectItem>
+                  {areas.map((a) => (
+                    <SelectItem key={a.id} value={String(a.id)}>
+                      {a.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </FilterSection>
+
+            {/* Pricing Tier */}
+            <FilterSection label="Pricing Tier">
+              <Select
+                value={filters.pricing_tier_id}
+                onValueChange={(v) => setFilter("pricing_tier_id", v ?? "all")}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue>
+                    {filters.pricing_tier_id === "all"
+                      ? "All tiers"
+                      : filters.pricing_tier_id === "none"
+                        ? "No tier"
+                        : (() => {
+                            const t = tiers.find((t) => String(t.id) === filters.pricing_tier_id);
+                            return t ? `${t.name} — ${t.unit_price}tk` : "All tiers";
+                          })()}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All tiers</SelectItem>
+                  <SelectItem value="none">No tier</SelectItem>
+                  {tiers.map((t) => (
+                    <SelectItem key={t.id} value={String(t.id)}>
+                      {t.name} — {t.unit_price}tk
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </FilterSection>
+
+            {/* Due Allowed */}
+            <FilterSection label="Due Allowed">
+              <FilterPills
+                options={[
+                  { label: "All", value: "all" },
+                  { label: "Yes", value: "yes" },
+                  { label: "No", value: "no" },
+                ]}
+                value={filters.due_allowed}
+                onChange={(v) => setFilter("due_allowed", v)}
+              />
+            </FilterSection>
+
+            {/* Delivery Frequency */}
+            <FilterSection label="Delivery Frequency">
+              <FilterPills
+                options={[
+                  { label: "All", value: "all" },
+                  { label: "Daily", value: "daily" },
+                  { label: "Alternate", value: "alternate" },
+                  { label: "Weekly", value: "weekly" },
+                ]}
+                value={filters.delivery_frequency}
+                onChange={(v) => setFilter("delivery_frequency", v)}
+              />
+            </FilterSection>
+
+            {activeFilterCount > 0 && (
+              <div className="flex justify-end pt-2">
+                <button
+                  onClick={() => setFilters(DEFAULT_FILTERS)}
+                  className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1 transition-colors"
+                >
+                  <X className="size-3" />
+                  Clear all
+                </button>
+              </div>
+            )}
+          </div>
+        </SheetContent>
+      </Sheet>
+
+      {/* ── Create / Edit Sheet ───────────────────────────────────── */}
       <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
         <SheetContent className="w-full sm:max-w-md overflow-y-auto">
           <SheetHeader>
@@ -591,6 +817,46 @@ export default function CustomersPage() {
         loading={confirming}
         onConfirm={handleDeactivateConfirmed}
       />
+    </div>
+  );
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+function FilterSection({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="space-y-2">
+      <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{label}</p>
+      {children}
+    </div>
+  );
+}
+
+function FilterPills({
+  options,
+  value,
+  onChange,
+}: {
+  options: { label: string; value: string }[];
+  value: string;
+  onChange: (v: string) => void;
+}) {
+  return (
+    <div className="flex flex-wrap gap-1.5">
+      {options.map((o) => (
+        <button
+          key={o.value}
+          type="button"
+          onClick={() => onChange(o.value)}
+          className={`px-3 py-1 text-xs font-medium rounded-full border transition-colors ${
+            value === o.value
+              ? "bg-foreground text-background border-foreground"
+              : "bg-background text-muted-foreground border-border hover:text-foreground"
+          }`}
+        >
+          {o.label}
+        </button>
+      ))}
     </div>
   );
 }

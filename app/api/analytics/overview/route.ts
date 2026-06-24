@@ -3,11 +3,15 @@ import { requireUser } from "@/lib/auth";
 
 // GET /api/analytics/overview
 // Admin: full business overview. Partner: their own daily summary.
-export async function GET() {
+export async function GET(request: Request) {
   const auth = await requireUser();
   if ("error" in auth) return auth.error;
 
   const { user } = auth;
+  const { searchParams } = new URL(request.url);
+  const rawProductId = searchParams.get("product_id");
+  const pid: number | null = rawProductId ? parseInt(rawProductId, 10) : null;
+
   const today = new Date().toISOString().slice(0, 10);
   const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
 
@@ -18,9 +22,10 @@ export async function GET() {
         COALESCE(SUM(o.quantity) FILTER (WHERE DATE(o.delivered_at AT TIME ZONE 'UTC') = ${today}), 0)       AS eggs_sold,
         COALESCE(SUM(o.paid_amount) FILTER (WHERE DATE(o.delivered_at AT TIME ZONE 'UTC') = ${today}), 0)    AS cash_in,
         COALESCE(SUM(o.due_amount) FILTER (WHERE DATE(o.delivered_at AT TIME ZONE 'UTC') = ${today}), 0)     AS new_due,
-        COALESCE((SELECT SUM(amount) FROM expenses WHERE date = ${today}), 0)                                AS expenses
+        COALESCE((SELECT SUM(amount) FROM expenses WHERE date = ${today} AND (${pid}::integer IS NULL OR product_id = ${pid}::integer)), 0) AS expenses
       FROM orders o
       WHERE o.status IN ('delivered', 'paid')
+        AND (${pid}::integer IS NULL OR o.product_id = ${pid}::integer)
     `;
 
     const [ydayKpi] = await sql`
@@ -28,9 +33,10 @@ export async function GET() {
         COALESCE(SUM(o.quantity) FILTER (WHERE DATE(o.delivered_at AT TIME ZONE 'UTC') = ${yesterday}), 0)   AS eggs_sold,
         COALESCE(SUM(o.paid_amount) FILTER (WHERE DATE(o.delivered_at AT TIME ZONE 'UTC') = ${yesterday}), 0) AS cash_in,
         COALESCE(SUM(o.due_amount) FILTER (WHERE DATE(o.delivered_at AT TIME ZONE 'UTC') = ${yesterday}), 0)  AS new_due,
-        COALESCE((SELECT SUM(amount) FROM expenses WHERE date = ${yesterday}), 0)                             AS expenses
+        COALESCE((SELECT SUM(amount) FROM expenses WHERE date = ${yesterday} AND (${pid}::integer IS NULL OR product_id = ${pid}::integer)), 0) AS expenses
       FROM orders o
       WHERE o.status IN ('delivered', 'paid')
+        AND (${pid}::integer IS NULL OR o.product_id = ${pid}::integer)
     `;
 
     // ── KPI cards: all time ───────────────────────────────────────
@@ -39,10 +45,17 @@ export async function GET() {
         COALESCE(SUM(o.quantity), 0)    AS eggs_sold,
         COALESCE(SUM(o.paid_amount), 0) AS cash_in,
         COALESCE(SUM(o.due_amount), 0)  AS new_due,
-        COALESCE((SELECT SUM(amount) FROM expenses), 0) AS expenses
+        COALESCE((SELECT SUM(amount) FROM expenses WHERE (${pid}::integer IS NULL OR product_id = ${pid}::integer)), 0) AS expenses
       FROM orders o
       WHERE o.status IN ('delivered', 'paid')
+        AND (${pid}::integer IS NULL OR o.product_id = ${pid}::integer)
     `;
+
+    // Add net_profit to each KPI row
+    const withProfit = (row: Record<string, string>) => ({
+      ...row,
+      net_profit: String(Number(row.cash_in) - Number(row.expenses)),
+    });
 
     // ── Stock per product ─────────────────────────────────────────
     const stock = await sql`
@@ -136,7 +149,11 @@ export async function GET() {
     `;
 
     return Response.json({
-      kpi: { today: todayKpi, yesterday: ydayKpi, allTime: allTimeKpi },
+      kpi: {
+        today: withProfit(todayKpi),
+        yesterday: withProfit(ydayKpi),
+        allTime: withProfit(allTimeKpi),
+      },
       stock,
       partners,
       pending,

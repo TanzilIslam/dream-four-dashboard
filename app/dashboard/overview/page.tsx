@@ -17,7 +17,13 @@ import { Badge } from "@/components/ui/badge";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-type KpiRow = { eggs_sold: string; cash_in: string; new_due: string; expenses: string };
+type KpiRow = {
+  eggs_sold: string;
+  cash_in: string;
+  new_due: string;
+  expenses: string;
+  net_profit: string;
+};
 
 type AdminData = {
   kpi: {
@@ -152,7 +158,6 @@ function StatCard({ label, value }: { label: string; value: string }) {
 
 export default function OverviewPage() {
   const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
-  const [adminData, setAdminData] = useState<AdminData | null>(null);
   const [partnerData, setPartnerData] = useState<PartnerData | null>(null);
   const [reminders, setReminders] = useState<Reminder | null>(null);
 
@@ -162,13 +167,10 @@ export default function OverviewPage() {
       .then((data) => {
         const admin = data.user?.role === "admin";
         setIsAdmin(admin);
-        fetch("/api/analytics/overview")
-          .then((r) => r.json())
-          .then((d) => {
-            if (admin) setAdminData(d);
-            else setPartnerData(d);
-          });
         if (!admin) {
+          fetch("/api/analytics/overview")
+            .then((r) => r.json())
+            .then(setPartnerData);
           fetch("/api/analytics/reminders")
             .then((r) => r.json())
             .then(setReminders);
@@ -182,7 +184,7 @@ export default function OverviewPage() {
   }
 
   if (!isAdmin) return <PartnerDashboard data={partnerData} reminders={reminders} />;
-  return <AdminDashboard data={adminData} />;
+  return <AdminDashboard />;
 }
 
 // ─── Partner Dashboard ────────────────────────────────────────────────────────
@@ -364,8 +366,29 @@ function ViewToggle({
 
 // ─── Admin Dashboard ──────────────────────────────────────────────────────────
 
-function AdminDashboard({ data }: { data: AdminData | null }) {
+function AdminDashboard() {
+  const [data, setData] = useState<AdminData | null>(null);
+  const [products, setProducts] = useState<{ id: number; name: string }[]>([]);
+  const [selectedProductId, setSelectedProductId] = useState<number | null>(null);
   const [viewMode, setViewMode] = useState<"today" | "alltime">("today");
+
+  // Fetch products once on mount, default to first
+  useEffect(() => {
+    fetch("/api/settings/products")
+      .then((r) => r.json())
+      .then((ps: { id: number; name: string }[]) => {
+        setProducts(ps);
+        if (ps.length > 0) setSelectedProductId(ps[0].id);
+      });
+  }, []);
+
+  // Fetch overview whenever selected product changes
+  useEffect(() => {
+    if (selectedProductId === null) return;
+    fetch(`/api/analytics/overview?product_id=${selectedProductId}`)
+      .then((r) => r.json())
+      .then(setData);
+  }, [selectedProductId]);
 
   const today = new Date().toLocaleDateString(undefined, {
     weekday: "long",
@@ -373,7 +396,7 @@ function AdminDashboard({ data }: { data: AdminData | null }) {
     day: "numeric",
   });
 
-  if (!data) {
+  if (!data || products.length === 0) {
     return (
       <div className="space-y-4">
         <h1 className="text-xl font-semibold">Overview</h1>
@@ -391,6 +414,8 @@ function AdminDashboard({ data }: { data: AdminData | null }) {
     Number(data.pending.remittances) +
     Number(data.pending.reports);
 
+  const selectedProductName = products.find((p) => p.id === selectedProductId)?.name ?? "";
+
   return (
     <div className="space-y-8">
       <div>
@@ -398,15 +423,37 @@ function AdminDashboard({ data }: { data: AdminData | null }) {
         <p className="text-sm text-muted-foreground">{today}</p>
       </div>
 
+      {/* Product selector */}
+      <section className="space-y-1.5">
+        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+          Product
+        </p>
+        <div className="flex flex-wrap gap-1.5">
+          {products.map((p) => (
+            <button
+              key={p.id}
+              onClick={() => setSelectedProductId(p.id)}
+              className={`px-3 py-1 text-xs font-medium rounded-full border transition-colors ${
+                selectedProductId === p.id
+                  ? "bg-foreground text-background border-foreground"
+                  : "bg-background text-muted-foreground border-border hover:text-foreground"
+              }`}
+            >
+              {p.name}
+            </button>
+          ))}
+        </div>
+      </section>
+
       {/* KPI cards */}
       <section className="space-y-2">
         <div className="flex items-center justify-between">
           <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-            {viewMode === "today" ? "Today" : "All Time"}
+            {selectedProductName} — {viewMode === "today" ? "Today" : "All Time"}
           </h2>
           <ViewToggle value={viewMode} onChange={setViewMode} />
         </div>
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
           {viewMode === "today" ? (
             <>
               <KpiCard
@@ -432,6 +479,12 @@ function AdminDashboard({ data }: { data: AdminData | null }) {
                 value={Number(t.expenses)}
                 yesterday={Number(y.expenses)}
               />
+              <KpiCard
+                label="Net Profit"
+                prefix="৳"
+                value={Number(t.net_profit)}
+                yesterday={Number(y.net_profit)}
+              />
             </>
           ) : (
             <>
@@ -439,6 +492,7 @@ function AdminDashboard({ data }: { data: AdminData | null }) {
               <KpiCard label="Cash In" prefix="৳" value={Number(at.cash_in)} />
               <KpiCard label="Total Due Added" prefix="৳" value={Number(at.new_due)} />
               <KpiCard label="Expenses" prefix="৳" value={Number(at.expenses)} />
+              <KpiCard label="Net Profit" prefix="৳" value={Number(at.net_profit)} />
             </>
           )}
         </div>

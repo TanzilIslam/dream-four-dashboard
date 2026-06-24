@@ -5,7 +5,16 @@ import { useForm } from "react-hook-form";
 import { useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
-import { PlusIcon, Truck, BanknoteIcon, XCircle, ChevronsUpDown, Check } from "lucide-react";
+import {
+  PlusIcon,
+  Truck,
+  BanknoteIcon,
+  XCircle,
+  ChevronsUpDown,
+  Check,
+  SlidersHorizontal,
+  X,
+} from "lucide-react";
 
 import { z } from "zod";
 import {
@@ -97,7 +106,14 @@ export default function OrdersPage() {
   const [stock, setStock] = useState<StockItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
-  const [statusFilter, setStatusFilter] = useState("all");
+  const [filterOpen, setFilterOpen] = useState(false);
+  const [filters, setFilters] = useState({
+    status: "due",
+    product_id: "all",
+    area_id: "all",
+    customer_search: "",
+    partner_name: "all",
+  });
 
   const [createOpen, setCreateOpen] = useState(false);
   const [payTarget, setPayTarget] = useState<Order | null>(null);
@@ -174,14 +190,17 @@ export default function OrdersPage() {
     createForm.setValue("unit_price", price);
   }, [customerId, productId, customers, products, tiers, createForm]);
 
+  const apiStatus = filters.status === "due" ? "all" : filters.status;
+
   useEffect(() => {
-    fetch(`/api/orders?status=${statusFilter}`)
+    fetch(`/api/orders?status=${apiStatus}`)
       .then((res) => res.json())
       .then((data) => {
         setOrders(data);
         setLoading(false);
       });
-  }, [statusFilter]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [apiStatus]);
 
   useEffect(() => {
     fetch("/api/auth/me")
@@ -193,7 +212,10 @@ export default function OrdersPage() {
       .then((data: Customer[]) => setCustomers(data));
     fetch("/api/settings/products")
       .then((res) => res.json())
-      .then((data: Product[]) => setProducts(data));
+      .then((data: Product[]) => {
+        setProducts(data);
+        if (data.length > 0) setFilters((prev) => ({ ...prev, product_id: String(data[0].id) }));
+      });
     fetch("/api/settings/pricing-tiers")
       .then((res) => res.json())
       .then((data: Tier[]) => setTiers(data));
@@ -204,12 +226,62 @@ export default function OrdersPage() {
 
   async function refreshOrders() {
     const [ordersRes, stockRes] = await Promise.all([
-      fetch(`/api/orders?status=${statusFilter}`),
+      fetch(`/api/orders?status=${apiStatus}`),
       fetch("/api/stock"),
     ]);
     setOrders(await ordersRes.json());
     setStock(await stockRes.json());
   }
+
+  function setFilter<K extends keyof typeof filters>(key: K, value: (typeof filters)[K]) {
+    setFilters((prev) => ({ ...prev, [key]: value }));
+  }
+
+  const defaultProductId = products.length > 0 ? String(products[0].id) : "all";
+
+  function clearFilters() {
+    setFilters({
+      status: "due",
+      product_id: defaultProductId,
+      area_id: "all",
+      customer_search: "",
+      partner_name: "all",
+    });
+  }
+
+  // Derive unique areas and partners from loaded orders
+  const uniqueAreas = [
+    ...new Map(
+      orders
+        .filter((o) => o.area_name)
+        .map((o) => [o.area_id, { id: o.area_id, name: o.area_name! }])
+    ).values(),
+  ].sort((a, b) => a.name.localeCompare(b.name));
+
+  const uniquePartners = [
+    ...new Set(orders.filter((o) => o.partner_name).map((o) => o.partner_name!)),
+  ].sort();
+
+  const activeFilterCount = [
+    filters.status !== "due",
+    filters.product_id !== defaultProductId,
+    filters.area_id !== "all",
+    filters.customer_search !== "",
+    filters.partner_name !== "all",
+  ].filter(Boolean).length;
+
+  const filteredOrders = orders.filter((o) => {
+    if (filters.status === "due" && Number(o.due_amount) <= 0) return false;
+    if (filters.product_id !== "all" && String(o.product_id) !== filters.product_id) return false;
+    if (filters.area_id !== "all" && String(o.area_id) !== filters.area_id) return false;
+    if (
+      filters.customer_search &&
+      !(o.customer_name ?? "").toLowerCase().includes(filters.customer_search.toLowerCase())
+    )
+      return false;
+    if (filters.partner_name !== "all" && o.partner_name !== filters.partner_name) return false;
+    return true;
+  });
 
   function openCreate() {
     createForm.reset({
@@ -300,51 +372,61 @@ export default function OrdersPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-xl font-semibold">Orders</h1>
-          <p className="text-sm text-muted-foreground">Track deliveries and payments.</p>
+          <p className="text-sm text-muted-foreground">
+            Track deliveries and payments.
+            {!loading && (
+              <span className="ml-1 font-medium text-foreground">
+                {filteredOrders.length}
+                {filteredOrders.length !== orders.length ? ` of ${orders.length}` : ""} total
+              </span>
+            )}
+          </p>
         </div>
-        <Button size="sm" onClick={openCreate}>
-          <PlusIcon className="size-4" />
-          New Order
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setFilterOpen(true)}
+            className="relative"
+          >
+            <SlidersHorizontal className="size-4" />
+            Filters
+            {activeFilterCount > 0 && (
+              <span className="absolute -top-1.5 -right-1.5 size-4 rounded-full bg-foreground text-background text-[10px] font-bold flex items-center justify-center leading-none">
+                {activeFilterCount}
+              </span>
+            )}
+          </Button>
+          <Button size="sm" onClick={openCreate}>
+            <PlusIcon className="size-4" />
+            New Order
+          </Button>
+        </div>
       </div>
 
-      {/* Stock summary */}
-      {stock.length > 0 && (
+      {/* Stock summary — filtered by selected product */}
+      {!loading && stock.length > 0 && (
         <div className="flex flex-wrap gap-2">
-          {stock.map((s) => {
-            const low = s.available_qty <= s.low_stock_threshold;
-            return (
-              <div
-                key={s.id}
-                className={`rounded-md border px-3 py-1.5 text-sm flex items-center gap-2 ${low ? "border-destructive/40 bg-destructive/5 text-destructive" : "border-border bg-muted/40"}`}
-              >
-                <span className="font-medium">{s.name}</span>
-                <span className="text-muted-foreground">
-                  {s.available_qty} {s.unit} available
-                  {s.reserved_qty > 0 && ` · ${s.reserved_qty} reserved`}
-                </span>
-                {low && <span className="text-xs font-medium">Low stock</span>}
-              </div>
-            );
-          })}
+          {stock
+            .filter((s) => filters.product_id === "all" || String(s.id) === filters.product_id)
+            .map((s) => {
+              const low = s.available_qty <= s.low_stock_threshold;
+              return (
+                <div
+                  key={s.id}
+                  className={`rounded-md border px-3 py-1.5 text-sm flex items-center gap-2 ${low ? "border-destructive/40 bg-destructive/5 text-destructive" : "border-border bg-muted/40"}`}
+                >
+                  <span className="font-medium">{s.name}</span>
+                  <span className="text-muted-foreground">
+                    {s.available_qty} {s.unit} available
+                    {s.reserved_qty > 0 && ` · ${s.reserved_qty} reserved`}
+                  </span>
+                  {low && <span className="text-xs font-medium">Low stock</span>}
+                </div>
+              );
+            })}
         </div>
       )}
-
-      <div className="flex items-center gap-2">
-        <Label className="text-sm text-muted-foreground">Filter:</Label>
-        <Select value={statusFilter} onValueChange={(v) => v != null && setStatusFilter(v)}>
-          <SelectTrigger className="w-40">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All active</SelectItem>
-            <SelectItem value="pending">Pending</SelectItem>
-            <SelectItem value="delivered">Delivered</SelectItem>
-            <SelectItem value="paid">Paid</SelectItem>
-            <SelectItem value="cancelled">Cancelled</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
 
       <div className="rounded-lg border border-border overflow-hidden">
         <Table>
@@ -371,17 +453,17 @@ export default function OrdersPage() {
                   Loading…
                 </TableCell>
               </TableRow>
-            ) : orders.length === 0 ? (
+            ) : filteredOrders.length === 0 ? (
               <TableRow>
                 <TableCell
                   colSpan={isAdmin ? 9 : 8}
                   className="text-center text-muted-foreground py-10"
                 >
-                  No orders
+                  {activeFilterCount > 0 ? "No orders match your filters" : "No orders"}
                 </TableCell>
               </TableRow>
             ) : (
-              orders.map((o) => (
+              filteredOrders.map((o) => (
                 <TableRow key={o.id}>
                   {isAdmin && <TableCell>{o.partner_name ?? "—"}</TableCell>}
                   <TableCell className="font-medium">{o.customer_name ?? "—"}</TableCell>
@@ -464,6 +546,127 @@ export default function OrdersPage() {
           </TableBody>
         </Table>
       </div>
+
+      {/* Filter sheet */}
+      <Sheet open={filterOpen} onOpenChange={setFilterOpen}>
+        <SheetContent className="w-full sm:max-w-sm overflow-y-auto">
+          <SheetHeader>
+            <SheetTitle>Filters</SheetTitle>
+          </SheetHeader>
+          <div className="mt-6 px-4 pb-8 space-y-6">
+            {/* Status */}
+            <OrderFilterSection label="Status">
+              <OrderFilterPills
+                options={[
+                  { label: "Due", value: "due" },
+                  { label: "All", value: "all" },
+                  { label: "Pending", value: "pending" },
+                  { label: "Delivered", value: "delivered" },
+                  { label: "Paid", value: "paid" },
+                  { label: "Cancelled", value: "cancelled" },
+                ]}
+                value={filters.status}
+                onChange={(v) => setFilter("status", v)}
+              />
+            </OrderFilterSection>
+
+            {/* Customer */}
+            <OrderFilterSection label="Customer">
+              <Input
+                placeholder="Search customer…"
+                value={filters.customer_search}
+                onChange={(e) => setFilter("customer_search", e.target.value)}
+              />
+            </OrderFilterSection>
+
+            {/* Product */}
+            <OrderFilterSection label="Product">
+              <Select
+                value={filters.product_id}
+                onValueChange={(v) => setFilter("product_id", v ?? "all")}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue>
+                    {filters.product_id === "all"
+                      ? "All products"
+                      : (products.find((p) => String(p.id) === filters.product_id)?.name ??
+                        "All products")}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All products</SelectItem>
+                  {products.map((p) => (
+                    <SelectItem key={p.id} value={String(p.id)}>
+                      {p.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </OrderFilterSection>
+
+            {/* Area */}
+            <OrderFilterSection label="Area">
+              <Select
+                value={filters.area_id}
+                onValueChange={(v) => setFilter("area_id", v ?? "all")}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue>
+                    {filters.area_id === "all"
+                      ? "All areas"
+                      : (uniqueAreas.find((a) => String(a.id) === filters.area_id)?.name ??
+                        "All areas")}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All areas</SelectItem>
+                  {uniqueAreas.map((a) => (
+                    <SelectItem key={a.id} value={String(a.id)}>
+                      {a.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </OrderFilterSection>
+
+            {/* Partner (admin only) */}
+            {isAdmin && uniquePartners.length > 0 && (
+              <OrderFilterSection label="Partner">
+                <Select
+                  value={filters.partner_name}
+                  onValueChange={(v) => setFilter("partner_name", v ?? "all")}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue>
+                      {filters.partner_name === "all" ? "All partners" : filters.partner_name}
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All partners</SelectItem>
+                    {uniquePartners.map((p) => (
+                      <SelectItem key={p} value={p}>
+                        {p}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </OrderFilterSection>
+            )}
+
+            {activeFilterCount > 0 && (
+              <div className="flex justify-end pt-2">
+                <button
+                  onClick={clearFilters}
+                  className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1 transition-colors"
+                >
+                  <X className="size-3" />
+                  Clear all
+                </button>
+              </div>
+            )}
+          </div>
+        </SheetContent>
+      </Sheet>
 
       {/* Create order sheet */}
       <Sheet open={createOpen} onOpenChange={setCreateOpen}>
@@ -780,6 +983,44 @@ function Field({
       <Label>{label}</Label>
       {children}
       {error && <p className="text-xs text-destructive">{error}</p>}
+    </div>
+  );
+}
+
+function OrderFilterSection({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="space-y-2">
+      <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{label}</p>
+      {children}
+    </div>
+  );
+}
+
+function OrderFilterPills({
+  options,
+  value,
+  onChange,
+}: {
+  options: { label: string; value: string }[];
+  value: string;
+  onChange: (v: string) => void;
+}) {
+  return (
+    <div className="flex flex-wrap gap-1.5">
+      {options.map((o) => (
+        <button
+          key={o.value}
+          type="button"
+          onClick={() => onChange(o.value)}
+          className={`px-3 py-1 text-xs font-medium rounded-full border transition-colors ${
+            value === o.value
+              ? "bg-foreground text-background border-foreground"
+              : "bg-background text-muted-foreground border-border hover:text-foreground"
+          }`}
+        >
+          {o.label}
+        </button>
+      ))}
     </div>
   );
 }

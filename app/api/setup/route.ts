@@ -227,6 +227,10 @@ export async function GET() {
     )
   `;
 
+  // Add product_id to expenses and backfill existing rows to product 5
+  await sql`ALTER TABLE expenses ADD COLUMN IF NOT EXISTS product_id INTEGER REFERENCES products(id)`;
+  await sql`UPDATE expenses SET product_id = 5 WHERE product_id IS NULL`;
+
   await sql`
     CREATE TABLE IF NOT EXISTS cash_remittances (
       id               SERIAL PRIMARY KEY,

@@ -19,10 +19,12 @@ export async function GET(request: Request) {
           SELECT e.*,
                  ec.name AS category_name,
                  a.name  AS area_name,
+                 p.name  AS product_name,
                  u.name  AS partner_name
           FROM expenses e
           LEFT JOIN expense_categories ec ON ec.id = e.category_id
           LEFT JOIN areas a               ON a.id = e.area_id
+          LEFT JOIN products p            ON p.id = e.product_id
           LEFT JOIN users u               ON u.id = e.partner_id
           WHERE 1=1 ${dateFilter}
           ORDER BY e.date DESC, e.created_at DESC
@@ -30,10 +32,12 @@ export async function GET(request: Request) {
       : await sql`
           SELECT e.*,
                  ec.name AS category_name,
-                 a.name  AS area_name
+                 a.name  AS area_name,
+                 p.name  AS product_name
           FROM expenses e
           LEFT JOIN expense_categories ec ON ec.id = e.category_id
           LEFT JOIN areas a               ON a.id = e.area_id
+          LEFT JOIN products p            ON p.id = e.product_id
           WHERE e.partner_id = ${user.id} ${dateFilter}
           ORDER BY e.date DESC, e.created_at DESC
         `;
@@ -55,10 +59,10 @@ export async function POST(request: Request) {
   const d = parsed.data;
   const [expense] = await sql`
     INSERT INTO expenses (
-      partner_id, category_id, area_id,
+      partner_id, category_id, area_id, product_id,
       amount, payment_method, description, date
     ) VALUES (
-      ${user.id}, ${d.category_id}, ${d.area_id ?? null},
+      ${user.id}, ${d.category_id}, ${d.area_id ?? null}, ${d.product_id ?? null},
       ${d.amount}, ${d.payment_method || null}, ${d.description || null}, ${d.date}
     )
     RETURNING *
