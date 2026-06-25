@@ -1,5 +1,5 @@
 import { sql } from "@/lib/db";
-import { requireUser } from "@/lib/auth";
+import { requireUser, requireAdmin } from "@/lib/auth";
 import {
   approvePurchaseRequestSchema,
   rejectPurchaseRequestSchema,
@@ -108,18 +108,13 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 }
 
 export async function DELETE(_request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const auth = await requireUser();
+  const auth = await requireAdmin();
   if ("error" in auth) return auth.error;
 
-  const { user } = auth;
   const { id } = await params;
   const pr = await getRequest(Number(id));
   if (!pr) return Response.json({ error: "Not found" }, { status: 404 });
 
-  // Only the owning partner can cancel, and only if still pending
-  if (pr.partner_id !== user.id && user.role !== "admin") {
-    return Response.json({ error: "Forbidden" }, { status: 403 });
-  }
   if (pr.status !== "pending") {
     return Response.json({ error: "Only pending requests can be cancelled" }, { status: 400 });
   }

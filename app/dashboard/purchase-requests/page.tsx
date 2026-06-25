@@ -257,10 +257,12 @@ export default function PurchaseRequestsPage() {
           <h1 className="text-xl font-semibold">Purchase Requests</h1>
           <p className="text-sm text-muted-foreground">Request stock purchases from admin.</p>
         </div>
-        <Button size="sm" onClick={openCreate}>
-          <PlusIcon className="size-4" />
-          New Request
-        </Button>
+        {isAdmin && (
+          <Button size="sm" onClick={openCreate}>
+            <PlusIcon className="size-4" />
+            New Request
+          </Button>
+        )}
       </div>
 
       {/* Status filter */}
@@ -336,8 +338,8 @@ export default function PurchaseRequestsPage() {
                   </TableCell>
                   <TableCell>
                     <div className="flex items-center gap-1">
-                      {/* Partner can cancel pending */}
-                      {r.status === "pending" && !isAdmin && (
+                      {/* Admin can cancel (delete) pending */}
+                      {r.status === "pending" && isAdmin && (
                         <Button
                           variant="ghost"
                           size="icon"
