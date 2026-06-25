@@ -163,6 +163,20 @@ export async function GET() {
   `;
 
   await sql`
+    CREATE TABLE IF NOT EXISTS supplier_payments (
+      id                    SERIAL PRIMARY KEY,
+      purchase_request_id   INTEGER NOT NULL REFERENCES purchase_requests(id) ON DELETE CASCADE,
+      amount                NUMERIC(12,2) NOT NULL CHECK (amount > 0),
+      paid_at               DATE NOT NULL,
+      payment_method        TEXT,
+      from_personal         BOOLEAN DEFAULT false,
+      note                  TEXT,
+      created_by            INTEGER REFERENCES users(id),
+      created_at            TIMESTAMPTZ DEFAULT NOW()
+    )
+  `;
+
+  await sql`
     CREATE TABLE IF NOT EXISTS orders (
       id                     SERIAL PRIMARY KEY,
       partner_id             INTEGER REFERENCES users(id),

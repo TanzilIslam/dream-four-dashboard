@@ -19,11 +19,18 @@ export async function GET(request: Request) {
                  s.name  AS supplier_name,
                  p.name  AS product_name,
                  p.unit  AS product_unit,
-                 u.name  AS partner_name
+                 u.name  AS partner_name,
+                 COALESCE(sp.paid_total, 0) AS paid_total,
+                 GREATEST(0, COALESCE(pr.actual_total, 0) - COALESCE(sp.paid_total, 0)) AS due_amount
           FROM purchase_requests pr
           LEFT JOIN suppliers s ON s.id = pr.supplier_id
           LEFT JOIN products p  ON p.id = pr.product_id
           LEFT JOIN users u     ON u.id = pr.partner_id
+          LEFT JOIN (
+            SELECT purchase_request_id, SUM(amount) AS paid_total
+            FROM supplier_payments
+            GROUP BY purchase_request_id
+          ) sp ON sp.purchase_request_id = pr.id
           WHERE 1=1 ${statusFilter}
           ORDER BY pr.created_at DESC
         `
@@ -31,10 +38,17 @@ export async function GET(request: Request) {
           SELECT pr.*,
                  s.name  AS supplier_name,
                  p.name  AS product_name,
-                 p.unit  AS product_unit
+                 p.unit  AS product_unit,
+                 COALESCE(sp.paid_total, 0) AS paid_total,
+                 GREATEST(0, COALESCE(pr.actual_total, 0) - COALESCE(sp.paid_total, 0)) AS due_amount
           FROM purchase_requests pr
           LEFT JOIN suppliers s ON s.id = pr.supplier_id
           LEFT JOIN products p  ON p.id = pr.product_id
+          LEFT JOIN (
+            SELECT purchase_request_id, SUM(amount) AS paid_total
+            FROM supplier_payments
+            GROUP BY purchase_request_id
+          ) sp ON sp.purchase_request_id = pr.id
           WHERE pr.partner_id = ${user.id} ${statusFilter}
           ORDER BY pr.created_at DESC
         `;

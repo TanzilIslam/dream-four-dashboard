@@ -5,6 +5,7 @@ import {
   approvePurchaseRequestSchema,
   rejectPurchaseRequestSchema,
   markPurchasedSchema,
+  addSupplierPaymentSchema,
 } from "@/lib/schemas/purchase-request";
 
 async function getRequest(id: number) {
@@ -88,6 +89,13 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     const d = parsed.data;
     const actual_total = d.actual_price * d.actual_qty;
 
+    if (d.initial_payment_amount && d.initial_payment_amount > actual_total) {
+      return Response.json(
+        { error: "Initial payment cannot exceed the total purchase amount" },
+        { status: 400 }
+      );
+    }
+
     const [updated] = await sql`
       UPDATE purchase_requests SET
         status          = 'purchased',
@@ -95,13 +103,19 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
         actual_price    = ${d.actual_price},
         actual_total    = ${actual_total},
         purchased_at    = ${d.purchased_at},
-        payment_method  = ${d.payment_method || null},
-        from_personal   = ${d.from_personal},
         admin_note      = ${d.admin_note || null},
         completed_at    = NOW()
       WHERE id = ${id}
       RETURNING *
     `;
+
+    if (d.initial_payment_amount && d.initial_payment_amount > 0) {
+      await sql`
+        INSERT INTO supplier_payments (purchase_request_id, amount, paid_at, created_by)
+        VALUES (${id}, ${d.initial_payment_amount}, ${d.purchased_at}, ${user.id})
+      `;
+    }
+
     return Response.json(updated);
   }
 

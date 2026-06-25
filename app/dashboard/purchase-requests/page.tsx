@@ -1,17 +1,27 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
-import { PlusIcon, Pencil, Trash2, CheckCircle2, XCircle, ShoppingBag, Eye } from "lucide-react";
-import { useWatch } from "react-hook-form";
+import {
+  PlusIcon,
+  Pencil,
+  Trash2,
+  CheckCircle2,
+  XCircle,
+  ShoppingBag,
+  Eye,
+  Banknote,
+} from "lucide-react";
 
 import {
   createPurchaseRequestSchema,
   markPurchasedSchema,
+  addSupplierPaymentSchema,
   type CreatePurchaseRequestInput,
   type MarkPurchasedInput,
+  type AddSupplierPaymentInput,
 } from "@/lib/schemas/purchase-request";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Button } from "@/components/ui/button";
@@ -50,14 +60,27 @@ type PurchaseRequest = {
   actual_price: string | null;
   actual_total: string | null;
   purchased_at: string | null;
-  payment_method: string | null;
-  from_personal: boolean;
   note: string | null;
   created_at: string;
   supplier_name: string | null;
   product_name: string | null;
   product_unit: string | null;
   partner_name?: string | null;
+  paid_total: string | null;
+  due_amount: string | null;
+};
+
+type SupplierPayment = {
+  id: number;
+  purchase_request_id: number;
+  amount: string;
+  paid_at: string;
+  payment_method: string | null;
+  from_personal: boolean;
+  note: string | null;
+  created_by: number | null;
+  created_at: string;
+  created_by_name: string | null;
 };
 
 type Supplier = { id: number; name: string };
@@ -83,7 +106,6 @@ export default function PurchaseRequestsPage() {
   const [cancelTarget, setCancelTarget] = useState<PurchaseRequest | null>(null);
   const [cancelling, setCancelling] = useState(false);
 
-  // Admin action state
   const [approveTarget, setApproveTarget] = useState<PurchaseRequest | null>(null);
   const [approving, setApproving] = useState(false);
   const [adminNote, setAdminNote] = useState("");
@@ -91,6 +113,17 @@ export default function PurchaseRequestsPage() {
   const [rejecting, setRejecting] = useState(false);
   const [purchaseTarget, setPurchaseTarget] = useState<PurchaseRequest | null>(null);
   const [detailsTarget, setDetailsTarget] = useState<PurchaseRequest | null>(null);
+
+  const [paymentTarget, setPaymentTarget] = useState<PurchaseRequest | null>(null);
+  const [detailPayments, setDetailPayments] = useState<SupplierPayment[]>([]);
+  const [detailPaymentsLoading, setDetailPaymentsLoading] = useState(false);
+  const [detailPaymentSummary, setDetailPaymentSummary] = useState<{
+    paid_total: number;
+    due_amount: number;
+    actual_total: number;
+  } | null>(null);
+  const [deletePaymentTarget, setDeletePaymentTarget] = useState<SupplierPayment | null>(null);
+  const [deletingPayment, setDeletingPayment] = useState(false);
 
   const createForm = useForm<CreatePurchaseRequestInput>({
     resolver: zodResolver(createPurchaseRequestSchema),
@@ -110,20 +143,31 @@ export default function PurchaseRequestsPage() {
       actual_qty: 1,
       actual_price: 0,
       purchased_at: new Date().toISOString().slice(0, 10),
-      payment_method: "",
-      from_personal: false,
       admin_note: "",
+      initial_payment_amount: 0,
     },
   });
 
-  const supplierId = useWatch({
-    control: createForm.control,
-    name: "supplier_id",
-    defaultValue: 0,
+  const paymentForm = useForm<AddSupplierPaymentInput>({
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    resolver: zodResolver(addSupplierPaymentSchema) as any,
+    defaultValues: {
+      amount: 0,
+      paid_at: new Date().toISOString().slice(0, 10),
+      payment_method: "",
+      from_personal: false,
+      note: "",
+    },
   });
+
+  const supplierId = useWatch({ control: createForm.control, name: "supplier_id", defaultValue: 0 });
   const productId = useWatch({ control: createForm.control, name: "product_id", defaultValue: 0 });
   const selectedSupplierName = suppliers.find((s) => s.id === supplierId)?.name;
   const selectedProductName = products.find((p) => p.id === productId)?.name;
+
+  const markActualQty = useWatch({ control: markPurchasedForm.control, name: "actual_qty", defaultValue: 1 });
+  const markActualPrice = useWatch({ control: markPurchasedForm.control, name: "actual_price", defaultValue: 0 });
+  const markComputedTotal = (Number(markActualQty) || 0) * (Number(markActualPrice) || 0);
 
   useEffect(() => {
     fetch(`/api/purchase-requests?status=${statusFilter}`)
@@ -147,9 +191,42 @@ export default function PurchaseRequestsPage() {
       .then((data: Product[]) => setProducts(data));
   }, []);
 
+  useEffect(() => {
+    if (!detailsTarget || detailsTarget.status !== "purchased") {
+      setDetailPayments([]);
+      setDetailPaymentSummary(null);
+      return;
+    }
+    setDetailPaymentsLoading(true);
+    fetch(`/api/purchase-requests/${detailsTarget.id}/payments`)
+      .then((res) => res.json())
+      .then((data) => {
+        setDetailPayments(data.payments ?? []);
+        setDetailPaymentSummary({
+          paid_total: Number(data.paid_total ?? 0),
+          due_amount: Number(data.due_amount ?? 0),
+          actual_total: Number(data.actual_total ?? 0),
+        });
+        setDetailPaymentsLoading(false);
+      })
+      .catch(() => setDetailPaymentsLoading(false));
+  }, [detailsTarget?.id]);
+
   async function refreshRequests() {
     const res = await fetch(`/api/purchase-requests?status=${statusFilter}`);
     setRequests(await res.json());
+  }
+
+  async function refreshDetailPayments() {
+    if (!detailsTarget) return;
+    const res = await fetch(`/api/purchase-requests/${detailsTarget.id}/payments`);
+    const data = await res.json();
+    setDetailPayments(data.payments ?? []);
+    setDetailPaymentSummary({
+      paid_total: Number(data.paid_total ?? 0),
+      due_amount: Number(data.due_amount ?? 0),
+      actual_total: Number(data.actual_total ?? 0),
+    });
   }
 
   function openCreate() {
@@ -215,12 +292,12 @@ export default function PurchaseRequestsPage() {
     setCancelling(true);
     const res = await fetch(`/api/purchase-requests/${cancelTarget.id}`, { method: "DELETE" });
     if (res.ok) {
-      toast.success("Request cancelled");
+      toast.success("Request deleted");
       setCancelTarget(null);
       refreshRequests();
     } else {
       const json = await res.json();
-      toast.error(json.error ?? "Failed to cancel");
+      toast.error(json.error ?? "Failed to delete");
     }
     setCancelling(false);
   }
@@ -282,6 +359,42 @@ export default function PurchaseRequestsPage() {
     }
   }
 
+  async function onAddPayment(data: AddSupplierPaymentInput) {
+    if (!paymentTarget) return;
+    const res = await fetch(`/api/purchase-requests/${paymentTarget.id}/payments`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data),
+    });
+    if (res.ok) {
+      toast.success("Payment recorded");
+      setPaymentTarget(null);
+      refreshRequests();
+    } else {
+      const json = await res.json();
+      toast.error(json.error ?? "Failed to record payment");
+    }
+  }
+
+  async function handleDeletePayment() {
+    if (!deletePaymentTarget || !detailsTarget) return;
+    setDeletingPayment(true);
+    const res = await fetch(
+      `/api/purchase-requests/${detailsTarget.id}/payments/${deletePaymentTarget.id}`,
+      { method: "DELETE" }
+    );
+    if (res.ok) {
+      toast.success("Payment deleted");
+      setDeletePaymentTarget(null);
+      refreshDetailPayments();
+      refreshRequests();
+    } else {
+      const json = await res.json();
+      toast.error(json.error ?? "Failed to delete payment");
+    }
+    setDeletingPayment(false);
+  }
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
@@ -297,7 +410,6 @@ export default function PurchaseRequestsPage() {
         )}
       </div>
 
-      {/* Status filter */}
       <div className="flex items-center gap-2">
         <Label className="text-sm text-muted-foreground">Filter:</Label>
         <Select value={statusFilter} onValueChange={(v) => v != null && setStatusFilter(v)}>
@@ -325,7 +437,7 @@ export default function PurchaseRequestsPage() {
               <TableHead>Est. Price</TableHead>
               <TableHead>Status</TableHead>
               <TableHead>Note</TableHead>
-              <TableHead className="w-[160px]" />
+              <TableHead className="w-[180px]" />
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -363,14 +475,23 @@ export default function PurchaseRequestsPage() {
                     {r.estimated_price ? `৳${Number(r.estimated_price).toFixed(2)}` : "—"}
                   </TableCell>
                   <TableCell>
-                    <Badge variant={STATUS_VARIANT[r.status] ?? "secondary"}>{r.status}</Badge>
+                    <div className="space-y-1">
+                      <Badge variant={STATUS_VARIANT[r.status] ?? "secondary"}>{r.status}</Badge>
+                      {r.status === "purchased" &&
+                        (Number(r.due_amount) > 0 ? (
+                          <p className="text-xs text-amber-600 font-medium">
+                            ৳{Number(r.due_amount).toFixed(2)} due
+                          </p>
+                        ) : (
+                          <p className="text-xs text-green-600 font-medium">Paid ✓</p>
+                        ))}
+                    </div>
                   </TableCell>
                   <TableCell className="text-sm text-muted-foreground max-w-[160px] truncate">
                     {r.admin_note ?? r.note ?? "—"}
                   </TableCell>
                   <TableCell>
                     <div className="flex items-center gap-1">
-                      {/* Admin: edit (always visible) */}
                       {isAdmin && (
                         <Button
                           variant="ghost"
@@ -382,7 +503,6 @@ export default function PurchaseRequestsPage() {
                           <Pencil className="size-3.5" />
                         </Button>
                       )}
-                      {/* Admin: delete (always visible) */}
                       {isAdmin && (
                         <Button
                           variant="ghost"
@@ -394,7 +514,6 @@ export default function PurchaseRequestsPage() {
                           <Trash2 className="size-3.5" />
                         </Button>
                       )}
-                      {/* Admin can approve/reject pending */}
                       {isAdmin && r.status === "pending" && (
                         <>
                           <Button
@@ -423,7 +542,6 @@ export default function PurchaseRequestsPage() {
                           </Button>
                         </>
                       )}
-                      {/* Admin can mark approved as purchased */}
                       {isAdmin && r.status === "approved" && (
                         <Button
                           variant="ghost"
@@ -433,9 +551,8 @@ export default function PurchaseRequestsPage() {
                               actual_qty: r.requested_qty,
                               actual_price: r.estimated_price ? Number(r.estimated_price) : 0,
                               purchased_at: new Date().toISOString().slice(0, 10),
-                              payment_method: "",
-                              from_personal: false,
                               admin_note: "",
+                              initial_payment_amount: 0,
                             });
                             setPurchaseTarget(r);
                           }}
@@ -445,7 +562,26 @@ export default function PurchaseRequestsPage() {
                           <ShoppingBag className="size-3.5" />
                         </Button>
                       )}
-                      {/* View details for purchased items */}
+                      {isAdmin && r.status === "purchased" && Number(r.due_amount) > 0 && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => {
+                            paymentForm.reset({
+                              amount: Number(r.due_amount),
+                              paid_at: new Date().toISOString().slice(0, 10),
+                              payment_method: "",
+                              from_personal: false,
+                              note: "",
+                            });
+                            setPaymentTarget(r);
+                          }}
+                          className="size-7 text-amber-600 hover:bg-amber-50 hover:text-amber-700"
+                          title="Add payment"
+                        >
+                          <Banknote className="size-3.5" />
+                        </Button>
+                      )}
                       {r.status === "purchased" && (
                         <Button
                           variant="ghost"
@@ -564,13 +700,20 @@ export default function PurchaseRequestsPage() {
             <div className="flex gap-2 pt-2">
               <Button type="submit" disabled={createForm.formState.isSubmitting} className="w-1/2">
                 {createForm.formState.isSubmitting
-                  ? editTarget ? "Saving…" : "Submitting…"
-                  : editTarget ? "Save Changes" : "Submit Request"}
+                  ? editTarget
+                    ? "Saving…"
+                    : "Submitting…"
+                  : editTarget
+                    ? "Save Changes"
+                    : "Submit Request"}
               </Button>
               <Button
                 type="button"
                 variant="outline"
-                onClick={() => { setCreateOpen(false); setEditTarget(null); }}
+                onClick={() => {
+                  setCreateOpen(false);
+                  setEditTarget(null);
+                }}
                 className="w-1/2"
               >
                 Cancel
@@ -580,7 +723,7 @@ export default function PurchaseRequestsPage() {
         </SheetContent>
       </Sheet>
 
-      {/* Mark as purchased sheet (admin) */}
+      {/* Mark as purchased sheet */}
       <Sheet
         open={purchaseTarget !== null}
         onOpenChange={(open) => !open && setPurchaseTarget(null)}
@@ -616,6 +759,13 @@ export default function PurchaseRequestsPage() {
               />
             </Field>
 
+            {markComputedTotal > 0 && (
+              <div className="rounded-md bg-muted px-3 py-2 text-sm">
+                <span className="text-muted-foreground">Total: </span>
+                <span className="font-semibold">৳{markComputedTotal.toFixed(2)}</span>
+              </div>
+            )}
+
             <Field
               label="Purchase Date"
               error={markPurchasedForm.formState.errors.purchased_at?.message}
@@ -623,27 +773,30 @@ export default function PurchaseRequestsPage() {
               <Input type="date" {...markPurchasedForm.register("purchased_at")} />
             </Field>
 
-            <Field label="Payment Method">
-              <Input placeholder="Cash, bKash…" {...markPurchasedForm.register("payment_method")} />
-            </Field>
-
-            <div className="flex items-center justify-between">
-              <div>
-                <Label>From Personal Funds</Label>
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  Partner paid from their own pocket
-                </p>
-              </div>
-              <input
-                type="checkbox"
-                className="size-4"
-                {...markPurchasedForm.register("from_personal")}
-              />
-            </div>
-
             <Field label="Admin Note">
               <Textarea {...markPurchasedForm.register("admin_note")} />
             </Field>
+
+            <div className="border-t border-border pt-4">
+              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-3">
+                Initial Payment (Optional)
+              </p>
+              <Field
+                label="Amount Paid Now (৳)"
+                error={
+                  (markPurchasedForm.formState.errors as Record<string, { message?: string }>)
+                    .initial_payment_amount?.message
+                }
+              >
+                <Input
+                  type="number"
+                  step="0.01"
+                  min={0}
+                  placeholder="0"
+                  {...markPurchasedForm.register("initial_payment_amount", { valueAsNumber: true })}
+                />
+              </Field>
+            </div>
 
             <div className="flex gap-2 pt-2">
               <Button
@@ -666,7 +819,97 @@ export default function PurchaseRequestsPage() {
         </SheetContent>
       </Sheet>
 
-      {/* Delete confirm */}
+      {/* Add Payment sheet */}
+      <Sheet
+        open={paymentTarget !== null}
+        onOpenChange={(open) => {
+          if (!open) setPaymentTarget(null);
+        }}
+      >
+        <SheetContent className="w-full sm:max-w-md overflow-y-auto">
+          <SheetHeader>
+            <SheetTitle>Add Payment</SheetTitle>
+          </SheetHeader>
+          {paymentTarget && (
+            <div className="mt-4 px-4">
+              <p className="text-sm text-muted-foreground">
+                {paymentTarget.product_name} — Due:{" "}
+                <span className="font-semibold text-amber-600">
+                  ৳{Number(paymentTarget.due_amount).toFixed(2)}
+                </span>
+              </p>
+            </div>
+          )}
+          <form
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            onSubmit={paymentForm.handleSubmit(onAddPayment as any)}
+            className="mt-4 space-y-5 px-4 pb-8"
+          >
+            <Field
+              label="Amount (৳)"
+              error={
+                (paymentForm.formState.errors as Record<string, { message?: string }>).amount
+                  ?.message
+              }
+            >
+              <Input
+                type="number"
+                step="0.01"
+                min={0.01}
+                {...paymentForm.register("amount", { valueAsNumber: true })}
+              />
+            </Field>
+
+            <Field
+              label="Payment Date"
+              error={
+                (paymentForm.formState.errors as Record<string, { message?: string }>).paid_at
+                  ?.message
+              }
+            >
+              <Input type="date" {...paymentForm.register("paid_at")} />
+            </Field>
+
+            <Field label="Payment Method">
+              <Input placeholder="Cash, bKash…" {...paymentForm.register("payment_method")} />
+            </Field>
+
+            <div className="flex items-center justify-between">
+              <div>
+                <Label>From Personal Funds</Label>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Paid from own pocket
+                </p>
+              </div>
+              <input type="checkbox" className="size-4" {...paymentForm.register("from_personal")} />
+            </div>
+
+            <Field label="Note">
+              <Textarea placeholder="Optional note…" {...paymentForm.register("note")} />
+            </Field>
+
+            <div className="flex gap-2 pt-2">
+              <Button
+                type="submit"
+                disabled={paymentForm.formState.isSubmitting}
+                className="w-1/2"
+              >
+                {paymentForm.formState.isSubmitting ? "Recording…" : "Record Payment"}
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setPaymentTarget(null)}
+                className="w-1/2"
+              >
+                Cancel
+              </Button>
+            </div>
+          </form>
+        </SheetContent>
+      </Sheet>
+
+      {/* Delete request confirm */}
       <ConfirmDialog
         open={cancelTarget !== null}
         onOpenChange={(open) => !open && setCancelTarget(null)}
@@ -699,6 +942,21 @@ export default function PurchaseRequestsPage() {
         onConfirm={handleReject}
       />
 
+      {/* Delete payment confirm */}
+      <ConfirmDialog
+        open={deletePaymentTarget !== null}
+        onOpenChange={(open) => !open && setDeletePaymentTarget(null)}
+        title="Delete Payment"
+        description={`Delete payment of ৳${Number(deletePaymentTarget?.amount ?? 0).toFixed(2)} on ${
+          deletePaymentTarget?.paid_at
+            ? new Date(deletePaymentTarget.paid_at).toLocaleDateString()
+            : "—"
+        }?`}
+        confirmLabel="Delete"
+        loading={deletingPayment}
+        onConfirm={handleDeletePayment}
+      />
+
       {/* Purchase details sidebar */}
       <Sheet open={detailsTarget !== null} onOpenChange={(open) => !open && setDetailsTarget(null)}>
         <SheetContent className="w-full sm:max-w-md overflow-y-auto">
@@ -707,7 +965,6 @@ export default function PurchaseRequestsPage() {
           </SheetHeader>
           {detailsTarget && (
             <div className="mt-6 px-4 pb-8 space-y-6">
-              {/* Request info */}
               <section className="space-y-3">
                 <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                   Request
@@ -748,7 +1005,6 @@ export default function PurchaseRequestsPage() {
 
               <div className="border-t border-border" />
 
-              {/* Purchase info */}
               <section className="space-y-3">
                 <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                   Purchase
@@ -779,15 +1035,78 @@ export default function PurchaseRequestsPage() {
                         : "—"
                     }
                   />
-                  <DetailRow label="Payment Method" value={detailsTarget.payment_method || "—"} />
-                  <DetailRow
-                    label="From Personal Funds"
-                    value={detailsTarget.from_personal ? "Yes" : "No"}
-                  />
                   {detailsTarget.admin_note && (
                     <DetailRow label="Admin Note" value={detailsTarget.admin_note} />
                   )}
                 </dl>
+              </section>
+
+              <div className="border-t border-border" />
+
+              <section className="space-y-3">
+                <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  Supplier Payments
+                </h3>
+                {detailPaymentsLoading ? (
+                  <p className="text-sm text-muted-foreground">Loading…</p>
+                ) : detailPayments.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">No payments recorded yet.</p>
+                ) : (
+                  <div className="space-y-3">
+                    {detailPayments.map((p) => (
+                      <div key={p.id} className="flex items-start justify-between gap-2">
+                        <div className="text-sm">
+                          <p className="font-medium">৳{Number(p.amount).toFixed(2)}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {new Date(p.paid_at).toLocaleDateString()}
+                            {p.payment_method && ` · ${p.payment_method}`}
+                            {p.from_personal && " · Personal"}
+                          </p>
+                          {p.note && (
+                            <p className="text-xs text-muted-foreground">{p.note}</p>
+                          )}
+                        </div>
+                        {isAdmin && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="size-6 text-destructive hover:bg-destructive/10 hover:text-destructive shrink-0"
+                            onClick={() => setDeletePaymentTarget(p)}
+                            title="Delete payment"
+                          >
+                            <Trash2 className="size-3" />
+                          </Button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {detailPaymentSummary && (
+                  <div className="rounded-md bg-muted px-3 py-2 text-sm space-y-1 mt-2">
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Total</span>
+                      <span className="font-semibold tabular-nums">
+                        ৳{detailPaymentSummary.actual_total.toFixed(2)}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Paid</span>
+                      <span className="font-semibold tabular-nums text-green-600">
+                        ৳{detailPaymentSummary.paid_total.toFixed(2)}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Due</span>
+                      <span
+                        className={`font-semibold tabular-nums ${
+                          detailPaymentSummary.due_amount > 0 ? "text-amber-600" : "text-green-600"
+                        }`}
+                      >
+                        ৳{detailPaymentSummary.due_amount.toFixed(2)}
+                      </span>
+                    </div>
+                  </div>
+                )}
               </section>
             </div>
           )}
