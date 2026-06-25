@@ -1,6 +1,7 @@
 import { sql } from "@/lib/db";
 import { requireUser, requireAdmin } from "@/lib/auth";
 import {
+  createPurchaseRequestSchema,
   approvePurchaseRequestSchema,
   rejectPurchaseRequestSchema,
   markPurchasedSchema,
@@ -104,6 +105,33 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     return Response.json(updated);
   }
 
+  if (action === "edit") {
+    if (user.role !== "admin") {
+      return Response.json({ error: "Forbidden" }, { status: 403 });
+    }
+
+    const parsed = createPurchaseRequestSchema.safeParse(rest);
+    if (!parsed.success) {
+      return Response.json({ error: parsed.error.flatten().fieldErrors }, { status: 400 });
+    }
+
+    const d = parsed.data;
+    const estimated_total = d.estimated_price != null ? d.estimated_price * d.requested_qty : null;
+
+    const [updated] = await sql`
+      UPDATE purchase_requests SET
+        supplier_id     = ${d.supplier_id},
+        product_id      = ${d.product_id},
+        requested_qty   = ${d.requested_qty},
+        estimated_price = ${d.estimated_price ?? null},
+        estimated_total = ${estimated_total},
+        note            = ${d.note || null}
+      WHERE id = ${id}
+      RETURNING *
+    `;
+    return Response.json(updated);
+  }
+
   return Response.json({ error: "Invalid action" }, { status: 400 });
 }
 
@@ -114,10 +142,6 @@ export async function DELETE(_request: Request, { params }: { params: Promise<{ 
   const { id } = await params;
   const pr = await getRequest(Number(id));
   if (!pr) return Response.json({ error: "Not found" }, { status: 404 });
-
-  if (pr.status !== "pending") {
-    return Response.json({ error: "Only pending requests can be cancelled" }, { status: 400 });
-  }
 
   await sql`DELETE FROM purchase_requests WHERE id = ${id}`;
   return new Response(null, { status: 204 });

@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
-import { PlusIcon, Trash2, CheckCircle2, XCircle, ShoppingBag, Eye } from "lucide-react";
+import { PlusIcon, Pencil, Trash2, CheckCircle2, XCircle, ShoppingBag, Eye } from "lucide-react";
 import { useWatch } from "react-hook-form";
 
 import {
@@ -79,6 +79,7 @@ export default function PurchaseRequestsPage() {
   const [statusFilter, setStatusFilter] = useState("all");
 
   const [createOpen, setCreateOpen] = useState(false);
+  const [editTarget, setEditTarget] = useState<PurchaseRequest | null>(null);
   const [cancelTarget, setCancelTarget] = useState<PurchaseRequest | null>(null);
   const [cancelling, setCancelling] = useState(false);
 
@@ -159,10 +160,41 @@ export default function PurchaseRequestsPage() {
       estimated_price: null,
       note: "",
     });
+    setEditTarget(null);
+    setCreateOpen(true);
+  }
+
+  function openEdit(r: PurchaseRequest) {
+    createForm.reset({
+      supplier_id: r.supplier_id,
+      product_id: r.product_id,
+      requested_qty: r.requested_qty,
+      estimated_price: r.estimated_price ? Number(r.estimated_price) : null,
+      note: r.note ?? "",
+    });
+    setEditTarget(r);
     setCreateOpen(true);
   }
 
   async function onCreateSubmit(data: CreatePurchaseRequestInput) {
+    if (editTarget) {
+      const res = await fetch(`/api/purchase-requests/${editTarget.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "edit", ...data }),
+      });
+      if (res.ok) {
+        toast.success("Purchase request updated");
+        setCreateOpen(false);
+        setEditTarget(null);
+        refreshRequests();
+      } else {
+        const json = await res.json();
+        toast.error(json.error ?? "Failed to update request");
+      }
+      return;
+    }
+
     const res = await fetch("/api/purchase-requests", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -293,7 +325,7 @@ export default function PurchaseRequestsPage() {
               <TableHead>Est. Price</TableHead>
               <TableHead>Status</TableHead>
               <TableHead>Note</TableHead>
-              <TableHead className="w-[100px]" />
+              <TableHead className="w-[160px]" />
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -338,13 +370,26 @@ export default function PurchaseRequestsPage() {
                   </TableCell>
                   <TableCell>
                     <div className="flex items-center gap-1">
-                      {/* Admin can cancel (delete) pending */}
-                      {r.status === "pending" && isAdmin && (
+                      {/* Admin: edit (always visible) */}
+                      {isAdmin && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => openEdit(r)}
+                          className="size-7 text-muted-foreground hover:text-foreground"
+                          title="Edit"
+                        >
+                          <Pencil className="size-3.5" />
+                        </Button>
+                      )}
+                      {/* Admin: delete (always visible) */}
+                      {isAdmin && (
                         <Button
                           variant="ghost"
                           size="icon"
                           onClick={() => setCancelTarget(r)}
                           className="size-7 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                          title="Delete"
                         >
                           <Trash2 className="size-3.5" />
                         </Button>
@@ -421,11 +466,19 @@ export default function PurchaseRequestsPage() {
         </Table>
       </div>
 
-      {/* Create sheet */}
-      <Sheet open={createOpen} onOpenChange={setCreateOpen}>
+      {/* Create / Edit sheet */}
+      <Sheet
+        open={createOpen}
+        onOpenChange={(open) => {
+          if (!open) {
+            setCreateOpen(false);
+            setEditTarget(null);
+          }
+        }}
+      >
         <SheetContent className="w-full sm:max-w-md overflow-y-auto">
           <SheetHeader>
-            <SheetTitle>New Purchase Request</SheetTitle>
+            <SheetTitle>{editTarget ? "Edit Purchase Request" : "New Purchase Request"}</SheetTitle>
           </SheetHeader>
           <form
             onSubmit={createForm.handleSubmit(onCreateSubmit)}
@@ -510,12 +563,14 @@ export default function PurchaseRequestsPage() {
 
             <div className="flex gap-2 pt-2">
               <Button type="submit" disabled={createForm.formState.isSubmitting} className="w-1/2">
-                {createForm.formState.isSubmitting ? "Submitting…" : "Submit Request"}
+                {createForm.formState.isSubmitting
+                  ? editTarget ? "Saving…" : "Submitting…"
+                  : editTarget ? "Save Changes" : "Submit Request"}
               </Button>
               <Button
                 type="button"
                 variant="outline"
-                onClick={() => setCreateOpen(false)}
+                onClick={() => { setCreateOpen(false); setEditTarget(null); }}
                 className="w-1/2"
               >
                 Cancel
@@ -611,13 +666,13 @@ export default function PurchaseRequestsPage() {
         </SheetContent>
       </Sheet>
 
-      {/* Cancel confirm */}
+      {/* Delete confirm */}
       <ConfirmDialog
         open={cancelTarget !== null}
         onOpenChange={(open) => !open && setCancelTarget(null)}
-        title="Cancel Request"
-        description={`Cancel the purchase request for "${cancelTarget?.product_name}"?`}
-        confirmLabel="Cancel Request"
+        title="Delete Request"
+        description={`Permanently delete the purchase request for "${cancelTarget?.product_name}"?`}
+        confirmLabel="Delete"
         loading={cancelling}
         onConfirm={handleCancel}
       />
