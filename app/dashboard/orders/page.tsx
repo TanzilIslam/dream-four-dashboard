@@ -432,10 +432,10 @@ export default function OrdersPage() {
         <Table>
           <TableHeader>
             <TableRow>
-              {isAdmin && <TableHead>Partner</TableHead>}
+              <TableHead>ID</TableHead>
               <TableHead>Customer</TableHead>
-              <TableHead>Product</TableHead>
               <TableHead>Qty</TableHead>
+              <TableHead>Unit Price</TableHead>
               <TableHead>Total</TableHead>
               <TableHead>Paid</TableHead>
               <TableHead>Due</TableHead>
@@ -447,7 +447,7 @@ export default function OrdersPage() {
             {loading ? (
               <TableRow>
                 <TableCell
-                  colSpan={isAdmin ? 9 : 8}
+                  colSpan={9}
                   className="text-center text-muted-foreground py-10"
                 >
                   Loading…
@@ -456,7 +456,7 @@ export default function OrdersPage() {
             ) : filteredOrders.length === 0 ? (
               <TableRow>
                 <TableCell
-                  colSpan={isAdmin ? 9 : 8}
+                  colSpan={9}
                   className="text-center text-muted-foreground py-10"
                 >
                   {activeFilterCount > 0 ? "No orders match your filters" : "No orders"}
@@ -465,15 +465,10 @@ export default function OrdersPage() {
             ) : (
               filteredOrders.map((o) => (
                 <TableRow key={o.id}>
-                  {isAdmin && <TableCell>{o.partner_name ?? "—"}</TableCell>}
+                  <TableCell className="text-muted-foreground text-xs">#{o.id}</TableCell>
                   <TableCell className="font-medium">{o.customer_name ?? "—"}</TableCell>
-                  <TableCell>
-                    {o.product_name ?? "—"}
-                    {o.product_unit && (
-                      <span className="text-muted-foreground text-xs ml-1">({o.product_unit})</span>
-                    )}
-                  </TableCell>
                   <TableCell>{o.quantity}</TableCell>
+                  <TableCell>৳{Number(o.unit_price).toFixed(2)}</TableCell>
                   <TableCell>৳{Number(o.total_amount).toFixed(2)}</TableCell>
                   <TableCell>
                     {Number(o.paid_amount) > 0 ? (
