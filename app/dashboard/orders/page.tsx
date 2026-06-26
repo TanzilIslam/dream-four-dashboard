@@ -106,6 +106,7 @@ export default function OrdersPage() {
   const [stock, setStock] = useState<StockItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [orderSummary, setOrderSummary] = useState({ total: 0, paid: 0, due: 0 });
   const [filterOpen, setFilterOpen] = useState(false);
   const [filters, setFilters] = useState({
     status: "due",
@@ -202,6 +203,12 @@ export default function OrdersPage() {
   }, [apiStatus]);
 
   useEffect(() => {
+    fetch(`/api/orders/summary?product_id=${filters.product_id}`)
+      .then((res) => res.json())
+      .then((data) => setOrderSummary(data));
+  }, [filters.product_id]);
+
+  useEffect(() => {
     fetch("/api/auth/me")
       .then((res) => (res.ok ? res.json() : { user: null }))
       .then((data) => setIsAdmin(data.user?.role === "admin"))
@@ -224,12 +231,14 @@ export default function OrdersPage() {
   }, []);
 
   async function refreshOrders() {
-    const [ordersRes, stockRes] = await Promise.all([
+    const [ordersRes, stockRes, summaryRes] = await Promise.all([
       fetch(`/api/orders?status=${apiStatus}`),
       fetch("/api/stock"),
+      fetch(`/api/orders/summary?product_id=${filters.product_id}`),
     ]);
     setOrders(await ordersRes.json());
     setStock(await stockRes.json());
+    setOrderSummary(await summaryRes.json());
   }
 
   function setFilter<K extends keyof typeof filters>(key: K, value: (typeof filters)[K]) {
@@ -282,7 +291,7 @@ export default function OrdersPage() {
     return true;
   });
 
-  function openCreate() {
+function openCreate() {
     createForm.reset({
       customer_id: 0,
       product_id: 0,
@@ -424,6 +433,20 @@ export default function OrdersPage() {
                 </div>
               );
             })}
+        </div>
+      )}
+
+      {!loading && orders.length > 0 && (
+        <div className="flex items-center gap-4 flex-wrap text-sm px-1">
+          <span className="text-muted-foreground">
+            Total: <span className="font-medium text-foreground">৳{orderSummary.total.toFixed(2)}</span>
+          </span>
+          <span className="text-muted-foreground">
+            Paid: <span className="font-medium text-green-600">৳{orderSummary.paid.toFixed(2)}</span>
+          </span>
+          <span className="text-muted-foreground">
+            Due: <span className="font-medium text-amber-600">৳{orderSummary.due.toFixed(2)}</span>
+          </span>
         </div>
       )}
 
