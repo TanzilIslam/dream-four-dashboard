@@ -5,7 +5,7 @@ import { useForm } from "react-hook-form";
 import { useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
-import { PlusIcon, Trash2Icon } from "lucide-react";
+import { PlusIcon, Trash2Icon, HistoryIcon, Loader2 } from "lucide-react";
 
 import {
   createStockAdjustmentSchema,
@@ -61,6 +61,18 @@ type Adjustment = {
   created_at: string;
 };
 
+type PurchaseReceipt = {
+  id: number;
+  purchased_at: string;
+  actual_qty: string;
+  actual_price: string;
+  actual_total: string;
+  note: string | null;
+  admin_note: string | null;
+  supplier_name: string | null;
+  partner_name: string | null;
+};
+
 function stockStatus(row: StockRow): {
   label: string;
   variant: "default" | "secondary" | "destructive";
@@ -79,6 +91,14 @@ export default function StockPage() {
   const [isAdmin, setIsAdmin] = useState(false);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [adjType, setAdjType] = useState<"deduct" | "add">("deduct");
+
+  const [historyTarget, setHistoryTarget] = useState<StockRow | null>(null);
+  const [historyRows, setHistoryRows] = useState<PurchaseReceipt[]>([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [historySummary, setHistorySummary] = useState<{
+    total_qty: number;
+    total_amount: number;
+  } | null>(null);
 
   const form = useForm<CreateStockAdjustmentInput>({
     resolver: zodResolver(createStockAdjustmentSchema),
@@ -115,6 +135,24 @@ export default function StockPage() {
   async function loadAdjustments() {
     const res = await fetch("/api/stock/adjustments");
     if (res.ok) setAdjustments(await res.json());
+  }
+
+  function openHistory(row: StockRow) {
+    setHistoryTarget(row);
+    setHistoryRows([]);
+    setHistorySummary(null);
+    setHistoryLoading(true);
+    fetch(`/api/stock/${row.id}/history`)
+      .then((r) => r.json())
+      .then((data) => {
+        setHistoryRows(data.rows ?? []);
+        setHistorySummary({
+          total_qty: Number(data.total_qty ?? 0),
+          total_amount: Number(data.total_amount ?? 0),
+        });
+        setHistoryLoading(false);
+      })
+      .catch(() => setHistoryLoading(false));
   }
 
   useEffect(() => {
@@ -211,13 +249,14 @@ export default function StockPage() {
               {isAdmin && <TableHead className="text-right">Adjusted</TableHead>}
               <TableHead className="text-right">Available</TableHead>
               <TableHead>Status</TableHead>
+              <TableHead className="w-10" />
             </TableRow>
           </TableHeader>
           <TableBody>
             {loading ? (
               <TableRow>
                 <TableCell
-                  colSpan={isAdmin ? 8 : 7}
+                  colSpan={isAdmin ? 9 : 8}
                   className="text-center py-10 text-muted-foreground"
                 >
                   Loading…
@@ -226,7 +265,7 @@ export default function StockPage() {
             ) : stock.length === 0 ? (
               <TableRow>
                 <TableCell
-                  colSpan={isAdmin ? 8 : 7}
+                  colSpan={isAdmin ? 9 : 8}
                   className="text-center py-10 text-muted-foreground"
                 >
                   No products found
@@ -282,6 +321,17 @@ export default function StockPage() {
                     </TableCell>
                     <TableCell>
                       <Badge variant={status.variant}>{status.label}</Badge>
+                    </TableCell>
+                    <TableCell>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7 text-muted-foreground hover:text-foreground"
+                        onClick={() => openHistory(row)}
+                        title="Purchase history"
+                      >
+                        <HistoryIcon className="h-3.5 w-3.5" />
+                      </Button>
                     </TableCell>
                   </TableRow>
                 );
@@ -351,6 +401,106 @@ export default function StockPage() {
           </div>
         </div>
       )}
+
+      {/* Purchase history sheet */}
+      <Sheet open={historyTarget !== null} onOpenChange={(open) => !open && setHistoryTarget(null)}>
+        <SheetContent className="w-full sm:max-w-2xl overflow-y-auto">
+          <SheetHeader>
+            <SheetTitle>
+              Purchase History — {historyTarget?.name}
+              {historyTarget?.unit && (
+                <span className="ml-1.5 text-sm font-normal text-muted-foreground">
+                  ({historyTarget.unit})
+                </span>
+              )}
+            </SheetTitle>
+          </SheetHeader>
+
+          {/* Summary */}
+          {historySummary && (
+            <div className="mx-4 mt-3 rounded-md bg-muted/50 px-4 py-3 text-sm grid grid-cols-2 gap-4">
+              <div>
+                <p className="text-xs text-muted-foreground">Total Received</p>
+                <p className="text-lg font-semibold tabular-nums">
+                  {historySummary.total_qty.toLocaleString()}{" "}
+                  <span className="text-sm font-normal text-muted-foreground">
+                    {historyTarget?.unit}
+                  </span>
+                </p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Total Spent</p>
+                <p className="text-lg font-semibold tabular-nums">
+                  ৳{historySummary.total_amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </p>
+              </div>
+            </div>
+          )}
+
+          <div className="px-4 mt-5">
+            {historyLoading ? (
+              <div className="flex justify-center py-12">
+                <Loader2 className="size-5 animate-spin text-muted-foreground" />
+              </div>
+            ) : historyRows.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-12">
+                No purchases recorded yet for this product.
+              </p>
+            ) : (
+              <div className="rounded-lg border border-border overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Date</TableHead>
+                      <TableHead>Supplier</TableHead>
+                      <TableHead className="text-right">Qty</TableHead>
+                      <TableHead className="text-right">Unit Price</TableHead>
+                      <TableHead className="text-right">Total</TableHead>
+                      <TableHead>Note</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {historyRows.map((r) => (
+                      <TableRow key={r.id}>
+                        <TableCell className="whitespace-nowrap text-muted-foreground">
+                          {new Date(r.purchased_at).toLocaleDateString()}
+                        </TableCell>
+                        <TableCell className="font-medium">
+                          {r.supplier_name ?? (
+                            <span className="text-muted-foreground">—</span>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-right tabular-nums">
+                          {Number(r.actual_qty).toLocaleString()}
+                        </TableCell>
+                        <TableCell className="text-right tabular-nums text-muted-foreground">
+                          ৳{Number(r.actual_price).toFixed(2)}
+                        </TableCell>
+                        <TableCell className="text-right tabular-nums font-medium">
+                          ৳{Number(r.actual_total).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </TableCell>
+                        <TableCell className="text-muted-foreground text-sm max-w-[140px] truncate">
+                          {r.note || r.admin_note || "—"}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+          </div>
+
+          <div className="px-4 mt-4 pb-6">
+            <Button
+              variant="outline"
+              className="w-full"
+              onClick={() => setHistoryTarget(null)}
+            >
+              Close
+            </Button>
+          </div>
+        </SheetContent>
+      </Sheet>
 
       {/* Log Adjustment Sheet */}
       <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
