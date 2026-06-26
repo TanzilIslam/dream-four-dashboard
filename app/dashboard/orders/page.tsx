@@ -14,6 +14,8 @@ import {
   Check,
   SlidersHorizontal,
   X,
+  Trash2,
+  Loader2,
 } from "lucide-react";
 
 import { z } from "zod";
@@ -91,6 +93,25 @@ type StockItem = {
   reserved_qty: number;
 };
 
+type OrderPayment = {
+  id: number;
+  order_id: number;
+  partner_id: number;
+  customer_id: number;
+  amount: string;
+  payment_method: string | null;
+  paid_at: string;
+  promised_payment_date: string | null;
+  note: string | null;
+  recorded_by_name: string | null;
+};
+
+type OrderPaymentSummary = {
+  paid_total: number;
+  due_amount: number;
+  total_amount: number;
+};
+
 const STATUS_VARIANT: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
   pending: "secondary",
   delivered: "default",
@@ -117,7 +138,12 @@ export default function OrdersPage() {
   });
 
   const [createOpen, setCreateOpen] = useState(false);
-  const [payTarget, setPayTarget] = useState<Order | null>(null);
+  const [paymentSheetTarget, setPaymentSheetTarget] = useState<Order | null>(null);
+  const [orderPayments, setOrderPayments] = useState<OrderPayment[]>([]);
+  const [orderPaymentsLoading, setOrderPaymentsLoading] = useState(false);
+  const [orderPaymentSummary, setOrderPaymentSummary] = useState<OrderPaymentSummary | null>(null);
+  const [deletePaymentTarget, setDeletePaymentTarget] = useState<OrderPayment | null>(null);
+  const [deletingOrderPayment, setDeletingOrderPayment] = useState(false);
   const [cancelTarget, setCancelTarget] = useState<Order | null>(null);
   const [cancelling, setCancelling] = useState(false);
   const [deliverTarget, setDeliverTarget] = useState<Order | null>(null);
@@ -232,6 +258,25 @@ export default function OrdersPage() {
     return () => mq.removeEventListener("change", handler);
   }, []);
 
+  useEffect(() => {
+    if (!paymentSheetTarget) return;
+    setOrderPaymentsLoading(true);
+    setOrderPayments([]);
+    setOrderPaymentSummary(null);
+    fetch(`/api/orders/${paymentSheetTarget.id}/payments`)
+      .then((res) => res.json())
+      .then((data) => {
+        setOrderPayments(data.payments ?? []);
+        setOrderPaymentSummary({
+          paid_total: Number(data.paid_total ?? 0),
+          due_amount: Number(data.due_amount ?? 0),
+          total_amount: Number(data.total_amount ?? 0),
+        });
+        setOrderPaymentsLoading(false);
+      })
+      .catch(() => setOrderPaymentsLoading(false));
+  }, [paymentSheetTarget?.id]);
+
   async function refreshOrders() {
     const [ordersRes, stockRes] = await Promise.all([
       fetch(`/api/orders?status=${apiStatus}`),
@@ -338,21 +383,98 @@ export default function OrdersPage() {
     setDelivering(false);
   }
 
+  async function reloadPaymentSheet(orderId: number) {
+    const [paymentsData, ordersData, stockData] = await Promise.all([
+      fetch(`/api/orders/${orderId}/payments`).then((r) => r.json()),
+      fetch(`/api/orders?status=${apiStatus}`).then((r) => r.json()),
+      fetch("/api/stock").then((r) => r.json()),
+    ]);
+    setOrderPayments(paymentsData.payments ?? []);
+    setOrderPaymentSummary({
+      paid_total: Number(paymentsData.paid_total ?? 0),
+      due_amount: Number(paymentsData.due_amount ?? 0),
+      total_amount: Number(paymentsData.total_amount ?? 0),
+    });
+    setOrders(ordersData);
+    setStock(stockData);
+  }
+
   async function onPaySubmit(data: PayOrderInput) {
-    if (!payTarget) return;
-    const res = await fetch(`/api/orders/${payTarget.id}`, {
+    if (!paymentSheetTarget) return;
+    const res = await fetch(`/api/orders/${paymentSheetTarget.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ action: "pay", ...data }),
     });
     if (res.ok) {
+      const updatedOrder: Order = await res.json();
       toast.success("Payment recorded");
-      setPayTarget(null);
-      refreshOrders();
+      setPaymentSheetTarget(updatedOrder);
+      payForm.reset({
+        paid_amount: Number(updatedOrder.due_amount) > 0 ? Number(updatedOrder.due_amount) : 0,
+        payment_method: "",
+        promised_payment_date: "",
+        note: "",
+      });
+      await reloadPaymentSheet(paymentSheetTarget.id);
     } else {
       const json = await res.json();
       toast.error(json.error ?? "Failed to record payment");
     }
+  }
+
+  async function handleDeleteOrderPayment() {
+    if (!deletePaymentTarget || !paymentSheetTarget) return;
+    setDeletingOrderPayment(true);
+    const res = await fetch(
+      `/api/orders/${paymentSheetTarget.id}/payments/${deletePaymentTarget.id}`,
+      { method: "DELETE" }
+    );
+    if (res.ok) {
+      toast.success("Payment deleted");
+      setDeletePaymentTarget(null);
+      const [paymentsData, ordersData, stockData] = await Promise.all([
+        fetch(`/api/orders/${paymentSheetTarget.id}/payments`).then((r) => r.json()),
+        fetch(`/api/orders?status=${apiStatus}`).then((r) => r.json()),
+        fetch("/api/stock").then((r) => r.json()),
+      ]);
+      setOrderPayments(paymentsData.payments ?? []);
+      setOrderPaymentSummary({
+        paid_total: Number(paymentsData.paid_total ?? 0),
+        due_amount: Number(paymentsData.due_amount ?? 0),
+        total_amount: Number(paymentsData.total_amount ?? 0),
+      });
+      setOrders(ordersData);
+      setStock(stockData);
+      const newDue = Number(paymentsData.due_amount ?? 0);
+      const newStatus =
+        newDue > 0 && paymentSheetTarget.status === "paid"
+          ? paymentSheetTarget.delivered_at
+            ? "delivered"
+            : "pending"
+          : paymentSheetTarget.status;
+      setPaymentSheetTarget((prev) => {
+        if (!prev) return null;
+        return {
+          ...prev,
+          paid_amount: String(paymentsData.paid_total ?? 0),
+          due_amount: String(newDue),
+          status: newStatus as Order["status"],
+        };
+      });
+      if (newDue > 0) {
+        payForm.reset({
+          paid_amount: newDue,
+          payment_method: "",
+          promised_payment_date: "",
+          note: "",
+        });
+      }
+    } else {
+      const err = await res.json().catch(() => ({}));
+      toast.error((err as { error?: string }).error ?? "Failed to delete payment");
+    }
+    setDeletingOrderPayment(false);
   }
 
   async function handleCancel() {
@@ -593,7 +715,9 @@ export default function OrdersPage() {
                           <Truck className="size-3.5" />
                         </Button>
                       )}
-                      {(o.status === "pending" || o.status === "delivered") && (
+                      {(o.status === "pending" ||
+                        o.status === "delivered" ||
+                        Number(o.paid_amount) > 0) && (
                         <Button
                           variant="ghost"
                           size="icon"
@@ -604,10 +728,10 @@ export default function OrdersPage() {
                               promised_payment_date: "",
                               note: "",
                             });
-                            setPayTarget(o);
+                            setPaymentSheetTarget(o);
                           }}
                           className="size-7 text-green-600 hover:bg-green-50 hover:text-green-700"
-                          title="Record payment"
+                          title="Payments"
                         >
                           <BanknoteIcon className="size-3.5" />
                         </Button>
@@ -875,54 +999,181 @@ export default function OrdersPage() {
         </SheetContent>
       </Sheet>
 
-      {/* Payment sheet */}
-      <Sheet open={payTarget !== null} onOpenChange={(open) => !open && setPayTarget(null)}>
+      {/* Payment sheet — history + record */}
+      <Sheet
+        open={paymentSheetTarget !== null}
+        onOpenChange={(open) => !open && setPaymentSheetTarget(null)}
+      >
         <SheetContent className="w-full sm:max-w-md overflow-y-auto">
           <SheetHeader>
-            <SheetTitle>Record Payment</SheetTitle>
+            <SheetTitle>
+              Payments — {paymentSheetTarget?.customer_name ?? "Order"}
+            </SheetTitle>
           </SheetHeader>
-          {payTarget && (
-            <div className="px-4 pt-3 text-sm text-muted-foreground">
-              Order: {payTarget.customer_name} — Due: ৳{Number(payTarget.due_amount).toFixed(2)}
+
+          {/* Summary bar */}
+          {orderPaymentSummary && (
+            <div className="mx-4 mt-3 rounded-md bg-muted/50 px-3 py-2 text-sm grid grid-cols-3 gap-2 text-center">
+              <div>
+                <p className="text-xs text-muted-foreground">Total</p>
+                <p className="font-medium tabular-nums">
+                  ৳{orderPaymentSummary.total_amount.toFixed(2)}
+                </p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Paid</p>
+                <p className="font-medium text-green-600 tabular-nums">
+                  ৳{orderPaymentSummary.paid_total.toFixed(2)}
+                </p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Due</p>
+                <p
+                  className={`font-medium tabular-nums ${orderPaymentSummary.due_amount > 0 ? "text-destructive" : "text-muted-foreground"}`}
+                >
+                  ৳{orderPaymentSummary.due_amount.toFixed(2)}
+                </p>
+              </div>
             </div>
           )}
-          <form onSubmit={payForm.handleSubmit(onPaySubmit)} className="mt-4 space-y-5 px-4 pb-8">
-            <Field label="Amount Paid (৳)" error={payForm.formState.errors.paid_amount?.message}>
-              <Input
-                type="number"
-                step="0.01"
-                {...payForm.register("paid_amount", { valueAsNumber: true })}
-              />
-            </Field>
 
-            <Field label="Payment Method">
-              <Input placeholder="Cash, bKash, bank…" {...payForm.register("payment_method")} />
-            </Field>
+          {/* Payment history */}
+          <div className="px-4 mt-5">
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">
+              Payment History
+            </p>
+            {orderPaymentsLoading ? (
+              <div className="flex justify-center py-6">
+                <Loader2 className="size-4 animate-spin text-muted-foreground" />
+              </div>
+            ) : orderPayments.length === 0 ? (
+              <p className="text-sm text-muted-foreground py-4 text-center">
+                No payments recorded yet
+              </p>
+            ) : (
+              <div className="space-y-2">
+                {orderPayments.map((p) => (
+                  <div
+                    key={p.id}
+                    className="flex items-start justify-between rounded-md border border-border bg-muted/30 px-3 py-2 text-sm"
+                  >
+                    <div className="space-y-0.5 min-w-0">
+                      <p className="font-medium tabular-nums">
+                        ৳{Number(p.amount).toFixed(2)}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {new Date(p.paid_at).toLocaleDateString()}
+                        {p.payment_method ? ` · ${p.payment_method}` : ""}
+                      </p>
+                      {p.note && (
+                        <p className="text-xs text-muted-foreground">{p.note}</p>
+                      )}
+                      {p.recorded_by_name && (
+                        <p className="text-xs text-muted-foreground">
+                          by {p.recorded_by_name}
+                        </p>
+                      )}
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="size-7 text-destructive hover:bg-destructive/10 shrink-0 ml-2"
+                      onClick={() => setDeletePaymentTarget(p)}
+                      title="Delete payment"
+                    >
+                      <Trash2 className="size-3.5" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
 
-            <Field label="Promised Payment Date">
-              <Input type="date" {...payForm.register("promised_payment_date")} />
-            </Field>
+          {/* Add payment form — only when order can still accept payments */}
+          {paymentSheetTarget &&
+            (paymentSheetTarget.status === "pending" ||
+              paymentSheetTarget.status === "delivered") && (
+              <>
+                <div className="mx-4 mt-5 border-t border-border" />
+                <div className="px-4 mt-4">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-3">
+                    Record Payment
+                  </p>
+                  <form
+                    onSubmit={payForm.handleSubmit(onPaySubmit)}
+                    className="space-y-4 pb-8"
+                  >
+                    <Field
+                      label="Amount (৳)"
+                      error={payForm.formState.errors.paid_amount?.message}
+                    >
+                      <Input
+                        type="number"
+                        step="0.01"
+                        {...payForm.register("paid_amount", { valueAsNumber: true })}
+                      />
+                    </Field>
+                    <Field label="Payment Method">
+                      <Input
+                        placeholder="Cash, bKash, bank…"
+                        {...payForm.register("payment_method")}
+                      />
+                    </Field>
+                    <Field label="Promised Payment Date">
+                      <Input type="date" {...payForm.register("promised_payment_date")} />
+                    </Field>
+                    <Field label="Note">
+                      <Textarea {...payForm.register("note")} />
+                    </Field>
+                    <div className="flex gap-2 pt-2">
+                      <Button
+                        type="submit"
+                        disabled={payForm.formState.isSubmitting}
+                        className="w-1/2"
+                      >
+                        {payForm.formState.isSubmitting ? "Saving…" : "Record Payment"}
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => setPaymentSheetTarget(null)}
+                        className="w-1/2"
+                      >
+                        Close
+                      </Button>
+                    </div>
+                  </form>
+                </div>
+              </>
+            )}
 
-            <Field label="Note">
-              <Textarea {...payForm.register("note")} />
-            </Field>
-
-            <div className="flex gap-2 pt-2">
-              <Button type="submit" disabled={payForm.formState.isSubmitting} className="w-1/2">
-                {payForm.formState.isSubmitting ? "Saving…" : "Record Payment"}
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => setPayTarget(null)}
-                className="w-1/2"
-              >
-                Cancel
-              </Button>
-            </div>
-          </form>
+          {/* Close button for paid orders with no form */}
+          {paymentSheetTarget &&
+            paymentSheetTarget.status !== "pending" &&
+            paymentSheetTarget.status !== "delivered" && (
+              <div className="px-4 mt-5 pb-8">
+                <Button
+                  variant="outline"
+                  className="w-full"
+                  onClick={() => setPaymentSheetTarget(null)}
+                >
+                  Close
+                </Button>
+              </div>
+            )}
         </SheetContent>
       </Sheet>
+
+      {/* Delete payment confirm */}
+      <ConfirmDialog
+        open={deletePaymentTarget !== null}
+        onOpenChange={(open) => !open && setDeletePaymentTarget(null)}
+        title="Delete Payment"
+        description={`Delete payment of ৳${deletePaymentTarget ? Number(deletePaymentTarget.amount).toFixed(2) : ""}? This will update the order balance.`}
+        confirmLabel="Delete Payment"
+        loading={deletingOrderPayment}
+        onConfirm={handleDeleteOrderPayment}
+      />
 
       {/* Deliver confirm */}
       <ConfirmDialog
