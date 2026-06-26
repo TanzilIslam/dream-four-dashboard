@@ -107,6 +107,7 @@ export default function OrdersPage() {
   const [loading, setLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
   const [filterOpen, setFilterOpen] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
   const [filters, setFilters] = useState({
     status: "due",
     product_id: "all",
@@ -221,6 +222,14 @@ export default function OrdersPage() {
     fetch("/api/stock")
       .then((res) => res.json())
       .then((data: StockItem[]) => setStock(data));
+  }, []);
+
+  useEffect(() => {
+    const mq = window.matchMedia("(max-width: 767px)");
+    setIsMobile(mq.matches);
+    const handler = (e: MediaQueryListEvent) => setIsMobile(e.matches);
+    mq.addEventListener("change", handler);
+    return () => mq.removeEventListener("change", handler);
   }, []);
 
   async function refreshOrders() {
@@ -385,7 +394,7 @@ export default function OrdersPage() {
           <Button
             variant="outline"
             size="sm"
-            onClick={() => setFilterOpen(true)}
+            onClick={() => setFilterOpen((v) => !v)}
             className="relative"
           >
             <SlidersHorizontal className="size-4" />
@@ -424,6 +433,97 @@ export default function OrdersPage() {
                 </div>
               );
             })}
+        </div>
+      )}
+
+      {/* Desktop inline filter panel */}
+      {filterOpen && !isMobile && (
+        <div className="hidden md:block rounded-lg border border-border bg-card p-4 space-y-4">
+          <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 items-start">
+            <OrderFilterSection label="Status">
+              <OrderFilterPills
+                options={[
+                  { label: "Due", value: "due" },
+                  { label: "All", value: "all" },
+                  { label: "Pending", value: "pending" },
+                  { label: "Delivered", value: "delivered" },
+                  { label: "Paid", value: "paid" },
+                  { label: "Cancelled", value: "cancelled" },
+                ]}
+                value={filters.status}
+                onChange={(v) => setFilter("status", v)}
+              />
+            </OrderFilterSection>
+            <OrderFilterSection label="Customer">
+              <Input
+                placeholder="Search customer…"
+                value={filters.customer_search}
+                onChange={(e) => setFilter("customer_search", e.target.value)}
+              />
+            </OrderFilterSection>
+            <OrderFilterSection label="Product">
+              <Select value={filters.product_id} onValueChange={(v) => setFilter("product_id", v ?? "all")}>
+                <SelectTrigger className="w-full">
+                  <SelectValue>
+                    {filters.product_id === "all"
+                      ? "All products"
+                      : (products.find((p) => String(p.id) === filters.product_id)?.name ?? "All products")}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All products</SelectItem>
+                  {products.map((p) => (
+                    <SelectItem key={p.id} value={String(p.id)}>{p.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </OrderFilterSection>
+            <OrderFilterSection label="Area">
+              <Select value={filters.area_id} onValueChange={(v) => setFilter("area_id", v ?? "all")}>
+                <SelectTrigger className="w-full">
+                  <SelectValue>
+                    {filters.area_id === "all"
+                      ? "All areas"
+                      : (uniqueAreas.find((a) => String(a.id) === filters.area_id)?.name ?? "All areas")}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All areas</SelectItem>
+                  {uniqueAreas.map((a) => (
+                    <SelectItem key={a.id} value={String(a.id)}>{a.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </OrderFilterSection>
+            {isAdmin && uniquePartners.length > 0 && (
+              <OrderFilterSection label="Partner">
+                <Select value={filters.partner_name} onValueChange={(v) => setFilter("partner_name", v ?? "all")}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue>
+                      {filters.partner_name === "all" ? "All partners" : filters.partner_name}
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All partners</SelectItem>
+                    {uniquePartners.map((p) => (
+                      <SelectItem key={p} value={p}>{p}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </OrderFilterSection>
+            )}
+          </div>
+          {activeFilterCount > 0 && (
+            <div className="flex justify-end">
+              <button
+                onClick={clearFilters}
+                className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1 transition-colors"
+              >
+                <X className="size-3" />
+                Clear all
+              </button>
+            </div>
+          )}
         </div>
       )}
 
@@ -535,8 +635,8 @@ export default function OrdersPage() {
         </Table>
       </div>
 
-      {/* Filter sheet */}
-      <Sheet open={filterOpen} onOpenChange={setFilterOpen}>
+      {/* Filter sheet (mobile only) */}
+      <Sheet open={filterOpen && isMobile} onOpenChange={(open) => !open && setFilterOpen(false)}>
         <SheetContent className="w-full sm:max-w-sm overflow-y-auto">
           <SheetHeader>
             <SheetTitle>Filters</SheetTitle>

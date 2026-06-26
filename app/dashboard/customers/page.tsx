@@ -95,6 +95,7 @@ export default function CustomersPage() {
   const [loading, setLoading] = useState(true);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [filterOpen, setFilterOpen] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
   const [filters, setFilters] = useState<Filters>(DEFAULT_FILTERS);
   const [mode, setMode] = useState<Mode>("create");
   const [editingId, setEditingId] = useState<number | null>(null);
@@ -268,6 +269,14 @@ export default function CustomersPage() {
       .then((data) => data && setPaymentDefaults(data));
   }, []);
 
+  useEffect(() => {
+    const mq = window.matchMedia("(max-width: 767px)");
+    setIsMobile(mq.matches);
+    const handler = (e: MediaQueryListEvent) => setIsMobile(e.matches);
+    mq.addEventListener("change", handler);
+    return () => mq.removeEventListener("change", handler);
+  }, []);
+
   async function refreshCustomers() {
     const res = await fetch(`/api/customers${showInactive ? "?inactive=true" : ""}`);
     setCustomers(await res.json());
@@ -372,7 +381,7 @@ export default function CustomersPage() {
           <Button
             variant="outline"
             size="sm"
-            onClick={() => setFilterOpen(true)}
+            onClick={() => setFilterOpen((v) => !v)}
             className="relative"
           >
             <SlidersHorizontal className="size-4" />
@@ -389,6 +398,122 @@ export default function CustomersPage() {
           </Button>
         </div>
       </div>
+
+      {/* Desktop inline filter panel */}
+      {filterOpen && !isMobile && (
+        <div className="hidden md:block rounded-lg border border-border bg-card p-4 space-y-4">
+          <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 items-start">
+            <FilterSection label="Search">
+              <Input
+                placeholder="Name or phone…"
+                value={filters.search}
+                onChange={(e) => setFilter("search", e.target.value)}
+              />
+            </FilterSection>
+            <FilterSection label="Status">
+              <FilterPills
+                options={[
+                  { label: "Active", value: "active" },
+                  { label: "Inactive", value: "inactive" },
+                ]}
+                value={filters.status}
+                onChange={(v) => setFilter("status", v)}
+              />
+            </FilterSection>
+            <FilterSection label="Customer Type">
+              <FilterPills
+                options={[
+                  { label: "All", value: "all" },
+                  { label: "Home", value: "home" },
+                  { label: "Confectionery", value: "confectionery" },
+                  { label: "Hotel", value: "hotel" },
+                  { label: "Restaurant", value: "restaurant" },
+                  { label: "Not set", value: "none" },
+                ]}
+                value={filters.customer_type}
+                onChange={(v) => setFilter("customer_type", v)}
+              />
+            </FilterSection>
+            <FilterSection label="Area">
+              <Select value={filters.area_id} onValueChange={(v) => setFilter("area_id", v ?? "all")}>
+                <SelectTrigger className="w-full">
+                  <SelectValue>
+                    {filters.area_id === "all"
+                      ? "All areas"
+                      : (areas.find((a) => String(a.id) === filters.area_id)?.name ?? "All areas")}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All areas</SelectItem>
+                  {areas.map((a) => (
+                    <SelectItem key={a.id} value={String(a.id)}>{a.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </FilterSection>
+            <FilterSection label="Pricing Tier">
+              <Select
+                value={filters.pricing_tier_id}
+                onValueChange={(v) => setFilter("pricing_tier_id", v ?? "all")}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue>
+                    {filters.pricing_tier_id === "all"
+                      ? "All tiers"
+                      : filters.pricing_tier_id === "none"
+                        ? "No tier"
+                        : (() => {
+                            const t = tiers.find((t) => String(t.id) === filters.pricing_tier_id);
+                            return t ? `${t.name} — ${t.unit_price}tk` : "All tiers";
+                          })()}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All tiers</SelectItem>
+                  <SelectItem value="none">No tier</SelectItem>
+                  {tiers.map((t) => (
+                    <SelectItem key={t.id} value={String(t.id)}>{t.name} — {t.unit_price}tk</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </FilterSection>
+            <FilterSection label="Due Allowed">
+              <FilterPills
+                options={[
+                  { label: "All", value: "all" },
+                  { label: "Yes", value: "yes" },
+                  { label: "No", value: "no" },
+                ]}
+                value={filters.due_allowed}
+                onChange={(v) => setFilter("due_allowed", v)}
+              />
+            </FilterSection>
+            <FilterSection label="Delivery Frequency">
+              <FilterPills
+                options={[
+                  { label: "All", value: "all" },
+                  { label: "Daily", value: "daily" },
+                  { label: "Alternate", value: "alternate" },
+                  { label: "Weekly", value: "weekly" },
+                ]}
+                value={filters.delivery_frequency}
+                onChange={(v) => setFilter("delivery_frequency", v)}
+              />
+            </FilterSection>
+          </div>
+          {activeFilterCount > 0 && (
+            <div className="flex justify-end">
+              <button
+                onClick={() => setFilters(DEFAULT_FILTERS)}
+                className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1 transition-colors"
+              >
+                <X className="size-3" />
+                Clear all
+              </button>
+            </div>
+          )}
+        </div>
+      )}
 
       <div className="rounded-lg border border-border overflow-hidden">
         <Table>
@@ -492,8 +617,8 @@ export default function CustomersPage() {
         </Table>
       </div>
 
-      {/* ── Filter Sheet ──────────────────────────────────────────── */}
-      <Sheet open={filterOpen} onOpenChange={setFilterOpen}>
+      {/* ── Filter Sheet (mobile only) ────────────────────────────── */}
+      <Sheet open={filterOpen && isMobile} onOpenChange={(open) => !open && setFilterOpen(false)}>
         <SheetContent className="w-full sm:max-w-sm overflow-y-auto">
           <SheetHeader>
             <SheetTitle>Filters</SheetTitle>
