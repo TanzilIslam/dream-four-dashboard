@@ -199,7 +199,6 @@ export default function OrdersPage() {
         setOrders(data);
         setLoading(false);
       });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [apiStatus]);
 
   useEffect(() => {
@@ -440,25 +439,19 @@ export default function OrdersPage() {
               <TableHead>Paid</TableHead>
               <TableHead>Due</TableHead>
               <TableHead>Status</TableHead>
-              <TableHead className="w-[100px]" />
+              <TableHead className="w-25" />
             </TableRow>
           </TableHeader>
           <TableBody>
             {loading ? (
               <TableRow>
-                <TableCell
-                  colSpan={9}
-                  className="text-center text-muted-foreground py-10"
-                >
+                <TableCell colSpan={9} className="text-center text-muted-foreground py-10">
                   Loading…
                 </TableCell>
               </TableRow>
             ) : filteredOrders.length === 0 ? (
               <TableRow>
-                <TableCell
-                  colSpan={9}
-                  className="text-center text-muted-foreground py-10"
-                >
+                <TableCell colSpan={9} className="text-center text-muted-foreground py-10">
                   {activeFilterCount > 0 ? "No orders match your filters" : "No orders"}
                 </TableCell>
               </TableRow>

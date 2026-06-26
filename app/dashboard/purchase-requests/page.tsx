@@ -100,6 +100,7 @@ export default function PurchaseRequestsPage() {
   const [loading, setLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
   const [statusFilter, setStatusFilter] = useState("all");
+  const [productFilter, setProductFilter] = useState("all");
 
   const [createOpen, setCreateOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<PurchaseRequest | null>(null);
@@ -160,13 +161,25 @@ export default function PurchaseRequestsPage() {
     },
   });
 
-  const supplierId = useWatch({ control: createForm.control, name: "supplier_id", defaultValue: 0 });
+  const supplierId = useWatch({
+    control: createForm.control,
+    name: "supplier_id",
+    defaultValue: 0,
+  });
   const productId = useWatch({ control: createForm.control, name: "product_id", defaultValue: 0 });
   const selectedSupplierName = suppliers.find((s) => s.id === supplierId)?.name;
   const selectedProductName = products.find((p) => p.id === productId)?.name;
 
-  const markActualQty = useWatch({ control: markPurchasedForm.control, name: "actual_qty", defaultValue: 1 });
-  const markActualPrice = useWatch({ control: markPurchasedForm.control, name: "actual_price", defaultValue: 0 });
+  const markActualQty = useWatch({
+    control: markPurchasedForm.control,
+    name: "actual_qty",
+    defaultValue: 1,
+  });
+  const markActualPrice = useWatch({
+    control: markPurchasedForm.control,
+    name: "actual_price",
+    defaultValue: 0,
+  });
   const markComputedTotal = (Number(markActualQty) || 0) * (Number(markActualPrice) || 0);
 
   useEffect(() => {
@@ -188,16 +201,16 @@ export default function PurchaseRequestsPage() {
       .then((data: Supplier[]) => setSuppliers(data));
     fetch("/api/settings/products")
       .then((res) => res.json())
-      .then((data: Product[]) => setProducts(data));
+      .then((data: Product[]) => {
+        setProducts(data);
+        if (data.length > 0) setProductFilter(String(data[0].id));
+      });
   }, []);
 
   useEffect(() => {
     if (!detailsTarget?.id || detailsTarget.status !== "purchased") {
       return;
     }
-    setDetailPaymentsLoading(true);
-    setDetailPayments([]);
-    setDetailPaymentSummary(null);
     fetch(`/api/purchase-requests/${detailsTarget.id}/payments`)
       .then((res) => res.json())
       .then((data) => {
@@ -227,6 +240,13 @@ export default function PurchaseRequestsPage() {
       due_amount: Number(data.due_amount ?? 0),
       actual_total: Number(data.actual_total ?? 0),
     });
+  }
+
+  function openDetails(r: PurchaseRequest) {
+    setDetailPayments([]);
+    setDetailPaymentSummary(null);
+    setDetailPaymentsLoading(true);
+    setDetailsTarget(r);
   }
 
   function openCreate() {
@@ -395,6 +415,21 @@ export default function PurchaseRequestsPage() {
     setDeletingPayment(false);
   }
 
+  const filteredRequests = requests.filter((r) =>
+    productFilter === "all" ? true : String(r.product_id) === productFilter
+  );
+
+  const summary = filteredRequests.reduce(
+    (acc, r) => {
+      acc.qty += Number(r.actual_qty ?? r.requested_qty);
+      acc.total += Number(r.actual_total ?? 0);
+      acc.paid += Number(r.paid_total ?? 0);
+      acc.due += Number(r.due_amount ?? 0);
+      return acc;
+    },
+    { qty: 0, total: 0, paid: 0, due: 0 }
+  );
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
@@ -409,6 +444,39 @@ export default function PurchaseRequestsPage() {
           </Button>
         )}
       </div>
+
+      <div className="flex items-center gap-2 flex-wrap">
+        {products.map((p) => (
+          <button
+            key={p.id}
+            onClick={() => setProductFilter(String(p.id))}
+            className={`px-3 py-1 rounded-full text-sm border transition-colors ${
+              productFilter === String(p.id)
+                ? "bg-primary text-primary-foreground border-primary"
+                : "border-border text-muted-foreground hover:border-foreground hover:text-foreground"
+            }`}
+          >
+            {p.name}
+          </button>
+        ))}
+      </div>
+
+      {!loading && filteredRequests.length > 0 && (
+        <div className="flex items-center gap-4 flex-wrap text-sm px-1">
+          <span className="text-muted-foreground">
+            Qty: <span className="font-medium text-foreground">{summary.qty}</span>
+          </span>
+          <span className="text-muted-foreground">
+            Total: <span className="font-medium text-foreground">৳{summary.total.toFixed(2)}</span>
+          </span>
+          <span className="text-muted-foreground">
+            Paid: <span className="font-medium text-green-600">৳{summary.paid.toFixed(2)}</span>
+          </span>
+          <span className="text-muted-foreground">
+            Due: <span className="font-medium text-amber-600">৳{summary.due.toFixed(2)}</span>
+          </span>
+        </div>
+      )}
 
       <div className="flex items-center gap-2">
         <Label className="text-sm text-muted-foreground">Filter:</Label>
@@ -430,13 +498,18 @@ export default function PurchaseRequestsPage() {
         <Table>
           <TableHeader>
             <TableRow>
+              <TableHead>ID</TableHead>
               {isAdmin && <TableHead>Partner</TableHead>}
               <TableHead>Product</TableHead>
               <TableHead>Supplier</TableHead>
               <TableHead>Qty</TableHead>
               <TableHead>Est. Price</TableHead>
+              <TableHead>Total</TableHead>
+              <TableHead>Paid</TableHead>
+              <TableHead>Due</TableHead>
               <TableHead>Status</TableHead>
               <TableHead>Note</TableHead>
+              <TableHead>Date</TableHead>
               <TableHead className="w-[180px]" />
             </TableRow>
           </TableHeader>
@@ -444,24 +517,25 @@ export default function PurchaseRequestsPage() {
             {loading ? (
               <TableRow>
                 <TableCell
-                  colSpan={isAdmin ? 8 : 7}
+                  colSpan={isAdmin ? 13 : 12}
                   className="text-center text-muted-foreground py-10"
                 >
                   Loading…
                 </TableCell>
               </TableRow>
-            ) : requests.length === 0 ? (
+            ) : filteredRequests.length === 0 ? (
               <TableRow>
                 <TableCell
-                  colSpan={isAdmin ? 8 : 7}
+                  colSpan={isAdmin ? 13 : 12}
                   className="text-center text-muted-foreground py-10"
                 >
                   No requests
                 </TableCell>
               </TableRow>
             ) : (
-              requests.map((r) => (
+              filteredRequests.map((r) => (
                 <TableRow key={r.id}>
+                  <TableCell className="text-muted-foreground text-xs">#{r.id}</TableCell>
                   {isAdmin && <TableCell>{r.partner_name ?? "—"}</TableCell>}
                   <TableCell className="font-medium">
                     {r.product_name ?? "—"}
@@ -474,21 +548,23 @@ export default function PurchaseRequestsPage() {
                   <TableCell>
                     {r.estimated_price ? `৳${Number(r.estimated_price).toFixed(2)}` : "—"}
                   </TableCell>
+                  <TableCell className="whitespace-nowrap">
+                    {r.actual_total ? `৳${Number(r.actual_total).toFixed(2)}` : "—"}
+                  </TableCell>
+                  <TableCell className="whitespace-nowrap text-green-600">
+                    {Number(r.paid_total) > 0 ? `৳${Number(r.paid_total).toFixed(2)}` : "—"}
+                  </TableCell>
+                  <TableCell className="whitespace-nowrap text-amber-600">
+                    {Number(r.due_amount) > 0 ? `৳${Number(r.due_amount).toFixed(2)}` : "—"}
+                  </TableCell>
                   <TableCell>
-                    <div className="space-y-1">
-                      <Badge variant={STATUS_VARIANT[r.status] ?? "secondary"}>{r.status}</Badge>
-                      {r.status === "purchased" &&
-                        (Number(r.due_amount) > 0 ? (
-                          <p className="text-xs text-amber-600 font-medium">
-                            ৳{Number(r.due_amount).toFixed(2)} due
-                          </p>
-                        ) : (
-                          <p className="text-xs text-green-600 font-medium">Paid ✓</p>
-                        ))}
-                    </div>
+                    <Badge variant={STATUS_VARIANT[r.status] ?? "secondary"}>{r.status}</Badge>
                   </TableCell>
                   <TableCell className="text-sm text-muted-foreground max-w-[160px] truncate">
                     {r.admin_note ?? r.note ?? "—"}
+                  </TableCell>
+                  <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
+                    {new Date(r.created_at).toLocaleDateString()}
                   </TableCell>
                   <TableCell>
                     <div className="flex items-center gap-1">
@@ -586,7 +662,7 @@ export default function PurchaseRequestsPage() {
                         <Button
                           variant="ghost"
                           size="icon"
-                          onClick={() => setDetailsTarget(r)}
+                          onClick={() => openDetails(r)}
                           className="size-7 text-muted-foreground hover:text-foreground"
                           title="View details"
                         >
@@ -877,11 +953,13 @@ export default function PurchaseRequestsPage() {
             <div className="flex items-center justify-between">
               <div>
                 <Label>From Personal Funds</Label>
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  Paid from own pocket
-                </p>
+                <p className="text-xs text-muted-foreground mt-0.5">Paid from own pocket</p>
               </div>
-              <input type="checkbox" className="size-4" {...paymentForm.register("from_personal")} />
+              <input
+                type="checkbox"
+                className="size-4"
+                {...paymentForm.register("from_personal")}
+              />
             </div>
 
             <Field label="Note">
@@ -889,11 +967,7 @@ export default function PurchaseRequestsPage() {
             </Field>
 
             <div className="flex gap-2 pt-2">
-              <Button
-                type="submit"
-                disabled={paymentForm.formState.isSubmitting}
-                className="w-1/2"
-              >
+              <Button type="submit" disabled={paymentForm.formState.isSubmitting} className="w-1/2">
                 {paymentForm.formState.isSubmitting ? "Recording…" : "Record Payment"}
               </Button>
               <Button
@@ -1062,9 +1136,7 @@ export default function PurchaseRequestsPage() {
                             {p.payment_method && ` · ${p.payment_method}`}
                             {p.from_personal && " · Personal"}
                           </p>
-                          {p.note && (
-                            <p className="text-xs text-muted-foreground">{p.note}</p>
-                          )}
+                          {p.note && <p className="text-xs text-muted-foreground">{p.note}</p>}
                         </div>
                         {isAdmin && (
                           <Button

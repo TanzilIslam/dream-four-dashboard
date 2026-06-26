@@ -48,10 +48,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   if (!pr) return Response.json({ error: "Not found" }, { status: 404 });
 
   if (pr.status !== "purchased") {
-    return Response.json(
-      { error: "Can only add payments to purchased requests" },
-      { status: 400 }
-    );
+    return Response.json({ error: "Can only add payments to purchased requests" }, { status: 400 });
   }
 
   const parsed = addSupplierPaymentSchema.safeParse(await request.json());
@@ -68,7 +65,9 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   const remaining_due = Number(pr.actual_total ?? 0) - Number(paid_total);
   if (parsed.data.amount > remaining_due) {
     return Response.json(
-      { error: `Payment of ৳${parsed.data.amount.toFixed(2)} exceeds remaining due amount of ৳${remaining_due.toFixed(2)}` },
+      {
+        error: `Payment of ৳${parsed.data.amount.toFixed(2)} exceeds remaining due amount of ৳${remaining_due.toFixed(2)}`,
+      },
       { status: 400 }
     );
   }
