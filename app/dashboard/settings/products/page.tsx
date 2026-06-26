@@ -5,7 +5,7 @@ import { z } from "zod";
 import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
-import { PlusIcon, Pencil, Power } from "lucide-react";
+import { PlusIcon, Pencil, Power, Boxes, Trash2 } from "lucide-react";
 
 import { productSchema, type ProductInput } from "@/lib/schemas/product";
 import { formatTaka } from "@/lib/utils";
@@ -35,6 +35,13 @@ type Product = {
   is_active: boolean;
 };
 
+type ProductAsset = {
+  id: number;
+  product_id: number;
+  name: string;
+  is_active: boolean;
+};
+
 type Mode = "create" | "edit";
 
 const emptyForm: ProductInput = {
@@ -54,6 +61,14 @@ function ProductsInner() {
   const [editingId, setEditingId] = useState<number | null>(null);
   const [confirmTarget, setConfirmTarget] = useState<Product | null>(null);
   const [confirming, setConfirming] = useState(false);
+
+  const [assetTarget, setAssetTarget] = useState<Product | null>(null);
+  const [assets, setAssets] = useState<ProductAsset[]>([]);
+  const [assetsLoading, setAssetsLoading] = useState(false);
+  const [newAssetName, setNewAssetName] = useState("");
+  const [addingAsset, setAddingAsset] = useState(false);
+  const [deleteAssetTarget, setDeleteAssetTarget] = useState<ProductAsset | null>(null);
+  const [deletingAsset, setDeletingAsset] = useState(false);
 
   const form = useForm<z.input<typeof productSchema>, unknown, ProductInput>({
     resolver: zodResolver(productSchema),
@@ -113,6 +128,50 @@ function ProductsInner() {
     }
   }
 
+  async function openAssets(p: Product) {
+    setAssetTarget(p);
+    setAssetsLoading(true);
+    setAssets([]);
+    setNewAssetName("");
+    const res = await fetch(`/api/products/${p.id}/assets`);
+    setAssets(res.ok ? await res.json() : []);
+    setAssetsLoading(false);
+  }
+
+  async function handleAddAsset() {
+    if (!assetTarget || !newAssetName.trim()) return;
+    setAddingAsset(true);
+    const res = await fetch(`/api/products/${assetTarget.id}/assets`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: newAssetName.trim() }),
+    });
+    if (res.ok) {
+      const created = await res.json();
+      setAssets((prev) => [...prev, created]);
+      setNewAssetName("");
+    } else {
+      toast.error("Failed to add asset");
+    }
+    setAddingAsset(false);
+  }
+
+  async function handleDeleteAssetConfirmed() {
+    if (!deleteAssetTarget || !assetTarget) return;
+    setDeletingAsset(true);
+    const res = await fetch(
+      `/api/products/${assetTarget.id}/assets/${deleteAssetTarget.id}`,
+      { method: "DELETE" }
+    );
+    if (res.ok) {
+      setAssets((prev) => prev.filter((a) => a.id !== deleteAssetTarget.id));
+      setDeleteAssetTarget(null);
+    } else {
+      toast.error("Failed to remove asset");
+    }
+    setDeletingAsset(false);
+  }
+
   async function handleDeactivateConfirmed() {
     if (!confirmTarget) return;
     setConfirming(true);
@@ -157,7 +216,7 @@ function ProductsInner() {
               <TableHead>Default Price</TableHead>
               <TableHead>Low Stock Threshold</TableHead>
               <TableHead>Active</TableHead>
-              <TableHead className="w-[80px]" />
+              <TableHead className="w-[100px]" />
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -187,6 +246,15 @@ function ProductsInner() {
                   </TableCell>
                   <TableCell>
                     <div className="flex items-center gap-1">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => openAssets(p)}
+                        className="size-7 hover:bg-muted"
+                        title="Manage assets"
+                      >
+                        <Boxes className="size-3.5" />
+                      </Button>
                       <Button
                         variant="ghost"
                         size="icon"
@@ -273,6 +341,65 @@ function ProductsInner() {
           </form>
         </SheetContent>
       </Sheet>
+
+      {/* Asset management sheet */}
+      <Sheet open={assetTarget !== null} onOpenChange={(open) => !open && setAssetTarget(null)}>
+        <SheetContent className="w-full sm:max-w-md overflow-y-auto">
+          <SheetHeader>
+            <SheetTitle>Assets — {assetTarget?.name}</SheetTitle>
+          </SheetHeader>
+          <div className="mt-6 space-y-4 px-4">
+            <p className="text-sm text-muted-foreground">
+              Define returnable assets for this product (e.g. Egg Box).
+            </p>
+            {assetsLoading ? (
+              <p className="text-sm text-muted-foreground">Loading…</p>
+            ) : assets.length === 0 ? (
+              <p className="text-sm text-muted-foreground">No assets yet.</p>
+            ) : (
+              <ul className="space-y-2">
+                {assets.map((a) => (
+                  <li key={a.id} className="flex items-center justify-between rounded-md border border-border px-3 py-2">
+                    <span className="text-sm">{a.name}</span>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="size-7 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                      onClick={() => setDeleteAssetTarget(a)}
+                    >
+                      <Trash2 className="size-3.5" />
+                    </Button>
+                  </li>
+                ))}
+              </ul>
+            )}
+            <div className="flex gap-2">
+              <Input
+                placeholder="Asset name (e.g. Egg Box)"
+                value={newAssetName}
+                onChange={(e) => setNewAssetName(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && handleAddAsset()}
+              />
+              <Button onClick={handleAddAsset} disabled={addingAsset || !newAssetName.trim()}>
+                {addingAsset ? "Adding…" : "Add"}
+              </Button>
+            </div>
+            <Button variant="outline" className="w-full" onClick={() => setAssetTarget(null)}>
+              Close
+            </Button>
+          </div>
+        </SheetContent>
+      </Sheet>
+
+      <ConfirmDialog
+        open={deleteAssetTarget !== null}
+        onOpenChange={(open) => !open && setDeleteAssetTarget(null)}
+        title="Remove Asset"
+        description={`Remove "${deleteAssetTarget?.name}"? Historical records will be preserved.`}
+        confirmLabel="Remove"
+        loading={deletingAsset}
+        onConfirm={handleDeleteAssetConfirmed}
+      />
 
       <ConfirmDialog
         open={confirmTarget !== null}

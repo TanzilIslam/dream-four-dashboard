@@ -85,6 +85,7 @@ type SupplierPayment = {
 
 type Supplier = { id: number; name: string };
 type Product = { id: number; name: string; unit: string };
+type ProductAsset = { id: number; name: string };
 
 const STATUS_VARIANT: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
   pending: "secondary",
@@ -113,6 +114,8 @@ export default function PurchaseRequestsPage() {
   const [rejectTarget, setRejectTarget] = useState<PurchaseRequest | null>(null);
   const [rejecting, setRejecting] = useState(false);
   const [purchaseTarget, setPurchaseTarget] = useState<PurchaseRequest | null>(null);
+  const [purchaseTargetAssets, setPurchaseTargetAssets] = useState<ProductAsset[]>([]);
+  const [purchaseAssetQtys, setPurchaseAssetQtys] = useState<Record<number, number>>({});
   const [detailsTarget, setDetailsTarget] = useState<PurchaseRequest | null>(null);
 
   const [paymentTarget, setPaymentTarget] = useState<PurchaseRequest | null>(null);
@@ -224,6 +227,24 @@ export default function PurchaseRequestsPage() {
       })
       .catch(() => setDetailPaymentsLoading(false));
   }, [detailsTarget?.id, detailsTarget?.status]);
+
+  useEffect(() => {
+    if (!purchaseTarget?.product_id) {
+      setPurchaseTargetAssets([]);
+      setPurchaseAssetQtys({});
+      return;
+    }
+    fetch(`/api/products/${purchaseTarget.product_id}/assets`)
+      .then((res) => (res.ok ? res.json() : []))
+      .then((data: ProductAsset[]) => {
+        setPurchaseTargetAssets(data);
+        setPurchaseAssetQtys({});
+      })
+      .catch(() => {
+        setPurchaseTargetAssets([]);
+        setPurchaseAssetQtys({});
+      });
+  }, [purchaseTarget?.product_id]);
 
   async function refreshRequests() {
     const res = await fetch(`/api/purchase-requests?status=${statusFilter}`);
@@ -364,10 +385,13 @@ export default function PurchaseRequestsPage() {
 
   async function onMarkPurchased(data: MarkPurchasedInput) {
     if (!purchaseTarget) return;
+    const assets = purchaseTargetAssets
+      .map((a) => ({ asset_id: a.id, quantity: purchaseAssetQtys[a.id] ?? 0 }))
+      .filter((a) => a.quantity > 0);
     const res = await fetch(`/api/purchase-requests/${purchaseTarget.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "mark-purchased", ...data }),
+      body: JSON.stringify({ action: "mark-purchased", ...data, assets }),
     });
     if (res.ok) {
       toast.success("Marked as purchased");
@@ -873,6 +897,32 @@ export default function PurchaseRequestsPage() {
                 />
               </Field>
             </div>
+
+            {purchaseTargetAssets.length > 0 && (
+              <div className="border-t border-border pt-4">
+                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-3">
+                  Assets Received (Optional)
+                </p>
+                <div className="space-y-3">
+                  {purchaseTargetAssets.map((a) => (
+                    <Field key={a.id} label={a.name}>
+                      <Input
+                        type="number"
+                        min={0}
+                        placeholder="0"
+                        value={purchaseAssetQtys[a.id] ?? ""}
+                        onChange={(e) =>
+                          setPurchaseAssetQtys((prev) => ({
+                            ...prev,
+                            [a.id]: Number(e.target.value),
+                          }))
+                        }
+                      />
+                    </Field>
+                  ))}
+                </div>
+              </div>
+            )}
 
             <div className="flex gap-2 pt-2">
               <Button

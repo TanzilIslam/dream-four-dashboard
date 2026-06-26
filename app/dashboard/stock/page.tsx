@@ -5,12 +5,13 @@ import { useForm } from "react-hook-form";
 import { useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
-import { PlusIcon, Trash2Icon, HistoryIcon, Loader2 } from "lucide-react";
+import { PlusIcon, Trash2Icon, HistoryIcon, Loader2, ArrowLeftRight } from "lucide-react";
 
 import {
   createStockAdjustmentSchema,
   type CreateStockAdjustmentInput,
 } from "@/lib/schemas/stock-adjustment";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -73,6 +74,33 @@ type PurchaseReceipt = {
   partner_name: string | null;
 };
 
+type AssetStockRow = {
+  asset_id: number;
+  product_id: number;
+  asset_name: string;
+  product_name: string;
+  received: number;
+  sent: number;
+  returned_by_customers: number;
+  returned_to_suppliers: number;
+  available: number;
+};
+
+type Supplier = { id: number; name: string };
+
+type SupplierAssetReturn = {
+  id: number;
+  supplier_id: number;
+  asset_id: number;
+  quantity: number;
+  returned_at: string;
+  note: string | null;
+  supplier_name: string;
+  asset_name: string;
+  product_name: string;
+  created_by_name: string | null;
+};
+
 function stockStatus(row: StockRow): {
   label: string;
   variant: "default" | "secondary" | "destructive";
@@ -99,6 +127,19 @@ export default function StockPage() {
     total_qty: number;
     total_amount: number;
   } | null>(null);
+
+  const [assetStock, setAssetStock] = useState<AssetStockRow[]>([]);
+  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+  const [supplierAssetReturns, setSupplierAssetReturns] = useState<SupplierAssetReturn[]>([]);
+  const [sarOpen, setSarOpen] = useState(false);
+  const [sarSupplierId, setSarSupplierId] = useState(0);
+  const [sarAssetId, setSarAssetId] = useState(0);
+  const [sarQty, setSarQty] = useState(1);
+  const [sarDate, setSarDate] = useState(new Date().toISOString().slice(0, 10));
+  const [sarNote, setSarNote] = useState("");
+  const [sarSubmitting, setSarSubmitting] = useState(false);
+  const [deleteSarTarget, setDeleteSarTarget] = useState<SupplierAssetReturn | null>(null);
+  const [deletingSar, setDeletingSar] = useState(false);
 
   const form = useForm<CreateStockAdjustmentInput>({
     resolver: zodResolver(createStockAdjustmentSchema),
@@ -137,6 +178,16 @@ export default function StockPage() {
     if (res.ok) setAdjustments(await res.json());
   }
 
+  async function loadAssetStock() {
+    const res = await fetch("/api/asset-stock");
+    if (res.ok) setAssetStock(await res.json());
+  }
+
+  async function loadSupplierAssetReturns() {
+    const res = await fetch("/api/supplier-asset-returns");
+    if (res.ok) setSupplierAssetReturns(await res.json());
+  }
+
   function openHistory(row: StockRow) {
     setHistoryTarget(row);
     setHistoryRows([]);
@@ -169,6 +220,10 @@ export default function StockPage() {
         if (data.user?.role === "admin") {
           setIsAdmin(true);
           loadAdjustments();
+          loadSupplierAssetReturns();
+          fetch("/api/settings/suppliers")
+            .then((r) => r.json())
+            .then((d: Supplier[]) => setSuppliers(d));
         }
       })
       .catch(() => {});
@@ -176,6 +231,8 @@ export default function StockPage() {
     fetch("/api/settings/products")
       .then((r) => r.json())
       .then((data: Product[]) => setProducts(data));
+
+    loadAssetStock();
   }, []);
 
   function openSheet() {
@@ -218,6 +275,54 @@ export default function StockPage() {
     }
     toast.success("Adjustment removed");
     await Promise.all([loadStock(), loadAdjustments()]);
+  }
+
+  async function handleAddSupplierAssetReturn() {
+    if (!sarSupplierId || !sarAssetId || sarQty < 1 || !sarDate) {
+      toast.error("Please fill in all fields");
+      return;
+    }
+    setSarSubmitting(true);
+    const res = await fetch("/api/supplier-asset-returns", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        supplier_id: sarSupplierId,
+        asset_id: sarAssetId,
+        quantity: sarQty,
+        returned_at: sarDate,
+        note: sarNote || undefined,
+      }),
+    });
+    if (res.ok) {
+      toast.success("Return recorded");
+      setSarOpen(false);
+      setSarSupplierId(0);
+      setSarAssetId(0);
+      setSarQty(1);
+      setSarNote("");
+      await Promise.all([loadAssetStock(), loadSupplierAssetReturns()]);
+    } else {
+      const err = await res.json();
+      toast.error(err.error ?? "Failed to record return");
+    }
+    setSarSubmitting(false);
+  }
+
+  async function handleDeleteSupplierAssetReturn() {
+    if (!deleteSarTarget) return;
+    setDeletingSar(true);
+    const res = await fetch(`/api/supplier-asset-returns/${deleteSarTarget.id}`, {
+      method: "DELETE",
+    });
+    if (res.ok) {
+      toast.success("Return deleted");
+      setDeleteSarTarget(null);
+      await Promise.all([loadAssetStock(), loadSupplierAssetReturns()]);
+    } else {
+      toast.error("Failed to delete return");
+    }
+    setDeletingSar(false);
   }
 
   return (
@@ -344,6 +449,112 @@ export default function StockPage() {
       <p className="text-xs text-muted-foreground">
         Available = Purchased − Reserved (pending orders) − Delivered + Returned + Adjustments
       </p>
+
+      {/* Asset stock section */}
+      {assetStock.length > 0 && (
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <h2 className="text-sm font-semibold">Asset Stock</h2>
+            {isAdmin && (
+              <Button size="sm" variant="outline" onClick={() => setSarOpen(true)}>
+                <ArrowLeftRight className="size-3.5 mr-1" />
+                Return to Supplier
+              </Button>
+            )}
+          </div>
+          <div className="rounded-lg border border-border overflow-hidden">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Product</TableHead>
+                  <TableHead>Asset</TableHead>
+                  <TableHead className="text-right">Received</TableHead>
+                  <TableHead className="text-right">Sent Out</TableHead>
+                  <TableHead className="text-right">Returned by Customers</TableHead>
+                  <TableHead className="text-right">Returned to Supplier</TableHead>
+                  <TableHead className="text-right">Available</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {assetStock.map((row) => (
+                  <TableRow key={row.asset_id}>
+                    <TableCell className="font-medium text-muted-foreground">
+                      {row.product_name}
+                    </TableCell>
+                    <TableCell className="font-medium">{row.asset_name}</TableCell>
+                    <TableCell className="text-right text-muted-foreground">
+                      {row.received}
+                    </TableCell>
+                    <TableCell className="text-right text-muted-foreground">{row.sent}</TableCell>
+                    <TableCell className="text-right text-muted-foreground">
+                      {row.returned_by_customers}
+                    </TableCell>
+                    <TableCell className="text-right text-muted-foreground">
+                      {row.returned_to_suppliers}
+                    </TableCell>
+                    <TableCell
+                      className={`text-right font-semibold ${
+                        row.available <= 0 ? "text-destructive" : "text-green-600"
+                      }`}
+                    >
+                      {row.available}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        </div>
+      )}
+
+      {/* Supplier asset returns history (admin only) */}
+      {isAdmin && supplierAssetReturns.length > 0 && (
+        <div className="space-y-2">
+          <h2 className="text-sm font-semibold">Asset Returns to Suppliers</h2>
+          <div className="rounded-lg border border-border overflow-hidden">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Date</TableHead>
+                  <TableHead>Supplier</TableHead>
+                  <TableHead>Asset</TableHead>
+                  <TableHead className="text-right">Qty</TableHead>
+                  <TableHead>Note</TableHead>
+                  <TableHead />
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {supplierAssetReturns.map((r) => (
+                  <TableRow key={r.id}>
+                    <TableCell className="text-muted-foreground">
+                      {new Date(r.returned_at).toLocaleDateString()}
+                    </TableCell>
+                    <TableCell className="font-medium">{r.supplier_name}</TableCell>
+                    <TableCell>
+                      {r.asset_name}
+                      <span className="ml-1 text-xs text-muted-foreground">
+                        ({r.product_name})
+                      </span>
+                    </TableCell>
+                    <TableCell className="text-right tabular-nums">{r.quantity}</TableCell>
+                    <TableCell className="text-muted-foreground">{r.note ?? "—"}</TableCell>
+                    <TableCell>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                        onClick={() => setDeleteSarTarget(r)}
+                      >
+                        <Trash2Icon className="h-3.5 w-3.5" />
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        </div>
+      )}
 
       {/* Adjustments history (admin only) */}
       {isAdmin && adjustments.length > 0 && (
@@ -501,6 +712,107 @@ export default function StockPage() {
           </div>
         </SheetContent>
       </Sheet>
+
+      {/* Return assets to supplier sheet (admin only) */}
+      <Sheet open={sarOpen} onOpenChange={setSarOpen}>
+        <SheetContent className="w-full sm:max-w-md overflow-y-auto">
+          <SheetHeader>
+            <SheetTitle>Return Assets to Supplier</SheetTitle>
+          </SheetHeader>
+          <div className="mt-6 space-y-5 px-4 pb-8">
+            <Field label="Supplier">
+              <Select
+                value={sarSupplierId ? String(sarSupplierId) : ""}
+                onValueChange={(v) => setSarSupplierId(Number(v))}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Select supplier">
+                    {suppliers.find((s) => s.id === sarSupplierId)?.name ?? undefined}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  {suppliers.map((s) => (
+                    <SelectItem key={s.id} value={String(s.id)}>
+                      {s.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </Field>
+
+            <Field label="Asset">
+              <Select
+                value={sarAssetId ? String(sarAssetId) : ""}
+                onValueChange={(v) => setSarAssetId(Number(v))}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Select asset">
+                    {(() => {
+                      const row = assetStock.find((a) => a.asset_id === sarAssetId);
+                      return row ? `${row.asset_name} (${row.product_name})` : undefined;
+                    })()}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  {assetStock.map((a) => (
+                    <SelectItem key={a.asset_id} value={String(a.asset_id)}>
+                      {a.asset_name} ({a.product_name}) — {a.available} available
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </Field>
+
+            <Field label="Quantity">
+              <Input
+                type="number"
+                min={1}
+                value={sarQty}
+                onChange={(e) => setSarQty(Number(e.target.value))}
+              />
+            </Field>
+
+            <Field label="Return Date">
+              <Input
+                type="date"
+                value={sarDate}
+                onChange={(e) => setSarDate(e.target.value)}
+              />
+            </Field>
+
+            <Field label="Note (optional)">
+              <Textarea
+                rows={2}
+                value={sarNote}
+                onChange={(e) => setSarNote(e.target.value)}
+              />
+            </Field>
+
+            <div className="flex gap-2 pt-2">
+              <Button
+                onClick={handleAddSupplierAssetReturn}
+                disabled={sarSubmitting || !sarSupplierId || !sarAssetId}
+                className="w-1/2"
+              >
+                {sarSubmitting ? "Saving…" : "Record Return"}
+              </Button>
+              <Button variant="outline" onClick={() => setSarOpen(false)} className="w-1/2">
+                Cancel
+              </Button>
+            </div>
+          </div>
+        </SheetContent>
+      </Sheet>
+
+      <ConfirmDialog
+        open={deleteSarTarget !== null}
+        onOpenChange={(open) => !open && setDeleteSarTarget(null)}
+        title="Delete Return"
+        description={`Delete this return of ${deleteSarTarget?.quantity} ${deleteSarTarget?.asset_name} to ${deleteSarTarget?.supplier_name}?`}
+        confirmLabel="Delete"
+        loading={deletingSar}
+        onConfirm={handleDeleteSupplierAssetReturn}
+      />
 
       {/* Log Adjustment Sheet */}
       <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>

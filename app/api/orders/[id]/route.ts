@@ -79,6 +79,15 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
               ${d.payment_method || null}, ${d.promised_payment_date || null} :: DATE, ${d.note || null})
     `;
 
+    if (d.asset_returns && d.asset_returns.length > 0) {
+      for (const ar of d.asset_returns) {
+        await sql`
+          INSERT INTO order_asset_returns (order_id, asset_id, quantity, returned_at, created_by)
+          VALUES (${id}, ${ar.asset_id}, ${ar.quantity}, ${ar.returned_at}, ${user.id})
+        `;
+      }
+    }
+
     return Response.json(updated);
   }
 

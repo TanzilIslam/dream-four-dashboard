@@ -363,6 +363,62 @@ export async function GET() {
     )
   `;
 
+  await sql`
+    CREATE TABLE IF NOT EXISTS product_assets (
+      id          SERIAL PRIMARY KEY,
+      product_id  INTEGER NOT NULL REFERENCES products(id),
+      name        TEXT    NOT NULL,
+      is_active   BOOLEAN NOT NULL DEFAULT true,
+      created_at  TIMESTAMPTZ DEFAULT NOW()
+    )
+  `;
+
+  await sql`
+    CREATE TABLE IF NOT EXISTS purchase_request_assets (
+      id                  SERIAL PRIMARY KEY,
+      purchase_request_id INTEGER NOT NULL REFERENCES purchase_requests(id) ON DELETE CASCADE,
+      asset_id            INTEGER NOT NULL REFERENCES product_assets(id) ON DELETE CASCADE,
+      quantity            INTEGER NOT NULL CHECK (quantity > 0),
+      created_at          TIMESTAMPTZ DEFAULT NOW()
+    )
+  `;
+
+  await sql`
+    CREATE TABLE IF NOT EXISTS order_assets (
+      id         SERIAL PRIMARY KEY,
+      order_id   INTEGER NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
+      asset_id   INTEGER NOT NULL REFERENCES product_assets(id) ON DELETE CASCADE,
+      quantity   INTEGER NOT NULL CHECK (quantity > 0),
+      created_at TIMESTAMPTZ DEFAULT NOW()
+    )
+  `;
+
+  await sql`
+    CREATE TABLE IF NOT EXISTS order_asset_returns (
+      id          SERIAL PRIMARY KEY,
+      order_id    INTEGER NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
+      asset_id    INTEGER NOT NULL REFERENCES product_assets(id) ON DELETE CASCADE,
+      quantity    INTEGER NOT NULL CHECK (quantity > 0),
+      returned_at DATE    NOT NULL,
+      note        TEXT,
+      created_by  INTEGER REFERENCES users(id),
+      created_at  TIMESTAMPTZ DEFAULT NOW()
+    )
+  `;
+
+  await sql`
+    CREATE TABLE IF NOT EXISTS supplier_asset_returns (
+      id          SERIAL PRIMARY KEY,
+      supplier_id INTEGER NOT NULL REFERENCES suppliers(id),
+      asset_id    INTEGER NOT NULL REFERENCES product_assets(id) ON DELETE CASCADE,
+      quantity    INTEGER NOT NULL CHECK (quantity > 0),
+      returned_at DATE    NOT NULL,
+      note        TEXT,
+      created_by  INTEGER REFERENCES users(id),
+      created_at  TIMESTAMPTZ DEFAULT NOW()
+    )
+  `;
+
   // Add customer_type column if missing
   await sql`ALTER TABLE customers ADD COLUMN IF NOT EXISTS customer_type TEXT`;
 

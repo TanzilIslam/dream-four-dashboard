@@ -8,6 +8,12 @@ export const createOrderSchema = z
     unit_price: z.number().min(0, "Price must be non-negative"),
     paid_amount: z.number().min(0, "Paid amount must be non-negative").default(0),
     note: z.string().optional().or(z.literal("")),
+    assets: z
+      .array(
+        z.object({ asset_id: z.number().int().positive(), quantity: z.number().int().min(1) })
+      )
+      .optional()
+      .default([]),
   })
   .refine((d) => d.paid_amount <= d.unit_price * d.quantity, {
     message: "Paid amount cannot exceed order total",
@@ -23,6 +29,16 @@ export const payOrderSchema = z.object({
   payment_method: z.string().optional().or(z.literal("")),
   promised_payment_date: z.string().optional().or(z.literal("")),
   note: z.string().optional().or(z.literal("")),
+  asset_returns: z
+    .array(
+      z.object({
+        asset_id: z.number().int().positive(),
+        quantity: z.number().int().min(1),
+        returned_at: z.string().min(1),
+      })
+    )
+    .optional()
+    .default([]),
 });
 
 export const cancelOrderSchema = z.object({

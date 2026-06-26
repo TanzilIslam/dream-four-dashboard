@@ -18,6 +18,10 @@ export const markPurchasedSchema = z.object({
   purchased_at: z.string().min(1, "Purchase date is required"),
   admin_note: z.string().optional().or(z.literal("")),
   initial_payment_amount: z.number().min(0).optional().nullable(),
+  assets: z
+    .array(z.object({ asset_id: z.number().int().positive(), quantity: z.number().int().min(1) }))
+    .optional()
+    .default([]),
 });
 
 export const rejectPurchaseRequestSchema = z.object({

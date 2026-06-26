@@ -115,6 +115,15 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       `;
     }
 
+    if (d.assets && d.assets.length > 0) {
+      for (const a of d.assets) {
+        await sql`
+          INSERT INTO purchase_request_assets (purchase_request_id, asset_id, quantity)
+          VALUES (${id}, ${a.asset_id}, ${a.quantity})
+        `;
+      }
+    }
+
     return Response.json(updated);
   }
 

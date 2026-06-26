@@ -112,6 +112,17 @@ type OrderPaymentSummary = {
   total_amount: number;
 };
 
+type ProductAsset = { id: number; name: string };
+type OrderAssetSent = { id: number; asset_id: number; quantity: number; asset_name: string };
+type OrderAssetReturn = {
+  id: number;
+  asset_id: number;
+  quantity: number;
+  returned_at: string;
+  asset_name: string;
+  created_by_name: string | null;
+};
+
 const STATUS_VARIANT: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
   pending: "secondary",
   delivered: "default",
@@ -149,6 +160,18 @@ export default function OrdersPage() {
   const [deliverTarget, setDeliverTarget] = useState<Order | null>(null);
   const [delivering, setDelivering] = useState(false);
 
+  // Assets for create order form
+  const [createOrderAssets, setCreateOrderAssets] = useState<ProductAsset[]>([]);
+  const [createOrderAssetQtys, setCreateOrderAssetQtys] = useState<Record<number, number>>({});
+
+  // Assets for payment sheet (asset returns from customer)
+  const [orderAssetsSent, setOrderAssetsSent] = useState<OrderAssetSent[]>([]);
+  const [orderAssetsReturned, setOrderAssetsReturned] = useState<OrderAssetReturn[]>([]);
+  const [payAssetReturnQtys, setPayAssetReturnQtys] = useState<Record<number, number>>({});
+  const [payAssetReturnDate, setPayAssetReturnDate] = useState(
+    new Date().toISOString().slice(0, 10)
+  );
+
   const createForm = useForm<z.input<typeof createOrderSchema>, unknown, CreateOrderInput>({
     resolver: zodResolver(createOrderSchema),
     defaultValues: {
@@ -161,13 +184,14 @@ export default function OrdersPage() {
     },
   });
 
-  const payForm = useForm<PayOrderInput>({
+  const payForm = useForm<z.input<typeof payOrderSchema>, unknown, PayOrderInput>({
     resolver: zodResolver(payOrderSchema),
     defaultValues: {
       paid_amount: 0,
       payment_method: "",
       promised_payment_date: "",
       note: "",
+      asset_returns: [],
     },
   });
 
@@ -277,6 +301,45 @@ export default function OrdersPage() {
       .catch(() => setOrderPaymentsLoading(false));
   }, [paymentSheetTarget?.id]);
 
+  useEffect(() => {
+    if (!productId) {
+      setCreateOrderAssets([]);
+      setCreateOrderAssetQtys({});
+      return;
+    }
+    fetch(`/api/products/${productId}/assets`)
+      .then((res) => (res.ok ? res.json() : []))
+      .then((data: ProductAsset[]) => {
+        setCreateOrderAssets(data);
+        setCreateOrderAssetQtys({});
+      })
+      .catch(() => {
+        setCreateOrderAssets([]);
+        setCreateOrderAssetQtys({});
+      });
+  }, [productId]);
+
+  useEffect(() => {
+    if (!paymentSheetTarget) {
+      setOrderAssetsSent([]);
+      setOrderAssetsReturned([]);
+      setPayAssetReturnQtys({});
+      return;
+    }
+    fetch(`/api/orders/${paymentSheetTarget.id}/asset-returns`)
+      .then((res) => (res.ok ? res.json() : { sent: [], returned: [] }))
+      .then((data: { sent: OrderAssetSent[]; returned: OrderAssetReturn[] }) => {
+        setOrderAssetsSent(data.sent ?? []);
+        setOrderAssetsReturned(data.returned ?? []);
+        setPayAssetReturnQtys({});
+      })
+      .catch(() => {
+        setOrderAssetsSent([]);
+        setOrderAssetsReturned([]);
+        setPayAssetReturnQtys({});
+      });
+  }, [paymentSheetTarget?.id]);
+
   async function refreshOrders() {
     const [ordersRes, stockRes] = await Promise.all([
       fetch(`/api/orders?status=${apiStatus}`),
@@ -345,14 +408,19 @@ export default function OrdersPage() {
       paid_amount: 0,
       note: "",
     });
+    setCreateOrderAssets([]);
+    setCreateOrderAssetQtys({});
     setCreateOpen(true);
   }
 
   async function onCreateSubmit(data: CreateOrderInput) {
+    const assets = createOrderAssets
+      .map((a) => ({ asset_id: a.id, quantity: createOrderAssetQtys[a.id] ?? 0 }))
+      .filter((a) => a.quantity > 0);
     const res = await fetch("/api/orders", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(data),
+      body: JSON.stringify({ ...data, assets }),
     });
     if (res.ok) {
       toast.success("Order created");
@@ -401,15 +469,23 @@ export default function OrdersPage() {
 
   async function onPaySubmit(data: PayOrderInput) {
     if (!paymentSheetTarget) return;
+    const asset_returns = orderAssetsSent
+      .map((s) => ({
+        asset_id: s.asset_id,
+        quantity: payAssetReturnQtys[s.asset_id] ?? 0,
+        returned_at: payAssetReturnDate,
+      }))
+      .filter((ar) => ar.quantity > 0);
     const res = await fetch(`/api/orders/${paymentSheetTarget.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "pay", ...data }),
+      body: JSON.stringify({ action: "pay", ...data, asset_returns }),
     });
     if (res.ok) {
       const updatedOrder: Order = await res.json();
       toast.success("Payment recorded");
       setPaymentSheetTarget(updatedOrder);
+      setPayAssetReturnQtys({});
       payForm.reset({
         paid_amount: Number(updatedOrder.due_amount) > 0 ? Number(updatedOrder.due_amount) : 0,
         payment_method: "",
@@ -417,6 +493,14 @@ export default function OrdersPage() {
         note: "",
       });
       await reloadPaymentSheet(paymentSheetTarget.id);
+      // Refresh asset returns data
+      fetch(`/api/orders/${paymentSheetTarget.id}/asset-returns`)
+        .then((r) => (r.ok ? r.json() : { sent: [], returned: [] }))
+        .then((d: { sent: OrderAssetSent[]; returned: OrderAssetReturn[] }) => {
+          setOrderAssetsSent(d.sent ?? []);
+          setOrderAssetsReturned(d.returned ?? []);
+        })
+        .catch(() => {});
     } else {
       const json = await res.json();
       toast.error(json.error ?? "Failed to record payment");
@@ -982,6 +1066,32 @@ export default function OrdersPage() {
               <Textarea placeholder="Optional note…" {...createForm.register("note")} />
             </Field>
 
+            {createOrderAssets.length > 0 && (
+              <div className="border-t border-border pt-4">
+                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-3">
+                  Assets Sent to Customer (Optional)
+                </p>
+                <div className="space-y-3">
+                  {createOrderAssets.map((a) => (
+                    <Field key={a.id} label={a.name}>
+                      <Input
+                        type="number"
+                        min={0}
+                        placeholder="0"
+                        value={createOrderAssetQtys[a.id] ?? ""}
+                        onChange={(e) =>
+                          setCreateOrderAssetQtys((prev) => ({
+                            ...prev,
+                            [a.id]: Number(e.target.value),
+                          }))
+                        }
+                      />
+                    </Field>
+                  ))}
+                </div>
+              </div>
+            )}
+
             <div className="flex gap-2 pt-2">
               <Button type="submit" disabled={createForm.formState.isSubmitting} className="w-1/2">
                 {createForm.formState.isSubmitting ? "Creating…" : "Create Order"}
@@ -1125,6 +1235,52 @@ export default function OrdersPage() {
                     <Field label="Note">
                       <Textarea {...payForm.register("note")} />
                     </Field>
+
+                    {orderAssetsSent.length > 0 && (
+                      <div className="border-t border-border pt-4">
+                        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1">
+                          Assets Returned by Customer (Optional)
+                        </p>
+                        {orderAssetsReturned.length > 0 && (
+                          <div className="mb-3 space-y-1">
+                            {orderAssetsReturned.map((r) => (
+                              <p key={r.id} className="text-xs text-muted-foreground">
+                                {r.asset_name}: {r.quantity} returned on{" "}
+                                {new Date(r.returned_at).toLocaleDateString()}
+                              </p>
+                            ))}
+                          </div>
+                        )}
+                        <div className="space-y-3 mb-3">
+                          {orderAssetsSent.map((s) => (
+                            <Field key={s.asset_id} label={`${s.asset_name} (sent: ${s.quantity})`}>
+                              <Input
+                                type="number"
+                                min={0}
+                                placeholder="0"
+                                value={payAssetReturnQtys[s.asset_id] ?? ""}
+                                onChange={(e) =>
+                                  setPayAssetReturnQtys((prev) => ({
+                                    ...prev,
+                                    [s.asset_id]: Number(e.target.value),
+                                  }))
+                                }
+                              />
+                            </Field>
+                          ))}
+                        </div>
+                        {Object.values(payAssetReturnQtys).some((q) => q > 0) && (
+                          <Field label="Return Date">
+                            <Input
+                              type="date"
+                              value={payAssetReturnDate}
+                              onChange={(e) => setPayAssetReturnDate(e.target.value)}
+                            />
+                          </Field>
+                        )}
+                      </div>
+                    )}
+
                     <div className="flex gap-2 pt-2">
                       <Button
                         type="submit"

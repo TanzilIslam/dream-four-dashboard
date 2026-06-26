@@ -126,5 +126,14 @@ export async function POST(request: Request) {
     RETURNING *
   `;
 
+  if (d.assets && d.assets.length > 0) {
+    for (const a of d.assets) {
+      await sql`
+        INSERT INTO order_assets (order_id, asset_id, quantity)
+        VALUES (${order.id}, ${a.asset_id}, ${a.quantity})
+      `;
+    }
+  }
+
   return Response.json(order, { status: 201 });
 }
