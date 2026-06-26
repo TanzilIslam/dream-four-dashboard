@@ -5,7 +5,6 @@ import {
   approvePurchaseRequestSchema,
   rejectPurchaseRequestSchema,
   markPurchasedSchema,
-  addSupplierPaymentSchema,
 } from "@/lib/schemas/purchase-request";
 
 async function getRequest(id: number) {

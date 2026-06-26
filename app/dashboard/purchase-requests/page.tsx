@@ -192,12 +192,12 @@ export default function PurchaseRequestsPage() {
   }, []);
 
   useEffect(() => {
-    if (!detailsTarget || detailsTarget.status !== "purchased") {
-      setDetailPayments([]);
-      setDetailPaymentSummary(null);
+    if (!detailsTarget?.id || detailsTarget.status !== "purchased") {
       return;
     }
     setDetailPaymentsLoading(true);
+    setDetailPayments([]);
+    setDetailPaymentSummary(null);
     fetch(`/api/purchase-requests/${detailsTarget.id}/payments`)
       .then((res) => res.json())
       .then((data) => {
@@ -210,7 +210,7 @@ export default function PurchaseRequestsPage() {
         setDetailPaymentsLoading(false);
       })
       .catch(() => setDetailPaymentsLoading(false));
-  }, [detailsTarget?.id]);
+  }, [detailsTarget?.id, detailsTarget?.status]);
 
   async function refreshRequests() {
     const res = await fetch(`/api/purchase-requests?status=${statusFilter}`);
