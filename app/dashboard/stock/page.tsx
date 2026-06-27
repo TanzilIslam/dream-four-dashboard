@@ -72,6 +72,7 @@ type PurchaseReceipt = {
   admin_note: string | null;
   supplier_name: string | null;
   partner_name: string | null;
+  stock_before: string;
 };
 
 type AssetStockRow = {
@@ -645,7 +646,8 @@ export default function StockPage() {
                     <TableRow>
                       <TableHead>Date</TableHead>
                       <TableHead>Supplier</TableHead>
-                      <TableHead className="text-right">Qty</TableHead>
+                      <TableHead className="text-right">Before</TableHead>
+                      <TableHead className="text-right">Purchased</TableHead>
                       <TableHead className="text-right">Unit Price</TableHead>
                       <TableHead className="text-right">Total</TableHead>
                       <TableHead>Note</TableHead>
@@ -655,13 +657,20 @@ export default function StockPage() {
                     {historyRows.map((r) => (
                       <TableRow key={r.id}>
                         <TableCell className="whitespace-nowrap text-muted-foreground">
-                          {new Date(r.purchased_at).toLocaleDateString()}
+                          {new Date(r.purchased_at).toLocaleDateString("en-GB", {
+                            day: "numeric",
+                            month: "short",
+                            year: "numeric",
+                          })}
                         </TableCell>
                         <TableCell className="font-medium">
                           {r.supplier_name ?? <span className="text-muted-foreground">—</span>}
                         </TableCell>
-                        <TableCell className="text-right tabular-nums">
-                          {Number(r.actual_qty).toLocaleString()}
+                        <TableCell className="text-right tabular-nums text-muted-foreground">
+                          {Number(r.stock_before).toLocaleString()}
+                        </TableCell>
+                        <TableCell className="text-right tabular-nums font-semibold text-primary">
+                          +{Number(r.actual_qty).toLocaleString()}
                         </TableCell>
                         <TableCell className="text-right tabular-nums text-muted-foreground">
                           ৳{Number(r.actual_price).toFixed(2)}

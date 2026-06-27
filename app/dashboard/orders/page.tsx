@@ -917,6 +917,8 @@ export default function OrdersPage() {
             <TableRow>
               <TableHead>ID</TableHead>
               <TableHead>Customer</TableHead>
+              <TableHead>Product</TableHead>
+              <TableHead>Date</TableHead>
               <TableHead>Qty</TableHead>
               <TableHead>Unit Price</TableHead>
               <TableHead>Total</TableHead>
@@ -929,13 +931,13 @@ export default function OrdersPage() {
           <TableBody>
             {loading ? (
               <TableRow>
-                <TableCell colSpan={9} className="text-center text-muted-foreground py-10">
+                <TableCell colSpan={11} className="text-center text-muted-foreground py-10">
                   Loading…
                 </TableCell>
               </TableRow>
             ) : filteredOrders.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={9} className="text-center text-muted-foreground py-10">
+                <TableCell colSpan={11} className="text-center text-muted-foreground py-10">
                   {activeFilterCount > 0 ? "No orders match your filters" : "No orders"}
                 </TableCell>
               </TableRow>
@@ -944,6 +946,14 @@ export default function OrdersPage() {
                 <TableRow key={o.id}>
                   <TableCell className="text-muted-foreground text-xs">#{o.id}</TableCell>
                   <TableCell className="font-medium">{o.customer_name ?? "—"}</TableCell>
+                  <TableCell className="text-sm">{o.product_name ?? "—"}</TableCell>
+                  <TableCell className="text-muted-foreground text-xs whitespace-nowrap">
+                    {new Date(o.ordered_at).toLocaleDateString("en-GB", {
+                      day: "numeric",
+                      month: "short",
+                      year: "numeric",
+                    })}
+                  </TableCell>
                   <TableCell>{o.quantity}</TableCell>
                   <TableCell>৳{Number(o.unit_price).toFixed(2)}</TableCell>
                   <TableCell>৳{Number(o.total_amount).toFixed(2)}</TableCell>

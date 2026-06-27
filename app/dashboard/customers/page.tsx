@@ -365,11 +365,8 @@ export default function CustomersPage() {
   }, []);
 
   useEffect(() => {
+    if (!viewingCustomer) return;
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    if (!viewingCustomer) {
-      setCustomerHistory(null);
-      return;
-    }
     setHistoryLoading(true);
     fetch(`/api/customers/${viewingCustomer.id}/history`)
       .then((r) => r.json())
