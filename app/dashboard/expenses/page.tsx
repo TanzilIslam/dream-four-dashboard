@@ -59,6 +59,13 @@ export default function ExpensesPage() {
   const [editingId, setEditingId] = useState<number | null>(null);
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState("all");
+  const [productFilter, setProductFilter] = useState("all");
+  const [areaFilter, setAreaFilter] = useState("all");
+  const [methodFilter, setMethodFilter] = useState("all");
+  const [sortBy, setSortBy] = useState<"date_desc" | "date_asc" | "amount_desc" | "amount_asc">(
+    "date_desc"
+  );
 
   const form = useForm<CreateExpenseInput>({
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -174,7 +181,33 @@ export default function ExpensesPage() {
     }
   }
 
-  const total = expenses.reduce((sum, e) => sum + Number(e.amount), 0);
+  const uniqueMethods = [
+    ...new Set(expenses.map((e) => e.payment_method).filter(Boolean)),
+  ] as string[];
+
+  const filteredExpenses = expenses
+    .filter((e) => {
+      if (categoryFilter !== "all" && String(e.category_id ?? "none") !== categoryFilter)
+        return false;
+      if (productFilter !== "all" && String(e.product_id ?? "none") !== productFilter) return false;
+      if (areaFilter !== "all" && String(e.area_id ?? "none") !== areaFilter) return false;
+      if (methodFilter !== "all" && (e.payment_method ?? "none") !== methodFilter) return false;
+      return true;
+    })
+    .sort((a, b) => {
+      switch (sortBy) {
+        case "date_asc":
+          return new Date(a.date).getTime() - new Date(b.date).getTime();
+        case "amount_desc":
+          return Number(b.amount) - Number(a.amount);
+        case "amount_asc":
+          return Number(a.amount) - Number(b.amount);
+        default:
+          return new Date(b.date).getTime() - new Date(a.date).getTime();
+      }
+    });
+
+  const total = filteredExpenses.reduce((sum, e) => sum + Number(e.amount), 0);
   const colSpan = isAdmin ? 9 : 8;
 
   return (
@@ -190,22 +223,114 @@ export default function ExpensesPage() {
         </Button>
       </div>
 
-      {/* Date filter + total */}
-      <div className="flex items-center gap-3 flex-wrap">
-        <div className="flex items-center gap-2">
-          <Label className="text-sm text-muted-foreground">From</Label>
-          <Input
-            type="date"
-            className="w-36"
-            value={from}
-            onChange={(e) => setFrom(e.target.value)}
-          />
-        </div>
-        <div className="flex items-center gap-2">
-          <Label className="text-sm text-muted-foreground">To</Label>
-          <Input type="date" className="w-36" value={to} onChange={(e) => setTo(e.target.value)} />
-        </div>
-        {expenses.length > 0 && (
+      {/* Filters + sort */}
+      <div className="flex items-center gap-2 flex-wrap">
+        <Input
+          type="date"
+          className="h-8 w-36 text-sm"
+          value={from}
+          onChange={(e) => setFrom(e.target.value)}
+        />
+        <Input
+          type="date"
+          className="h-8 w-36 text-sm"
+          value={to}
+          onChange={(e) => setTo(e.target.value)}
+        />
+
+        <Select value={categoryFilter} onValueChange={(v) => setCategoryFilter(v ?? "all")}>
+          <SelectTrigger className="h-8 text-sm w-36">
+            <SelectValue>
+              {categoryFilter === "all"
+                ? "All categories"
+                : (categories.find((c) => String(c.id) === categoryFilter)?.name ??
+                  "All categories")}
+            </SelectValue>
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All categories</SelectItem>
+            {categories.map((c) => (
+              <SelectItem key={c.id} value={String(c.id)}>
+                {c.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+        <Select value={productFilter} onValueChange={(v) => setProductFilter(v ?? "all")}>
+          <SelectTrigger className="h-8 text-sm w-32">
+            <SelectValue>
+              {productFilter === "all"
+                ? "All products"
+                : (products.find((p) => String(p.id) === productFilter)?.name ?? "All products")}
+            </SelectValue>
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All products</SelectItem>
+            {products.map((p) => (
+              <SelectItem key={p.id} value={String(p.id)}>
+                {p.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+        <Select value={areaFilter} onValueChange={(v) => setAreaFilter(v ?? "all")}>
+          <SelectTrigger className="h-8 text-sm w-32">
+            <SelectValue>
+              {areaFilter === "all"
+                ? "All areas"
+                : (areas.find((a) => String(a.id) === areaFilter)?.name ?? "All areas")}
+            </SelectValue>
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All areas</SelectItem>
+            {areas.map((a) => (
+              <SelectItem key={a.id} value={String(a.id)}>
+                {a.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+        {uniqueMethods.length > 0 && (
+          <Select value={methodFilter} onValueChange={(v) => setMethodFilter(v ?? "all")}>
+            <SelectTrigger className="h-8 text-sm w-32">
+              <SelectValue>{methodFilter === "all" ? "All methods" : methodFilter}</SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All methods</SelectItem>
+              {uniqueMethods.map((m) => (
+                <SelectItem key={m} value={m}>
+                  {m}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
+
+        <Select value={sortBy} onValueChange={(v) => setSortBy(v as typeof sortBy)}>
+          <SelectTrigger className="h-8 text-sm w-40">
+            <SelectValue>
+              {
+                {
+                  date_desc: "Newest first",
+                  date_asc: "Oldest first",
+                  amount_desc: "Amount: high to low",
+                  amount_asc: "Amount: low to high",
+                }[sortBy]
+              }
+            </SelectValue>
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="date_desc">Newest first</SelectItem>
+            <SelectItem value="date_asc">Oldest first</SelectItem>
+            <SelectItem value="amount_desc">Amount: high to low</SelectItem>
+            <SelectItem value="amount_asc">Amount: low to high</SelectItem>
+          </SelectContent>
+        </Select>
+
+        {filteredExpenses.length > 0 && (
           <span className="ml-auto text-sm font-medium">Total: ৳{total.toFixed(2)}</span>
         )}
       </div>
@@ -232,14 +357,14 @@ export default function ExpensesPage() {
                   Loading…
                 </TableCell>
               </TableRow>
-            ) : expenses.length === 0 ? (
+            ) : filteredExpenses.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={colSpan} className="text-center text-muted-foreground py-10">
                   No expenses
                 </TableCell>
               </TableRow>
             ) : (
-              expenses.map((e) => (
+              filteredExpenses.map((e) => (
                 <TableRow key={e.id}>
                   {isAdmin && <TableCell>{e.partner_name ?? "—"}</TableCell>}
                   <TableCell className="font-medium">{e.category_name ?? "—"}</TableCell>

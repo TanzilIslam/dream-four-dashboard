@@ -23,7 +23,11 @@ export async function GET(request: Request) {
                  a.name  AS area_name,
                  p.name  AS product_name,
                  p.unit  AS product_unit,
-                 u.name  AS partner_name
+                 u.name  AS partner_name,
+                 GREATEST(0,
+                   COALESCE((SELECT SUM(oa.quantity) FROM order_assets oa WHERE oa.order_id = o.id), 0)
+                   - COALESCE((SELECT SUM(oar.quantity) FROM order_asset_returns oar WHERE oar.order_id = o.id), 0)
+                 )::int AS unreturned_assets
           FROM orders o
           LEFT JOIN customers c ON c.id = o.customer_id
           LEFT JOIN areas a     ON a.id = o.area_id
@@ -37,7 +41,11 @@ export async function GET(request: Request) {
                  c.name  AS customer_name,
                  a.name  AS area_name,
                  p.name  AS product_name,
-                 p.unit  AS product_unit
+                 p.unit  AS product_unit,
+                 GREATEST(0,
+                   COALESCE((SELECT SUM(oa.quantity) FROM order_assets oa WHERE oa.order_id = o.id), 0)
+                   - COALESCE((SELECT SUM(oar.quantity) FROM order_asset_returns oar WHERE oar.order_id = o.id), 0)
+                 )::int AS unreturned_assets
           FROM orders o
           LEFT JOIN customers c ON c.id = o.customer_id
           LEFT JOIN areas a     ON a.id = o.area_id
@@ -94,23 +102,6 @@ export async function POST(request: Request) {
         { status: 400 }
       );
     }
-  }
-
-  // Stock availability check
-  const [stockRow] = await sql`
-    SELECT
-      COALESCE((SELECT SUM(actual_qty) FROM purchase_requests WHERE product_id = ${d.product_id} AND status = 'purchased'), 0)
-      - COALESCE((SELECT SUM(quantity) FROM orders WHERE product_id = ${d.product_id} AND status IN ('pending', 'delivered')), 0)
-      + COALESCE((SELECT SUM(quantity) FROM returns WHERE product_id = ${d.product_id}), 0)
-      + COALESCE((SELECT SUM(quantity) FROM stock_adjustments WHERE product_id = ${d.product_id}), 0)
-      AS available
-  `;
-  const available = Number(stockRow.available);
-  if (available < d.quantity) {
-    return Response.json(
-      { error: `Insufficient stock. Available: ${available}, requested: ${d.quantity}.` },
-      { status: 400 }
-    );
   }
 
   const [order] = await sql`

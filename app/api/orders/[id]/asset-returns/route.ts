@@ -12,10 +12,7 @@ function canAccess(user: { id: number; role: string }, order: Record<string, unk
 
 // GET /api/orders/[id]/asset-returns
 // Returns assets sent with the order and all returns so far
-export async function GET(
-  _request: Request,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   const auth = await requireUser();
   if ("error" in auth) return auth.error;
 
@@ -42,4 +39,31 @@ export async function GET(
   `;
 
   return Response.json({ sent, returned });
+}
+
+// POST /api/orders/[id]/asset-returns
+// Records a standalone asset return (after payment is done)
+export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
+  const auth = await requireUser();
+  if ("error" in auth) return auth.error;
+
+  const { user } = auth;
+  const { id } = await params;
+  const order = await getOrder(Number(id));
+  if (!order) return Response.json({ error: "Not found" }, { status: 404 });
+  if (!canAccess(user, order)) return Response.json({ error: "Forbidden" }, { status: 403 });
+
+  const body = await request.json();
+  const returns: { asset_id: number; quantity: number; returned_at: string; note?: string }[] =
+    body.returns ?? [];
+
+  for (const r of returns) {
+    if (!r.quantity || r.quantity <= 0) continue;
+    await sql`
+      INSERT INTO order_asset_returns (order_id, asset_id, quantity, returned_at, note, created_by)
+      VALUES (${Number(id)}, ${r.asset_id}, ${r.quantity}, ${r.returned_at}::date, ${r.note ?? null}, ${user.id})
+    `;
+  }
+
+  return Response.json({ ok: true });
 }

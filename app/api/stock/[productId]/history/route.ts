@@ -32,7 +32,7 @@ export async function GET(
     ORDER BY pr.purchased_at ASC, pr.id ASC
   `;
 
-  const total_qty    = rows.reduce((sum, r) => sum + Number(r.actual_qty ?? 0), 0);
+  const total_qty = rows.reduce((sum, r) => sum + Number(r.actual_qty ?? 0), 0);
   const total_amount = rows.reduce((sum, r) => sum + Number(r.actual_total ?? 0), 0);
 
   return Response.json({ rows, total_qty, total_amount });

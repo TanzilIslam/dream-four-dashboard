@@ -422,6 +422,10 @@ export async function GET() {
   // Add customer_type column if missing
   await sql`ALTER TABLE customers ADD COLUMN IF NOT EXISTS customer_type TEXT`;
 
+  // Update customer_type check constraint to include madrasha
+  await sql`ALTER TABLE customers DROP CONSTRAINT IF EXISTS customers_customer_type_check`;
+  await sql`ALTER TABLE customers ADD CONSTRAINT customers_customer_type_check CHECK (customer_type IN ('home', 'confectionery', 'hotel', 'restaurant', 'madrasha'))`;
+
   // Migrate legacy role 'user' → 'partner'
   await sql`UPDATE users SET role = 'partner' WHERE role = 'user'`;
 

@@ -4,7 +4,16 @@ import { useEffect, useState } from "react";
 import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
-import { PlusIcon, Pencil, Power, ArrowUp, ArrowDown, SlidersHorizontal, X } from "lucide-react";
+import {
+  PlusIcon,
+  Pencil,
+  Power,
+  ArrowUp,
+  ArrowDown,
+  SlidersHorizontal,
+  X,
+  Eye,
+} from "lucide-react";
 
 import {
   createCustomerSchema,
@@ -54,9 +63,47 @@ type Customer = {
   max_due: string;
   delivery_frequency: string;
   delivery_interval: number;
-  customer_type: "home" | "confectionery" | "hotel" | "restaurant" | null;
+  customer_type: "home" | "confectionery" | "hotel" | "restaurant" | "madrasha" | null;
   notes: string | null;
   is_active: boolean;
+  total_orders: number;
+  total_quantity: number;
+  total_paid: string;
+  total_due: string;
+  unreturned_assets: number;
+  last_order_date: string | null;
+};
+
+type CustomerHistoryOrder = {
+  id: number;
+  ordered_at: string;
+  delivered_at: string | null;
+  status: string;
+  quantity: number;
+  unit_price: string;
+  total_amount: string;
+  paid_amount: string;
+  due_amount: string;
+  note: string | null;
+  payments: {
+    id: number;
+    amount: string;
+    payment_method: string | null;
+    paid_at: string;
+    note: string | null;
+  }[];
+};
+
+type CustomerHistoryProduct = {
+  product_id: number;
+  product_name: string;
+  product_unit: string;
+  total_orders: number;
+  total_qty: number;
+  total_amount: number;
+  total_paid: number;
+  total_due: number;
+  orders: CustomerHistoryOrder[];
 };
 
 type Area = { id: number; name: string };
@@ -95,13 +142,31 @@ export default function CustomersPage() {
   const [loading, setLoading] = useState(true);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [filterOpen, setFilterOpen] = useState(false);
-  const [isMobile, setIsMobile] = useState(false);
+  const [isMobile, setIsMobile] = useState<boolean>(
+    () => typeof window !== "undefined" && window.matchMedia("(max-width: 767px)").matches
+  );
   const [filters, setFilters] = useState<Filters>(DEFAULT_FILTERS);
   const [mode, setMode] = useState<Mode>("create");
   const [editingId, setEditingId] = useState<number | null>(null);
   const [confirmTarget, setConfirmTarget] = useState<Customer | null>(null);
   const [confirming, setConfirming] = useState(false);
+  const [viewingCustomer, setViewingCustomer] = useState<Customer | null>(null);
+  const [customerHistory, setCustomerHistory] = useState<CustomerHistoryProduct[] | null>(null);
+  const [historyLoading, setHistoryLoading] = useState(false);
   const [nameSortDir, setNameSortDir] = useState<"asc" | "desc">("asc");
+  const [orderSort, setOrderSort] = useState<
+    | "none"
+    | "orders_desc"
+    | "orders_asc"
+    | "qty_desc"
+    | "qty_asc"
+    | "due_desc"
+    | "due_asc"
+    | "paid_desc"
+    | "paid_asc"
+    | "last_order_desc"
+    | "last_order_asc"
+  >("none");
 
   // Fetch inactive from API when status filter requires it
   const showInactive = filters.status !== "active";
@@ -209,9 +274,7 @@ export default function CustomersPage() {
     filters.area_id !== "all",
     filters.customer_type !== "all",
     filters.pricing_tier_id !== "all",
-    filters.due_allowed !== "all",
     filters.status !== "active",
-    filters.delivery_frequency !== "all",
   ].filter(Boolean).length;
 
   // Frontend filtering + sorting
@@ -244,9 +307,34 @@ export default function CustomersPage() {
         return false;
       return true;
     })
-    .sort((a, b) =>
-      nameSortDir === "asc" ? a.name.localeCompare(b.name) : b.name.localeCompare(a.name)
-    );
+    .sort((a, b) => {
+      switch (orderSort) {
+        case "orders_desc":
+          return b.total_orders - a.total_orders;
+        case "orders_asc":
+          return a.total_orders - b.total_orders;
+        case "qty_desc":
+          return b.total_quantity - a.total_quantity;
+        case "qty_asc":
+          return a.total_quantity - b.total_quantity;
+        case "due_desc":
+          return Number(b.total_due) - Number(a.total_due);
+        case "due_asc":
+          return Number(a.total_due) - Number(b.total_due);
+        case "paid_desc":
+          return Number(b.total_paid) - Number(a.total_paid);
+        case "paid_asc":
+          return Number(a.total_paid) - Number(b.total_paid);
+        case "last_order_desc":
+          return (b.last_order_date ?? "").localeCompare(a.last_order_date ?? "");
+        case "last_order_asc":
+          return (a.last_order_date ?? "").localeCompare(b.last_order_date ?? "");
+        default:
+          return nameSortDir === "asc"
+            ? a.name.localeCompare(b.name)
+            : b.name.localeCompare(a.name);
+      }
+    });
 
   useEffect(() => {
     fetch(`/api/customers${showInactive ? "?inactive=true" : ""}`)
@@ -271,11 +359,23 @@ export default function CustomersPage() {
 
   useEffect(() => {
     const mq = window.matchMedia("(max-width: 767px)");
-    setIsMobile(mq.matches);
     const handler = (e: MediaQueryListEvent) => setIsMobile(e.matches);
     mq.addEventListener("change", handler);
     return () => mq.removeEventListener("change", handler);
   }, []);
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (!viewingCustomer) {
+      setCustomerHistory(null);
+      return;
+    }
+    setHistoryLoading(true);
+    fetch(`/api/customers/${viewingCustomer.id}/history`)
+      .then((r) => r.json())
+      .then((data) => setCustomerHistory(data.products))
+      .finally(() => setHistoryLoading(false));
+  }, [viewingCustomer]);
 
   async function refreshCustomers() {
     const res = await fetch(`/api/customers${showInactive ? "?inactive=true" : ""}`);
@@ -378,6 +478,40 @@ export default function CustomersPage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <Select value={orderSort} onValueChange={(v) => setOrderSort(v as typeof orderSort)}>
+            <SelectTrigger className="h-8 text-sm w-48">
+              <SelectValue>
+                {
+                  {
+                    none: "Sort by name",
+                    orders_desc: "Orders: high to low",
+                    orders_asc: "Orders: low to high",
+                    qty_desc: "Qty: high to low",
+                    qty_asc: "Qty: low to high",
+                    due_desc: "Due: high to low",
+                    due_asc: "Due: low to high",
+                    paid_desc: "Paid: high to low",
+                    paid_asc: "Paid: low to high",
+                    last_order_desc: "Last order: newest",
+                    last_order_asc: "Last order: oldest",
+                  }[orderSort]
+                }
+              </SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="none">Sort by name</SelectItem>
+              <SelectItem value="orders_desc">Orders: high to low</SelectItem>
+              <SelectItem value="orders_asc">Orders: low to high</SelectItem>
+              <SelectItem value="qty_desc">Qty: high to low</SelectItem>
+              <SelectItem value="qty_asc">Qty: low to high</SelectItem>
+              <SelectItem value="due_desc">Due: high to low</SelectItem>
+              <SelectItem value="due_asc">Due: low to high</SelectItem>
+              <SelectItem value="paid_desc">Paid: high to low</SelectItem>
+              <SelectItem value="paid_asc">Paid: low to high</SelectItem>
+              <SelectItem value="last_order_desc">Last order: newest</SelectItem>
+              <SelectItem value="last_order_asc">Last order: oldest</SelectItem>
+            </SelectContent>
+          </Select>
           <Button
             variant="outline"
             size="sm"
@@ -402,7 +536,7 @@ export default function CustomersPage() {
       {/* Desktop inline filter panel */}
       {filterOpen && !isMobile && (
         <div className="hidden md:block rounded-lg border border-border bg-card p-4 space-y-4">
-          <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 items-start">
+          <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4 items-start">
             <FilterSection label="Search">
               <Input
                 placeholder="Name or phone…"
@@ -411,31 +545,43 @@ export default function CustomersPage() {
               />
             </FilterSection>
             <FilterSection label="Status">
-              <FilterPills
-                options={[
-                  { label: "Active", value: "active" },
-                  { label: "Inactive", value: "inactive" },
-                ]}
+              <Select
                 value={filters.status}
-                onChange={(v) => setFilter("status", v)}
-              />
+                onValueChange={(v) => setFilter("status", v ?? "active")}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="active">Active</SelectItem>
+                  <SelectItem value="inactive">Inactive</SelectItem>
+                </SelectContent>
+              </Select>
             </FilterSection>
             <FilterSection label="Customer Type">
-              <FilterPills
-                options={[
-                  { label: "All", value: "all" },
-                  { label: "Home", value: "home" },
-                  { label: "Confectionery", value: "confectionery" },
-                  { label: "Hotel", value: "hotel" },
-                  { label: "Restaurant", value: "restaurant" },
-                  { label: "Not set", value: "none" },
-                ]}
+              <Select
                 value={filters.customer_type}
-                onChange={(v) => setFilter("customer_type", v)}
-              />
+                onValueChange={(v) => setFilter("customer_type", v ?? "all")}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All</SelectItem>
+                  <SelectItem value="home">Home</SelectItem>
+                  <SelectItem value="confectionery">Confectionery</SelectItem>
+                  <SelectItem value="hotel">Hotel</SelectItem>
+                  <SelectItem value="restaurant">Restaurant</SelectItem>
+                  <SelectItem value="madrasha">Madrasha</SelectItem>
+                  <SelectItem value="none">Not set</SelectItem>
+                </SelectContent>
+              </Select>
             </FilterSection>
             <FilterSection label="Area">
-              <Select value={filters.area_id} onValueChange={(v) => setFilter("area_id", v ?? "all")}>
+              <Select
+                value={filters.area_id}
+                onValueChange={(v) => setFilter("area_id", v ?? "all")}
+              >
                 <SelectTrigger className="w-full">
                   <SelectValue>
                     {filters.area_id === "all"
@@ -446,7 +592,9 @@ export default function CustomersPage() {
                 <SelectContent>
                   <SelectItem value="all">All areas</SelectItem>
                   {areas.map((a) => (
-                    <SelectItem key={a.id} value={String(a.id)}>{a.name}</SelectItem>
+                    <SelectItem key={a.id} value={String(a.id)}>
+                      {a.name}
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -472,33 +620,12 @@ export default function CustomersPage() {
                   <SelectItem value="all">All tiers</SelectItem>
                   <SelectItem value="none">No tier</SelectItem>
                   {tiers.map((t) => (
-                    <SelectItem key={t.id} value={String(t.id)}>{t.name} — {t.unit_price}tk</SelectItem>
+                    <SelectItem key={t.id} value={String(t.id)}>
+                      {t.name} — {t.unit_price}tk
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
-            </FilterSection>
-            <FilterSection label="Due Allowed">
-              <FilterPills
-                options={[
-                  { label: "All", value: "all" },
-                  { label: "Yes", value: "yes" },
-                  { label: "No", value: "no" },
-                ]}
-                value={filters.due_allowed}
-                onChange={(v) => setFilter("due_allowed", v)}
-              />
-            </FilterSection>
-            <FilterSection label="Delivery Frequency">
-              <FilterPills
-                options={[
-                  { label: "All", value: "all" },
-                  { label: "Daily", value: "daily" },
-                  { label: "Alternate", value: "alternate" },
-                  { label: "Weekly", value: "weekly" },
-                ]}
-                value={filters.delivery_frequency}
-                onChange={(v) => setFilter("delivery_frequency", v)}
-              />
             </FilterSection>
           </div>
           {activeFilterCount > 0 && (
@@ -534,24 +661,26 @@ export default function CustomersPage() {
               </TableHead>
               <TableHead>Type</TableHead>
               <TableHead>Area</TableHead>
-              <TableHead>Pricing Tier</TableHead>
               <TableHead>Phone</TableHead>
-              <TableHead>Due Allowed</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead>Created By</TableHead>
-              <TableHead className="w-[80px]" />
+              <TableHead className="text-right">Orders</TableHead>
+              <TableHead className="text-right">Qty</TableHead>
+              <TableHead className="text-right">Total Paid</TableHead>
+              <TableHead className="text-right">Total Due</TableHead>
+              <TableHead className="text-right">Last Order</TableHead>
+              <TableHead className="text-right">Assets to Return</TableHead>
+              <TableHead className="w-[80px]">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {loading ? (
               <TableRow>
-                <TableCell colSpan={9} className="text-center text-muted-foreground py-10">
+                <TableCell colSpan={11} className="text-center text-muted-foreground py-10">
                   Loading…
                 </TableCell>
               </TableRow>
             ) : filteredCustomers.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={9} className="text-center text-muted-foreground py-10">
+                <TableCell colSpan={11} className="text-center text-muted-foreground py-10">
                   {activeFilterCount > 0 ? "No customers match your filters" : "No customers yet"}
                 </TableCell>
               </TableRow>
@@ -569,27 +698,41 @@ export default function CustomersPage() {
                     )}
                   </TableCell>
                   <TableCell>{c.area_name ?? "—"}</TableCell>
-                  <TableCell>
-                    {c.tier_name
-                      ? `${c.tier_name}-${c.tier_unit_price}tk-${c.tier_min_qty}${c.tier_product_unit}`
+                  <TableCell>{c.phone ?? "—"}</TableCell>
+                  <TableCell className="text-right tabular-nums">{c.total_orders}</TableCell>
+                  <TableCell className="text-right tabular-nums">{c.total_quantity}</TableCell>
+                  <TableCell className="text-right tabular-nums text-green-600">
+                    {Number(c.total_paid) > 0 ? `৳${Number(c.total_paid).toFixed(0)}` : "—"}
+                  </TableCell>
+                  <TableCell className="text-right tabular-nums text-amber-600">
+                    {Number(c.total_due) > 0 ? `৳${Number(c.total_due).toFixed(0)}` : "—"}
+                  </TableCell>
+                  <TableCell className="text-right tabular-nums text-muted-foreground text-xs">
+                    {c.last_order_date
+                      ? new Date(c.last_order_date).toLocaleDateString("en-GB", {
+                          day: "numeric",
+                          month: "short",
+                          year: "numeric",
+                        })
                       : "—"}
                   </TableCell>
-                  <TableCell>{c.phone ?? "—"}</TableCell>
-                  <TableCell>
-                    <Badge variant={c.due_allowed ? "secondary" : "outline"}>
-                      {c.due_allowed ? "Yes" : "No"}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant={c.is_active ? "default" : "secondary"}>
-                      {c.is_active ? "Active" : "Inactive"}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="text-muted-foreground text-sm">
-                    {c.partner_name ?? "—"}
+                  <TableCell className="text-right tabular-nums">
+                    {c.unreturned_assets > 0 ? (
+                      <span className="text-destructive font-medium">{c.unreturned_assets}</span>
+                    ) : (
+                      "—"
+                    )}
                   </TableCell>
                   <TableCell>
                     <div className="flex items-center gap-1">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => setViewingCustomer(c)}
+                        className="size-7 hover:bg-muted"
+                      >
+                        <Eye className="size-3.5" />
+                      </Button>
                       <Button
                         variant="ghost"
                         size="icon"
@@ -636,30 +779,39 @@ export default function CustomersPage() {
 
             {/* Status */}
             <FilterSection label="Status">
-              <FilterPills
-                options={[
-                  { label: "Active", value: "active" },
-                  { label: "Inactive", value: "inactive" },
-                ]}
+              <Select
                 value={filters.status}
-                onChange={(v) => setFilter("status", v)}
-              />
+                onValueChange={(v) => setFilter("status", v ?? "active")}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="active">Active</SelectItem>
+                  <SelectItem value="inactive">Inactive</SelectItem>
+                </SelectContent>
+              </Select>
             </FilterSection>
 
             {/* Customer Type */}
             <FilterSection label="Customer Type">
-              <FilterPills
-                options={[
-                  { label: "All", value: "all" },
-                  { label: "Home", value: "home" },
-                  { label: "Confectionery", value: "confectionery" },
-                  { label: "Hotel", value: "hotel" },
-                  { label: "Restaurant", value: "restaurant" },
-                  { label: "Not set", value: "none" },
-                ]}
+              <Select
                 value={filters.customer_type}
-                onChange={(v) => setFilter("customer_type", v)}
-              />
+                onValueChange={(v) => setFilter("customer_type", v ?? "all")}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All</SelectItem>
+                  <SelectItem value="home">Home</SelectItem>
+                  <SelectItem value="confectionery">Confectionery</SelectItem>
+                  <SelectItem value="hotel">Hotel</SelectItem>
+                  <SelectItem value="restaurant">Restaurant</SelectItem>
+                  <SelectItem value="madrasha">Madrasha</SelectItem>
+                  <SelectItem value="none">Not set</SelectItem>
+                </SelectContent>
+              </Select>
             </FilterSection>
 
             {/* Area */}
@@ -714,33 +866,6 @@ export default function CustomersPage() {
                   ))}
                 </SelectContent>
               </Select>
-            </FilterSection>
-
-            {/* Due Allowed */}
-            <FilterSection label="Due Allowed">
-              <FilterPills
-                options={[
-                  { label: "All", value: "all" },
-                  { label: "Yes", value: "yes" },
-                  { label: "No", value: "no" },
-                ]}
-                value={filters.due_allowed}
-                onChange={(v) => setFilter("due_allowed", v)}
-              />
-            </FilterSection>
-
-            {/* Delivery Frequency */}
-            <FilterSection label="Delivery Frequency">
-              <FilterPills
-                options={[
-                  { label: "All", value: "all" },
-                  { label: "Daily", value: "daily" },
-                  { label: "Alternate", value: "alternate" },
-                  { label: "Weekly", value: "weekly" },
-                ]}
-                value={filters.delivery_frequency}
-                onChange={(v) => setFilter("delivery_frequency", v)}
-              />
             </FilterSection>
 
             {activeFilterCount > 0 && (
@@ -879,7 +1004,9 @@ export default function CustomersPage() {
                 onValueChange={(v) =>
                   form.setValue(
                     "customer_type",
-                    v === "none" ? null : (v as "home" | "confectionery" | "hotel" | "restaurant")
+                    v === "none"
+                      ? null
+                      : (v as "home" | "confectionery" | "hotel" | "restaurant" | "madrasha")
                   )
                 }
               >
@@ -896,6 +1023,7 @@ export default function CustomersPage() {
                   <SelectItem value="confectionery">Confectionery</SelectItem>
                   <SelectItem value="hotel">Hotel</SelectItem>
                   <SelectItem value="restaurant">Restaurant</SelectItem>
+                  <SelectItem value="madrasha">Madrasha</SelectItem>
                 </SelectContent>
               </Select>
             </Field>
@@ -933,6 +1061,245 @@ export default function CustomersPage() {
         </SheetContent>
       </Sheet>
 
+      {/* ── Customer Detail Sheet ─────────────────────────────────── */}
+      <Sheet
+        open={viewingCustomer !== null}
+        onOpenChange={(open) => !open && setViewingCustomer(null)}
+      >
+        <SheetContent className="w-full sm:!max-w-2xl overflow-y-auto">
+          <SheetHeader>
+            <SheetTitle>{viewingCustomer?.name}</SheetTitle>
+          </SheetHeader>
+          {viewingCustomer && (
+            <div className="mt-6 px-4 pb-8 space-y-6">
+              {/* Purchase & Payment History — top */}
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-3">
+                  Purchase &amp; Payment History
+                </p>
+                {historyLoading ? (
+                  <p className="text-sm text-muted-foreground">Loading…</p>
+                ) : customerHistory && customerHistory.length > 0 ? (
+                  <div className="space-y-6">
+                    {customerHistory.map((product) => (
+                      <div key={product.product_id} className="space-y-2">
+                        {/* Product header */}
+                        <div className="flex items-center justify-between">
+                          <p className="text-sm font-semibold">{product.product_name}</p>
+                          <div className="flex gap-3 text-xs text-muted-foreground">
+                            <span>{product.total_orders} orders</span>
+                            <span>
+                              {product.total_qty} {product.product_unit}
+                            </span>
+                            <span className="text-green-600 font-medium">
+                              ৳{product.total_paid.toFixed(0)} paid
+                            </span>
+                            {product.total_due > 0 && (
+                              <span className="text-amber-600 font-medium">
+                                ৳{product.total_due.toFixed(0)} due
+                              </span>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Orders table */}
+                        <div className="rounded-md border border-border overflow-hidden text-xs">
+                          <table className="w-full">
+                            <thead>
+                              <tr className="bg-muted/50 text-muted-foreground">
+                                <th className="text-left px-3 py-2 font-medium">Date</th>
+                                <th className="text-left px-3 py-2 font-medium">Status</th>
+                                <th className="text-right px-3 py-2 font-medium">Qty</th>
+                                <th className="text-right px-3 py-2 font-medium">Total</th>
+                                <th className="text-right px-3 py-2 font-medium">Paid</th>
+                                <th className="text-right px-3 py-2 font-medium">Due</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-border">
+                              {product.orders.map((order) => (
+                                <>
+                                  <tr key={order.id} className="hover:bg-muted/30">
+                                    <td className="px-3 py-2 whitespace-nowrap">
+                                      {new Date(order.ordered_at).toLocaleDateString("en-GB", {
+                                        day: "numeric",
+                                        month: "short",
+                                        year: "numeric",
+                                      })}
+                                    </td>
+                                    <td className="px-3 py-2">
+                                      <span
+                                        className={`capitalize px-1.5 py-0.5 rounded text-[10px] font-medium ${
+                                          order.status === "delivered"
+                                            ? "bg-green-100 text-green-700"
+                                            : order.status === "pending"
+                                              ? "bg-yellow-100 text-yellow-700"
+                                              : order.status === "cancelled"
+                                                ? "bg-red-100 text-red-700"
+                                                : "bg-muted text-muted-foreground"
+                                        }`}
+                                      >
+                                        {order.status}
+                                      </span>
+                                    </td>
+                                    <td className="px-3 py-2 text-right tabular-nums">
+                                      {order.quantity}
+                                    </td>
+                                    <td className="px-3 py-2 text-right tabular-nums">
+                                      ৳{Number(order.total_amount).toFixed(0)}
+                                    </td>
+                                    <td className="px-3 py-2 text-right tabular-nums text-green-600">
+                                      ৳{Number(order.paid_amount).toFixed(0)}
+                                    </td>
+                                    <td className="px-3 py-2 text-right tabular-nums text-amber-600">
+                                      {Number(order.due_amount) > 0
+                                        ? `৳${Number(order.due_amount).toFixed(0)}`
+                                        : "—"}
+                                    </td>
+                                  </tr>
+                                  {order.payments.length > 0 &&
+                                    order.payments.map((pay) => (
+                                      <tr
+                                        key={`pay-${pay.id}`}
+                                        className="bg-muted/20 text-muted-foreground"
+                                      >
+                                        <td className="pl-6 pr-3 py-1.5 whitespace-nowrap">
+                                          ↳{" "}
+                                          {new Date(pay.paid_at).toLocaleDateString("en-GB", {
+                                            day: "numeric",
+                                            month: "short",
+                                          })}
+                                        </td>
+                                        <td className="px-3 py-1.5 capitalize text-[10px]">
+                                          {pay.payment_method ?? "—"}
+                                        </td>
+                                        <td colSpan={2} className="px-3 py-1.5 text-[11px]">
+                                          {pay.note ?? ""}
+                                        </td>
+                                        <td className="px-3 py-1.5 text-right tabular-nums text-green-600 font-medium">
+                                          ৳{Number(pay.amount).toFixed(0)}
+                                        </td>
+                                        <td />
+                                      </tr>
+                                    ))}
+                                </>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground">No orders yet.</p>
+                )}
+              </div>
+
+              {/* Customer details — below history */}
+              <div className="border-t border-border pt-4 space-y-6">
+                <div className="grid grid-cols-3 gap-x-4 gap-y-5">
+                  <DetailCell label="Status">
+                    <Badge variant={viewingCustomer.is_active ? "default" : "secondary"}>
+                      {viewingCustomer.is_active ? "Active" : "Inactive"}
+                    </Badge>
+                  </DetailCell>
+                  <DetailCell label="Type">
+                    {viewingCustomer.customer_type ? (
+                      <Badge variant="outline" className="capitalize">
+                        {viewingCustomer.customer_type}
+                      </Badge>
+                    ) : (
+                      "—"
+                    )}
+                  </DetailCell>
+                  <DetailCell label="Area">{viewingCustomer.area_name ?? "—"}</DetailCell>
+                  <DetailCell label="Phone">{viewingCustomer.phone ?? "—"}</DetailCell>
+                  <DetailCell label="WhatsApp">{viewingCustomer.whatsapp ?? "—"}</DetailCell>
+                  <DetailCell label="Last Order">
+                    {viewingCustomer.last_order_date
+                      ? new Date(viewingCustomer.last_order_date).toLocaleDateString("en-GB", {
+                          day: "numeric",
+                          month: "short",
+                          year: "numeric",
+                        })
+                      : "—"}
+                  </DetailCell>
+                  <DetailCell label="Delivery" className="capitalize">
+                    {viewingCustomer.delivery_frequency}
+                  </DetailCell>
+                  <DetailCell label="Interval">
+                    {viewingCustomer.delivery_interval} day(s)
+                  </DetailCell>
+                  <DetailCell label="Due Allowed">
+                    {viewingCustomer.due_allowed ? "Yes" : "No"}
+                  </DetailCell>
+                  {viewingCustomer.due_allowed && (
+                    <DetailCell label="Max Due">
+                      ৳{Number(viewingCustomer.max_due).toFixed(0)}
+                    </DetailCell>
+                  )}
+                </div>
+
+                {viewingCustomer.address && (
+                  <div>
+                    <p className="text-xs text-muted-foreground mb-1">Address</p>
+                    <p className="text-sm">{viewingCustomer.address}</p>
+                  </div>
+                )}
+
+                <div className="grid grid-cols-3 gap-x-4 gap-y-5">
+                  <DetailCell label="Orders">{viewingCustomer.total_orders}</DetailCell>
+                  <DetailCell label="Total Qty">{viewingCustomer.total_quantity}</DetailCell>
+                  <DetailCell label="Assets to Return">
+                    {viewingCustomer.unreturned_assets > 0 ? (
+                      <span className="text-destructive font-medium">
+                        {viewingCustomer.unreturned_assets}
+                      </span>
+                    ) : (
+                      "—"
+                    )}
+                  </DetailCell>
+                  <DetailCell label="Total Paid">
+                    <span className="text-green-600 font-medium">
+                      ৳{Number(viewingCustomer.total_paid).toFixed(0)}
+                    </span>
+                  </DetailCell>
+                  <DetailCell label="Total Due">
+                    <span
+                      className={
+                        Number(viewingCustomer.total_due) > 0 ? "text-amber-600 font-medium" : ""
+                      }
+                    >
+                      ৳{Number(viewingCustomer.total_due).toFixed(0)}
+                    </span>
+                  </DetailCell>
+                </div>
+
+                {viewingCustomer.tier_name && (
+                  <div className="grid grid-cols-3 gap-x-4 gap-y-5">
+                    <DetailCell label="Tier">{viewingCustomer.tier_name}</DetailCell>
+                    <DetailCell label="Unit Price">৳{viewingCustomer.tier_unit_price}</DetailCell>
+                    <DetailCell label="Min Qty">
+                      {viewingCustomer.tier_min_qty} {viewingCustomer.tier_product_unit}
+                    </DetailCell>
+                  </div>
+                )}
+
+                {viewingCustomer.notes && (
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">
+                      Notes
+                    </p>
+                    <p className="text-sm text-muted-foreground whitespace-pre-wrap">
+                      {viewingCustomer.notes}
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+        </SheetContent>
+      </Sheet>
+
       <ConfirmDialog
         open={confirmTarget !== null}
         onOpenChange={(open) => !open && setConfirmTarget(null)}
@@ -957,31 +1324,19 @@ function FilterSection({ label, children }: { label: string; children: React.Rea
   );
 }
 
-function FilterPills({
-  options,
-  value,
-  onChange,
+function DetailCell({
+  label,
+  children,
+  className,
 }: {
-  options: { label: string; value: string }[];
-  value: string;
-  onChange: (v: string) => void;
+  label: string;
+  children: React.ReactNode;
+  className?: string;
 }) {
   return (
-    <div className="flex flex-wrap gap-1.5">
-      {options.map((o) => (
-        <button
-          key={o.value}
-          type="button"
-          onClick={() => onChange(o.value)}
-          className={`px-3 py-1 text-xs font-medium rounded-full border transition-colors ${
-            value === o.value
-              ? "bg-foreground text-background border-foreground"
-              : "bg-background text-muted-foreground border-border hover:text-foreground"
-          }`}
-        >
-          {o.label}
-        </button>
-      ))}
+    <div className="space-y-0.5">
+      <p className="text-xs text-muted-foreground">{label}</p>
+      <p className={`text-sm font-medium ${className ?? ""}`}>{children}</p>
     </div>
   );
 }

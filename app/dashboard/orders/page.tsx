@@ -16,6 +16,7 @@ import {
   X,
   Trash2,
   Loader2,
+  Undo2,
 } from "lucide-react";
 
 import { z } from "zod";
@@ -72,6 +73,7 @@ type Order = {
   product_name: string | null;
   product_unit: string | null;
   partner_name?: string | null;
+  unreturned_assets: number;
 };
 
 type Customer = {
@@ -140,7 +142,22 @@ export default function OrdersPage() {
   const [isAdmin, setIsAdmin] = useState(false);
   const [orderSummary, setOrderSummary] = useState({ total: 0, paid: 0, due: 0 });
   const [filterOpen, setFilterOpen] = useState(false);
-  const [isMobile, setIsMobile] = useState(false);
+  const [orderSort, setOrderSort] = useState<
+    | "none"
+    | "id_desc"
+    | "id_asc"
+    | "qty_desc"
+    | "qty_asc"
+    | "total_desc"
+    | "total_asc"
+    | "paid_desc"
+    | "paid_asc"
+    | "due_desc"
+    | "due_asc"
+  >("id_desc");
+  const [isMobile, setIsMobile] = useState<boolean>(
+    () => typeof window !== "undefined" && window.matchMedia("(max-width: 767px)").matches
+  );
   const [filters, setFilters] = useState({
     status: "due",
     product_id: "all",
@@ -172,6 +189,14 @@ export default function OrdersPage() {
   const [payAssetReturnDate, setPayAssetReturnDate] = useState(
     new Date().toISOString().slice(0, 10)
   );
+
+  // Standalone asset return sheet
+  const [returnAssetTarget, setReturnAssetTarget] = useState<Order | null>(null);
+  const [returnAssetSent, setReturnAssetSent] = useState<OrderAssetSent[]>([]);
+  const [returnAssetReturned, setReturnAssetReturned] = useState<OrderAssetReturn[]>([]);
+  const [returnAssetQtys, setReturnAssetQtys] = useState<Record<number, number>>({});
+  const [returnAssetDate, setReturnAssetDate] = useState(new Date().toISOString().slice(0, 10));
+  const [returnAssetSubmitting, setReturnAssetSubmitting] = useState(false);
 
   const createForm = useForm<z.input<typeof createOrderSchema>, unknown, CreateOrderInput>({
     resolver: zodResolver(createOrderSchema),
@@ -283,7 +308,6 @@ export default function OrdersPage() {
 
   useEffect(() => {
     const mq = window.matchMedia("(max-width: 767px)");
-    setIsMobile(mq.matches);
     const handler = (e: MediaQueryListEvent) => setIsMobile(e.matches);
     mq.addEventListener("change", handler);
     return () => mq.removeEventListener("change", handler);
@@ -291,6 +315,7 @@ export default function OrdersPage() {
 
   useEffect(() => {
     if (!paymentSheetTarget) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setOrderPaymentsLoading(true);
     setOrderPayments([]);
     setOrderPaymentSummary(null);
@@ -306,10 +331,11 @@ export default function OrdersPage() {
         setOrderPaymentsLoading(false);
       })
       .catch(() => setOrderPaymentsLoading(false));
-  }, [paymentSheetTarget?.id]);
+  }, [paymentSheetTarget]);
 
   useEffect(() => {
     if (!productId) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setCreateOrderAssets([]);
       setCreateOrderAssetQtys({});
       return;
@@ -328,6 +354,7 @@ export default function OrdersPage() {
 
   useEffect(() => {
     if (!paymentSheetTarget) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setOrderAssetsSent([]);
       setOrderAssetsReturned([]);
       setPayAssetReturnQtys({});
@@ -345,7 +372,7 @@ export default function OrdersPage() {
         setOrderAssetsReturned([]);
         setPayAssetReturnQtys({});
       });
-  }, [paymentSheetTarget?.id]);
+  }, [paymentSheetTarget]);
 
   async function refreshOrders() {
     const [ordersRes, stockRes, summaryRes] = await Promise.all([
@@ -362,12 +389,10 @@ export default function OrdersPage() {
     setFilters((prev) => ({ ...prev, [key]: value }));
   }
 
-  const defaultProductId = products.length > 0 ? String(products[0].id) : "all";
-
   function clearFilters() {
     setFilters({
       status: "due",
-      product_id: defaultProductId,
+      product_id: products.length > 0 ? String(products[0].id) : "all",
       area_id: "all",
       customer_search: "",
       partner_name: "all",
@@ -389,26 +414,53 @@ export default function OrdersPage() {
 
   const activeFilterCount = [
     filters.status !== "due",
-    filters.product_id !== defaultProductId,
+    filters.product_id !== "all",
     filters.area_id !== "all",
     filters.customer_search !== "",
     filters.partner_name !== "all",
   ].filter(Boolean).length;
 
-  const filteredOrders = orders.filter((o) => {
-    if (filters.status === "due" && Number(o.due_amount) <= 0) return false;
-    if (filters.product_id !== "all" && String(o.product_id) !== filters.product_id) return false;
-    if (filters.area_id !== "all" && String(o.area_id) !== filters.area_id) return false;
-    if (
-      filters.customer_search &&
-      !(o.customer_name ?? "").toLowerCase().includes(filters.customer_search.toLowerCase())
-    )
-      return false;
-    if (filters.partner_name !== "all" && o.partner_name !== filters.partner_name) return false;
-    return true;
-  });
+  const filteredOrders = orders
+    .filter((o) => {
+      if (filters.status === "due" && Number(o.due_amount) <= 0) return false;
+      if (filters.product_id !== "all" && String(o.product_id) !== filters.product_id) return false;
+      if (filters.area_id !== "all" && String(o.area_id) !== filters.area_id) return false;
+      if (
+        filters.customer_search &&
+        !(o.customer_name ?? "").toLowerCase().includes(filters.customer_search.toLowerCase())
+      )
+        return false;
+      if (filters.partner_name !== "all" && o.partner_name !== filters.partner_name) return false;
+      return true;
+    })
+    .sort((a, b) => {
+      switch (orderSort) {
+        case "id_desc":
+          return b.id - a.id;
+        case "id_asc":
+          return a.id - b.id;
+        case "qty_desc":
+          return b.quantity - a.quantity;
+        case "qty_asc":
+          return a.quantity - b.quantity;
+        case "total_desc":
+          return Number(b.total_amount) - Number(a.total_amount);
+        case "total_asc":
+          return Number(a.total_amount) - Number(b.total_amount);
+        case "paid_desc":
+          return Number(b.paid_amount) - Number(a.paid_amount);
+        case "paid_asc":
+          return Number(a.paid_amount) - Number(b.paid_amount);
+        case "due_desc":
+          return Number(b.due_amount) - Number(a.due_amount);
+        case "due_asc":
+          return Number(a.due_amount) - Number(b.due_amount);
+        default:
+          return b.id - a.id;
+      }
+    });
 
-function openCreate() {
+  function openCreate() {
     createForm.reset({
       customer_id: 0,
       product_id: 0,
@@ -516,6 +568,57 @@ function openCreate() {
     }
   }
 
+  function openReturnAssetSheet(order: Order) {
+    setReturnAssetTarget(order);
+    setReturnAssetQtys({});
+    setReturnAssetDate(new Date().toISOString().slice(0, 10));
+    fetch(`/api/orders/${order.id}/asset-returns`)
+      .then((r) => r.json())
+      .then((d: { sent: OrderAssetSent[]; returned: OrderAssetReturn[] }) => {
+        setReturnAssetSent(d.sent ?? []);
+        setReturnAssetReturned(d.returned ?? []);
+      });
+  }
+
+  async function handleReturnAssetSubmit() {
+    if (!returnAssetTarget) return;
+    const returns = returnAssetSent
+      .map((s) => ({
+        asset_id: s.asset_id,
+        quantity: returnAssetQtys[s.asset_id] ?? 0,
+        returned_at: returnAssetDate,
+      }))
+      .filter((r) => r.quantity > 0);
+    if (returns.length === 0) {
+      toast.error("Enter at least one quantity");
+      return;
+    }
+    setReturnAssetSubmitting(true);
+    const res = await fetch(`/api/orders/${returnAssetTarget.id}/asset-returns`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ returns }),
+    });
+    if (res.ok) {
+      toast.success("Asset return recorded");
+      // Refresh
+      fetch(`/api/orders/${returnAssetTarget.id}/asset-returns`)
+        .then((r) => r.json())
+        .then((d: { sent: OrderAssetSent[]; returned: OrderAssetReturn[] }) => {
+          setReturnAssetSent(d.sent ?? []);
+          setReturnAssetReturned(d.returned ?? []);
+        });
+      setReturnAssetQtys({});
+      // Refresh orders list
+      fetch(`/api/orders?status=${filters.status !== "all" ? filters.status : "all"}`)
+        .then((r) => r.json())
+        .then(setOrders);
+    } else {
+      toast.error("Failed to record return");
+    }
+    setReturnAssetSubmitting(false);
+  }
+
   async function handleDeleteOrderPayment() {
     if (!deletePaymentTarget || !paymentSheetTarget) return;
     setDeletingOrderPayment(true);
@@ -606,6 +709,39 @@ function openCreate() {
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <Select value={orderSort} onValueChange={(v) => setOrderSort(v as typeof orderSort)}>
+            <SelectTrigger className="h-8 text-sm w-44">
+              <SelectValue>
+                {
+                  {
+                    id_desc: "Newest first",
+                    id_asc: "Oldest first",
+                    qty_desc: "Qty: high to low",
+                    qty_asc: "Qty: low to high",
+                    total_desc: "Total: high to low",
+                    total_asc: "Total: low to high",
+                    paid_desc: "Paid: high to low",
+                    paid_asc: "Paid: low to high",
+                    due_desc: "Due: high to low",
+                    due_asc: "Due: low to high",
+                    none: "No sort",
+                  }[orderSort]
+                }
+              </SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="id_desc">Newest first</SelectItem>
+              <SelectItem value="id_asc">Oldest first</SelectItem>
+              <SelectItem value="qty_desc">Qty: high to low</SelectItem>
+              <SelectItem value="qty_asc">Qty: low to high</SelectItem>
+              <SelectItem value="total_desc">Total: high to low</SelectItem>
+              <SelectItem value="total_asc">Total: low to high</SelectItem>
+              <SelectItem value="paid_desc">Paid: high to low</SelectItem>
+              <SelectItem value="paid_asc">Paid: low to high</SelectItem>
+              <SelectItem value="due_desc">Due: high to low</SelectItem>
+              <SelectItem value="due_asc">Due: low to high</SelectItem>
+            </SelectContent>
+          </Select>
           <Button
             variant="outline"
             size="sm"
@@ -654,20 +790,21 @@ function openCreate() {
       {/* Desktop inline filter panel */}
       {filterOpen && !isMobile && (
         <div className="hidden md:block rounded-lg border border-border bg-card p-4 space-y-4">
-          <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 items-start">
+          <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4 items-start">
             <OrderFilterSection label="Status">
-              <OrderFilterPills
-                options={[
-                  { label: "Due", value: "due" },
-                  { label: "All", value: "all" },
-                  { label: "Pending", value: "pending" },
-                  { label: "Delivered", value: "delivered" },
-                  { label: "Paid", value: "paid" },
-                  { label: "Cancelled", value: "cancelled" },
-                ]}
-                value={filters.status}
-                onChange={(v) => setFilter("status", v)}
-              />
+              <Select value={filters.status} onValueChange={(v) => setFilter("status", v ?? "all")}>
+                <SelectTrigger className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="due">Due</SelectItem>
+                  <SelectItem value="all">All</SelectItem>
+                  <SelectItem value="pending">Pending</SelectItem>
+                  <SelectItem value="delivered">Delivered</SelectItem>
+                  <SelectItem value="paid">Paid</SelectItem>
+                  <SelectItem value="cancelled">Cancelled</SelectItem>
+                </SelectContent>
+              </Select>
             </OrderFilterSection>
             <OrderFilterSection label="Customer">
               <Input
@@ -677,42 +814,57 @@ function openCreate() {
               />
             </OrderFilterSection>
             <OrderFilterSection label="Product">
-              <Select value={filters.product_id} onValueChange={(v) => setFilter("product_id", v ?? "all")}>
+              <Select
+                value={filters.product_id}
+                onValueChange={(v) => setFilter("product_id", v ?? "all")}
+              >
                 <SelectTrigger className="w-full">
                   <SelectValue>
                     {filters.product_id === "all"
                       ? "All products"
-                      : (products.find((p) => String(p.id) === filters.product_id)?.name ?? "All products")}
+                      : (products.find((p) => String(p.id) === filters.product_id)?.name ??
+                        "All products")}
                   </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All products</SelectItem>
                   {products.map((p) => (
-                    <SelectItem key={p.id} value={String(p.id)}>{p.name}</SelectItem>
+                    <SelectItem key={p.id} value={String(p.id)}>
+                      {p.name}
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </OrderFilterSection>
             <OrderFilterSection label="Area">
-              <Select value={filters.area_id} onValueChange={(v) => setFilter("area_id", v ?? "all")}>
+              <Select
+                value={filters.area_id}
+                onValueChange={(v) => setFilter("area_id", v ?? "all")}
+              >
                 <SelectTrigger className="w-full">
                   <SelectValue>
                     {filters.area_id === "all"
                       ? "All areas"
-                      : (uniqueAreas.find((a) => String(a.id) === filters.area_id)?.name ?? "All areas")}
+                      : (uniqueAreas.find((a) => String(a.id) === filters.area_id)?.name ??
+                        "All areas")}
                   </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All areas</SelectItem>
                   {uniqueAreas.map((a) => (
-                    <SelectItem key={a.id} value={String(a.id)}>{a.name}</SelectItem>
+                    <SelectItem key={a.id} value={String(a.id)}>
+                      {a.name}
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </OrderFilterSection>
             {isAdmin && uniquePartners.length > 0 && (
               <OrderFilterSection label="Partner">
-                <Select value={filters.partner_name} onValueChange={(v) => setFilter("partner_name", v ?? "all")}>
+                <Select
+                  value={filters.partner_name}
+                  onValueChange={(v) => setFilter("partner_name", v ?? "all")}
+                >
                   <SelectTrigger className="w-full">
                     <SelectValue>
                       {filters.partner_name === "all" ? "All partners" : filters.partner_name}
@@ -721,7 +873,9 @@ function openCreate() {
                   <SelectContent>
                     <SelectItem value="all">All partners</SelectItem>
                     {uniquePartners.map((p) => (
-                      <SelectItem key={p} value={p}>{p}</SelectItem>
+                      <SelectItem key={p} value={p}>
+                        {p}
+                      </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
@@ -744,10 +898,12 @@ function openCreate() {
       {!loading && orders.length > 0 && (
         <div className="flex items-center gap-4 flex-wrap text-sm px-1">
           <span className="text-muted-foreground">
-            Total: <span className="font-medium text-foreground">৳{orderSummary.total.toFixed(2)}</span>
+            Total:{" "}
+            <span className="font-medium text-foreground">৳{orderSummary.total.toFixed(2)}</span>
           </span>
           <span className="text-muted-foreground">
-            Paid: <span className="font-medium text-green-600">৳{orderSummary.paid.toFixed(2)}</span>
+            Paid:{" "}
+            <span className="font-medium text-green-600">৳{orderSummary.paid.toFixed(2)}</span>
           </span>
           <span className="text-muted-foreground">
             Due: <span className="font-medium text-amber-600">৳{orderSummary.due.toFixed(2)}</span>
@@ -842,6 +998,17 @@ function openCreate() {
                           <BanknoteIcon className="size-3.5" />
                         </Button>
                       )}
+                      {o.unreturned_assets > 0 && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => openReturnAssetSheet(o)}
+                          className="size-7 text-amber-600 hover:bg-amber-50 hover:text-amber-700"
+                          title={`Return assets (${o.unreturned_assets} unreturned)`}
+                        >
+                          <Undo2 className="size-3.5" />
+                        </Button>
+                      )}
                       {o.status !== "paid" && o.status !== "cancelled" && (
                         <Button
                           variant="ghost"
@@ -874,18 +1041,19 @@ function openCreate() {
           <div className="mt-6 px-4 pb-8 space-y-6">
             {/* Status */}
             <OrderFilterSection label="Status">
-              <OrderFilterPills
-                options={[
-                  { label: "Due", value: "due" },
-                  { label: "All", value: "all" },
-                  { label: "Pending", value: "pending" },
-                  { label: "Delivered", value: "delivered" },
-                  { label: "Paid", value: "paid" },
-                  { label: "Cancelled", value: "cancelled" },
-                ]}
-                value={filters.status}
-                onChange={(v) => setFilter("status", v)}
-              />
+              <Select value={filters.status} onValueChange={(v) => setFilter("status", v ?? "all")}>
+                <SelectTrigger className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="due">Due</SelectItem>
+                  <SelectItem value="all">All</SelectItem>
+                  <SelectItem value="pending">Pending</SelectItem>
+                  <SelectItem value="delivered">Delivered</SelectItem>
+                  <SelectItem value="paid">Paid</SelectItem>
+                  <SelectItem value="cancelled">Cancelled</SelectItem>
+                </SelectContent>
+              </Select>
             </OrderFilterSection>
 
             {/* Customer */}
@@ -1138,9 +1306,7 @@ function openCreate() {
       >
         <SheetContent className="w-full sm:max-w-md overflow-y-auto">
           <SheetHeader>
-            <SheetTitle>
-              Payments — {paymentSheetTarget?.customer_name ?? "Order"}
-            </SheetTitle>
+            <SheetTitle>Payments — {paymentSheetTarget?.customer_name ?? "Order"}</SheetTitle>
           </SheetHeader>
 
           {/* Summary bar */}
@@ -1190,20 +1356,14 @@ function openCreate() {
                     className="flex items-start justify-between rounded-md border border-border bg-muted/30 px-3 py-2 text-sm"
                   >
                     <div className="space-y-0.5 min-w-0">
-                      <p className="font-medium tabular-nums">
-                        ৳{Number(p.amount).toFixed(2)}
-                      </p>
+                      <p className="font-medium tabular-nums">৳{Number(p.amount).toFixed(2)}</p>
                       <p className="text-xs text-muted-foreground">
                         {new Date(p.paid_at).toLocaleDateString()}
                         {p.payment_method ? ` · ${p.payment_method}` : ""}
                       </p>
-                      {p.note && (
-                        <p className="text-xs text-muted-foreground">{p.note}</p>
-                      )}
+                      {p.note && <p className="text-xs text-muted-foreground">{p.note}</p>}
                       {p.recorded_by_name && (
-                        <p className="text-xs text-muted-foreground">
-                          by {p.recorded_by_name}
-                        </p>
+                        <p className="text-xs text-muted-foreground">by {p.recorded_by_name}</p>
                       )}
                     </div>
                     <Button
@@ -1231,14 +1391,8 @@ function openCreate() {
                   <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-3">
                     Record Payment
                   </p>
-                  <form
-                    onSubmit={payForm.handleSubmit(onPaySubmit)}
-                    className="space-y-4 pb-8"
-                  >
-                    <Field
-                      label="Amount (৳)"
-                      error={payForm.formState.errors.paid_amount?.message}
-                    >
+                  <form onSubmit={payForm.handleSubmit(onPaySubmit)} className="space-y-4 pb-8">
+                    <Field label="Amount (৳)" error={payForm.formState.errors.paid_amount?.message}>
                       <Input
                         type="number"
                         step="0.01"
@@ -1399,6 +1553,121 @@ function openCreate() {
           </form>
         </SheetContent>
       </Sheet>
+
+      {/* ── Standalone Asset Return Sheet ────────────────────────── */}
+      <Sheet
+        open={returnAssetTarget !== null}
+        onOpenChange={(open) => !open && setReturnAssetTarget(null)}
+      >
+        <SheetContent className="w-full sm:max-w-md overflow-y-auto">
+          <SheetHeader>
+            <SheetTitle>Return Assets — Order #{returnAssetTarget?.id}</SheetTitle>
+          </SheetHeader>
+          {returnAssetTarget && (
+            <div className="mt-6 px-4 pb-8 space-y-5">
+              <div className="text-sm text-muted-foreground space-y-0.5">
+                <p>
+                  <span className="font-medium text-foreground">
+                    {returnAssetTarget.customer_name}
+                  </span>
+                </p>
+                <p>
+                  {new Date(returnAssetTarget.ordered_at).toLocaleDateString("en-GB", {
+                    day: "numeric",
+                    month: "short",
+                    year: "numeric",
+                  })}
+                </p>
+              </div>
+
+              {/* Already returned */}
+              {returnAssetReturned.length > 0 && (
+                <div className="rounded-md border border-border p-3 space-y-1">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">
+                    Already Returned
+                  </p>
+                  {returnAssetReturned.map((r) => (
+                    <p key={r.id} className="text-xs text-muted-foreground">
+                      {r.asset_name}:{" "}
+                      <span className="font-medium text-foreground">{r.quantity}</span> on{" "}
+                      {new Date(r.returned_at).toLocaleDateString("en-GB", {
+                        day: "numeric",
+                        month: "short",
+                        year: "numeric",
+                      })}
+                    </p>
+                  ))}
+                </div>
+              )}
+
+              {/* Return inputs */}
+              <div className="space-y-3">
+                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  Record Return
+                </p>
+                {returnAssetSent.map((s) => {
+                  const alreadyReturned = returnAssetReturned
+                    .filter((r) => r.asset_id === s.asset_id)
+                    .reduce((sum, r) => sum + r.quantity, 0);
+                  const remaining = s.quantity - alreadyReturned;
+                  return (
+                    <Field
+                      key={s.asset_id}
+                      label={`${s.asset_name} (sent: ${s.quantity}, returned: ${alreadyReturned}, remaining: ${remaining})`}
+                    >
+                      <Input
+                        type="number"
+                        min={0}
+                        max={remaining}
+                        placeholder="0"
+                        value={returnAssetQtys[s.asset_id] ?? ""}
+                        onChange={(e) =>
+                          setReturnAssetQtys((prev) => ({
+                            ...prev,
+                            [s.asset_id]: Number(e.target.value),
+                          }))
+                        }
+                      />
+                    </Field>
+                  );
+                })}
+                {returnAssetSent.length === 0 && (
+                  <p className="text-sm text-muted-foreground">
+                    No assets were sent with this order.
+                  </p>
+                )}
+              </div>
+
+              {returnAssetSent.length > 0 && (
+                <Field label="Return Date">
+                  <Input
+                    type="date"
+                    value={returnAssetDate}
+                    onChange={(e) => setReturnAssetDate(e.target.value)}
+                  />
+                </Field>
+              )}
+
+              <div className="flex gap-2 pt-2">
+                <Button
+                  onClick={handleReturnAssetSubmit}
+                  disabled={returnAssetSubmitting || returnAssetSent.length === 0}
+                  className="w-1/2"
+                >
+                  {returnAssetSubmitting ? "Saving…" : "Record Return"}
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => setReturnAssetTarget(null)}
+                  className="w-1/2"
+                >
+                  Close
+                </Button>
+              </div>
+            </div>
+          )}
+        </SheetContent>
+      </Sheet>
     </div>
   );
 }
@@ -1509,35 +1778,6 @@ function OrderFilterSection({ label, children }: { label: string; children: Reac
     <div className="space-y-2">
       <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{label}</p>
       {children}
-    </div>
-  );
-}
-
-function OrderFilterPills({
-  options,
-  value,
-  onChange,
-}: {
-  options: { label: string; value: string }[];
-  value: string;
-  onChange: (v: string) => void;
-}) {
-  return (
-    <div className="flex flex-wrap gap-1.5">
-      {options.map((o) => (
-        <button
-          key={o.value}
-          type="button"
-          onClick={() => onChange(o.value)}
-          className={`px-3 py-1 text-xs font-medium rounded-full border transition-colors ${
-            value === o.value
-              ? "bg-foreground text-background border-foreground"
-              : "bg-background text-muted-foreground border-border hover:text-foreground"
-          }`}
-        >
-          {o.label}
-        </button>
-      ))}
     </div>
   );
 }

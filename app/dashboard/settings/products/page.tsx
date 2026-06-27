@@ -159,10 +159,9 @@ function ProductsInner() {
   async function handleDeleteAssetConfirmed() {
     if (!deleteAssetTarget || !assetTarget) return;
     setDeletingAsset(true);
-    const res = await fetch(
-      `/api/products/${assetTarget.id}/assets/${deleteAssetTarget.id}`,
-      { method: "DELETE" }
-    );
+    const res = await fetch(`/api/products/${assetTarget.id}/assets/${deleteAssetTarget.id}`, {
+      method: "DELETE",
+    });
     if (res.ok) {
       setAssets((prev) => prev.filter((a) => a.id !== deleteAssetTarget.id));
       setDeleteAssetTarget(null);
@@ -359,7 +358,10 @@ function ProductsInner() {
             ) : (
               <ul className="space-y-2">
                 {assets.map((a) => (
-                  <li key={a.id} className="flex items-center justify-between rounded-md border border-border px-3 py-2">
+                  <li
+                    key={a.id}
+                    className="flex items-center justify-between rounded-md border border-border px-3 py-2"
+                  >
                     <span className="text-sm">{a.name}</span>
                     <Button
                       variant="ghost"

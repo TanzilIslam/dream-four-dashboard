@@ -129,6 +129,27 @@ export async function GET(request: Request) {
         (SELECT COUNT(*) FROM daily_reports     WHERE status = 'submitted') AS reports
     `;
 
+    // ── Asset stock ───────────────────────────────────────────────
+    const assets = await sql`
+      SELECT
+        pa.id                                                                  AS asset_id,
+        pa.product_id,
+        pa.name                                                                AS asset_name,
+        COALESCE(SUM(oa.quantity), 0)::int                                     AS sent,
+        COALESCE(SUM(oar.quantity), 0)::int                                    AS returned_by_customers,
+        COALESCE((SELECT SUM(sar.quantity) FROM supplier_asset_returns sar WHERE sar.asset_id = pa.id), 0)::int AS returned_to_suppliers,
+        (
+          COALESCE(SUM(oa.quantity), 0)
+          - COALESCE(SUM(oar.quantity), 0)
+          - COALESCE((SELECT SUM(sar.quantity) FROM supplier_asset_returns sar WHERE sar.asset_id = pa.id), 0)
+        )::int AS unreturned
+      FROM product_assets pa
+      LEFT JOIN order_assets oa  ON oa.asset_id = pa.id
+      LEFT JOIN order_asset_returns oar ON oar.asset_id = pa.id
+      GROUP BY pa.id, pa.product_id, pa.name
+      ORDER BY pa.name ASC
+    `;
+
     // ── Outstanding dues ──────────────────────────────────────────
     const [duesSummary] = await sql`
       SELECT
@@ -155,6 +176,7 @@ export async function GET(request: Request) {
         allTime: withProfit(allTimeKpi),
       },
       stock,
+      assets,
       partners,
       pending,
       dues: { summary: duesSummary, topDebtors },

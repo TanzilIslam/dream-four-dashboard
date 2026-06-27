@@ -2,10 +2,7 @@ import { sql } from "@/lib/db";
 import { requireAdmin } from "@/lib/auth";
 
 // DELETE /api/supplier-asset-returns/[id]
-export async function DELETE(
-  _request: Request,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function DELETE(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   const auth = await requireAdmin();
   if ("error" in auth) return auth.error;
 

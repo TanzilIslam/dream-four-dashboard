@@ -7,10 +7,7 @@ const assetSchema = z.object({
 });
 
 // GET /api/products/[id]/assets
-export async function GET(
-  _request: Request,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   const auth = await requireAdmin();
   if ("error" in auth) return auth.error;
 
@@ -24,10 +21,7 @@ export async function GET(
 }
 
 // POST /api/products/[id]/assets
-export async function POST(
-  request: Request,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const auth = await requireAdmin();
   if ("error" in auth) return auth.error;
 

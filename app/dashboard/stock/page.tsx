@@ -232,6 +232,7 @@ export default function StockPage() {
       .then((r) => r.json())
       .then((data: Product[]) => setProducts(data));
 
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     loadAssetStock();
   }, []);
 
@@ -326,13 +327,12 @@ export default function StockPage() {
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
+      {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-xl font-semibold">Stock</h1>
-          <p className="text-sm text-muted-foreground">
-            Current inventory levels across all products.
-          </p>
+          <p className="text-sm text-muted-foreground">Current inventory levels.</p>
         </div>
         {isAdmin && (
           <Button size="sm" onClick={openSheet}>
@@ -342,160 +342,139 @@ export default function StockPage() {
         )}
       </div>
 
-      <div className="rounded-lg border border-border overflow-hidden">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Product</TableHead>
-              <TableHead className="text-right">Purchased</TableHead>
-              <TableHead className="text-right">Reserved</TableHead>
-              <TableHead className="text-right">Delivered</TableHead>
-              <TableHead className="text-right">Returned</TableHead>
-              {isAdmin && <TableHead className="text-right">Adjusted</TableHead>}
-              <TableHead className="text-right">Available</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead className="w-10" />
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {loading ? (
-              <TableRow>
-                <TableCell
-                  colSpan={isAdmin ? 9 : 8}
-                  className="text-center py-10 text-muted-foreground"
-                >
-                  Loading…
-                </TableCell>
-              </TableRow>
-            ) : stock.length === 0 ? (
-              <TableRow>
-                <TableCell
-                  colSpan={isAdmin ? 9 : 8}
-                  className="text-center py-10 text-muted-foreground"
-                >
-                  No products found
-                </TableCell>
-              </TableRow>
-            ) : (
-              stock.map((row) => {
-                const status = stockStatus(row);
-                return (
-                  <TableRow key={row.id}>
-                    <TableCell className="font-medium">
-                      {row.name}
-                      <span className="ml-1.5 text-xs text-muted-foreground">({row.unit})</span>
-                    </TableCell>
-                    <TableCell className="text-right text-muted-foreground">
-                      {row.purchased_qty}
-                    </TableCell>
-                    <TableCell className="text-right text-muted-foreground">
-                      {row.reserved_qty}
-                    </TableCell>
-                    <TableCell className="text-right text-muted-foreground">
-                      {row.delivered_qty}
-                    </TableCell>
-                    <TableCell className="text-right text-muted-foreground">
-                      {row.returned_qty}
-                    </TableCell>
-                    {isAdmin && (
-                      <TableCell
-                        className={`text-right ${
-                          row.adjusted_qty < 0
-                            ? "text-red-500"
-                            : row.adjusted_qty > 0
-                              ? "text-blue-500"
-                              : "text-muted-foreground"
-                        }`}
-                      >
-                        {row.adjusted_qty !== 0
-                          ? `${row.adjusted_qty > 0 ? "+" : ""}${row.adjusted_qty}`
-                          : "—"}
-                      </TableCell>
-                    )}
-                    <TableCell
-                      className={`text-right font-semibold ${
-                        row.available_qty <= 0
-                          ? "text-red-600"
-                          : row.low_stock_threshold != null &&
-                              row.available_qty <= row.low_stock_threshold
-                            ? "text-yellow-600"
-                            : "text-green-600"
-                      }`}
-                    >
+      {/* Product stock cards */}
+      {loading ? (
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {[1, 2].map((i) => (
+            <div key={i} className="rounded-xl border bg-card p-5 h-44 animate-pulse" />
+          ))}
+        </div>
+      ) : stock.length === 0 ? (
+        <p className="text-sm text-muted-foreground py-8 text-center">No products found.</p>
+      ) : (
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {stock.map((row) => {
+            const status = stockStatus(row);
+            const availableColor =
+              row.available_qty <= 0
+                ? "text-destructive"
+                : row.low_stock_threshold != null && row.available_qty <= row.low_stock_threshold
+                  ? "text-amber-600"
+                  : "text-green-600";
+            return (
+              <div key={row.id} className="rounded-xl border bg-card p-5 space-y-4">
+                {/* Product name + status */}
+                <div className="flex items-start justify-between gap-2">
+                  <div>
+                    <p className="font-semibold">{row.name}</p>
+                    <p className="text-xs text-muted-foreground">{row.unit}</p>
+                  </div>
+                  <Badge variant={status.variant} className="shrink-0">
+                    {status.label}
+                  </Badge>
+                </div>
+
+                {/* Big available number */}
+                <div className="flex items-end justify-between">
+                  <div>
+                    <p className={`text-4xl font-bold tabular-nums leading-none ${availableColor}`}>
                       {row.available_qty}
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant={status.variant}>{status.label}</Badge>
-                    </TableCell>
-                    <TableCell>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-7 w-7 text-muted-foreground hover:text-foreground"
-                        onClick={() => openHistory(row)}
-                        title="Purchase history"
-                      >
-                        <HistoryIcon className="h-3.5 w-3.5" />
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                );
-              })
-            )}
-          </TableBody>
-        </Table>
-      </div>
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-1">available</p>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                    onClick={() => openHistory(row)}
+                    title="Purchase history"
+                  >
+                    <HistoryIcon className="h-4 w-4" />
+                  </Button>
+                </div>
 
-      <p className="text-xs text-muted-foreground">
-        Available = Purchased − Reserved (pending orders) − Delivered + Returned + Adjustments
-      </p>
+                {/* Breakdown */}
+                <div className="border-t pt-3 grid grid-cols-4 gap-2 text-center">
+                  {[
+                    { label: "Purchased", value: row.purchased_qty },
+                    { label: "Reserved", value: row.reserved_qty },
+                    { label: "Delivered", value: row.delivered_qty },
+                    { label: "Returned", value: row.returned_qty },
+                  ].map(({ label, value }) => (
+                    <div key={label}>
+                      <p className="text-sm font-medium tabular-nums">{value}</p>
+                      <p className="text-[10px] text-muted-foreground leading-tight">{label}</p>
+                    </div>
+                  ))}
+                </div>
 
-      {/* Asset stock section */}
+                {/* Adjusted (admin only, if non-zero) */}
+                {isAdmin && row.adjusted_qty !== 0 && (
+                  <p className="text-xs text-muted-foreground">
+                    Adjustment:{" "}
+                    <span
+                      className={
+                        row.adjusted_qty > 0
+                          ? "text-blue-600 font-medium"
+                          : "text-red-600 font-medium"
+                      }
+                    >
+                      {row.adjusted_qty > 0 ? "+" : ""}
+                      {row.adjusted_qty}
+                    </span>
+                  </p>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Asset stock */}
       {assetStock.length > 0 && (
-        <div className="space-y-2">
+        <div className="space-y-3">
           <div className="flex items-center justify-between">
-            <h2 className="text-sm font-semibold">Asset Stock</h2>
+            <h2 className="font-semibold">Asset Stock</h2>
             {isAdmin && (
               <Button size="sm" variant="outline" onClick={() => setSarOpen(true)}>
-                <ArrowLeftRight className="size-3.5 mr-1" />
+                <ArrowLeftRight className="size-3.5 mr-1.5" />
                 Return to Supplier
               </Button>
             )}
           </div>
-          <div className="rounded-lg border border-border overflow-hidden">
+          <div className="rounded-xl border overflow-hidden">
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Product</TableHead>
                   <TableHead>Asset</TableHead>
                   <TableHead className="text-right">Received</TableHead>
-                  <TableHead className="text-right">Sent Out</TableHead>
-                  <TableHead className="text-right">Returned by Customers</TableHead>
-                  <TableHead className="text-right">Returned to Supplier</TableHead>
+                  <TableHead className="text-right">Sent</TableHead>
+                  <TableHead className="text-right">Back from Customers</TableHead>
+                  <TableHead className="text-right">Back to Supplier</TableHead>
                   <TableHead className="text-right">Available</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {assetStock.map((row) => (
                   <TableRow key={row.asset_id}>
-                    <TableCell className="font-medium text-muted-foreground">
-                      {row.product_name}
+                    <TableCell>
+                      <p className="font-medium">{row.asset_name}</p>
+                      <p className="text-xs text-muted-foreground">{row.product_name}</p>
                     </TableCell>
-                    <TableCell className="font-medium">{row.asset_name}</TableCell>
-                    <TableCell className="text-right text-muted-foreground">
+                    <TableCell className="text-right tabular-nums text-muted-foreground">
                       {row.received}
                     </TableCell>
-                    <TableCell className="text-right text-muted-foreground">{row.sent}</TableCell>
-                    <TableCell className="text-right text-muted-foreground">
+                    <TableCell className="text-right tabular-nums text-muted-foreground">
+                      {row.sent}
+                    </TableCell>
+                    <TableCell className="text-right tabular-nums text-muted-foreground">
                       {row.returned_by_customers}
                     </TableCell>
-                    <TableCell className="text-right text-muted-foreground">
+                    <TableCell className="text-right tabular-nums text-muted-foreground">
                       {row.returned_to_suppliers}
                     </TableCell>
                     <TableCell
-                      className={`text-right font-semibold ${
-                        row.available <= 0 ? "text-destructive" : "text-green-600"
-                      }`}
+                      className={`text-right tabular-nums font-semibold ${row.available <= 0 ? "text-destructive" : "text-green-600"}`}
                     >
                       {row.available}
                     </TableCell>
@@ -507,11 +486,11 @@ export default function StockPage() {
         </div>
       )}
 
-      {/* Supplier asset returns history (admin only) */}
+      {/* Supplier asset returns (admin) */}
       {isAdmin && supplierAssetReturns.length > 0 && (
-        <div className="space-y-2">
-          <h2 className="text-sm font-semibold">Asset Returns to Suppliers</h2>
-          <div className="rounded-lg border border-border overflow-hidden">
+        <div className="space-y-3">
+          <h2 className="font-semibold">Asset Returns to Suppliers</h2>
+          <div className="rounded-xl border overflow-hidden">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -520,24 +499,22 @@ export default function StockPage() {
                   <TableHead>Asset</TableHead>
                   <TableHead className="text-right">Qty</TableHead>
                   <TableHead>Note</TableHead>
-                  <TableHead />
+                  <TableHead className="w-10" />
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {supplierAssetReturns.map((r) => (
                   <TableRow key={r.id}>
-                    <TableCell className="text-muted-foreground">
+                    <TableCell className="text-muted-foreground whitespace-nowrap">
                       {new Date(r.returned_at).toLocaleDateString()}
                     </TableCell>
                     <TableCell className="font-medium">{r.supplier_name}</TableCell>
                     <TableCell>
                       {r.asset_name}
-                      <span className="ml-1 text-xs text-muted-foreground">
-                        ({r.product_name})
-                      </span>
+                      <span className="ml-1 text-xs text-muted-foreground">({r.product_name})</span>
                     </TableCell>
                     <TableCell className="text-right tabular-nums">{r.quantity}</TableCell>
-                    <TableCell className="text-muted-foreground">{r.note ?? "—"}</TableCell>
+                    <TableCell className="text-muted-foreground text-sm">{r.note ?? "—"}</TableCell>
                     <TableCell>
                       <Button
                         variant="ghost"
@@ -556,11 +533,11 @@ export default function StockPage() {
         </div>
       )}
 
-      {/* Adjustments history (admin only) */}
+      {/* Adjustment history (admin) */}
       {isAdmin && adjustments.length > 0 && (
-        <div className="space-y-2">
-          <h2 className="text-sm font-semibold">Adjustment History</h2>
-          <div className="rounded-lg border border-border overflow-hidden">
+        <div className="space-y-3">
+          <h2 className="font-semibold">Adjustment History</h2>
+          <div className="rounded-xl border overflow-hidden">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -569,7 +546,7 @@ export default function StockPage() {
                   <TableHead>Reason</TableHead>
                   <TableHead>Date</TableHead>
                   <TableHead>Note</TableHead>
-                  <TableHead></TableHead>
+                  <TableHead className="w-10" />
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -584,17 +561,17 @@ export default function StockPage() {
                       )}
                     </TableCell>
                     <TableCell
-                      className={`text-right font-medium ${
-                        adj.quantity < 0 ? "text-red-600" : "text-blue-600"
-                      }`}
+                      className={`text-right tabular-nums font-medium ${adj.quantity < 0 ? "text-red-600" : "text-blue-600"}`}
                     >
                       {adj.quantity > 0 ? `+${adj.quantity}` : adj.quantity}
                     </TableCell>
-                    <TableCell>{adj.reason}</TableCell>
-                    <TableCell className="text-muted-foreground">
+                    <TableCell className="text-sm">{adj.reason}</TableCell>
+                    <TableCell className="text-muted-foreground whitespace-nowrap">
                       {new Date(adj.date).toLocaleDateString()}
                     </TableCell>
-                    <TableCell className="text-muted-foreground">{adj.note ?? "—"}</TableCell>
+                    <TableCell className="text-muted-foreground text-sm">
+                      {adj.note ?? "—"}
+                    </TableCell>
                     <TableCell>
                       <Button
                         variant="ghost"
@@ -615,7 +592,7 @@ export default function StockPage() {
 
       {/* Purchase history sheet */}
       <Sheet open={historyTarget !== null} onOpenChange={(open) => !open && setHistoryTarget(null)}>
-        <SheetContent className="w-full sm:max-w-2xl overflow-y-auto">
+        <SheetContent className="w-full sm:!max-w-4xl overflow-y-auto">
           <SheetHeader>
             <SheetTitle>
               Purchase History — {historyTarget?.name}
@@ -642,7 +619,11 @@ export default function StockPage() {
               <div>
                 <p className="text-xs text-muted-foreground">Total Spent</p>
                 <p className="text-lg font-semibold tabular-nums">
-                  ৳{historySummary.total_amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  ৳
+                  {historySummary.total_amount.toLocaleString(undefined, {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2,
+                  })}
                 </p>
               </div>
             </div>
@@ -677,9 +658,7 @@ export default function StockPage() {
                           {new Date(r.purchased_at).toLocaleDateString()}
                         </TableCell>
                         <TableCell className="font-medium">
-                          {r.supplier_name ?? (
-                            <span className="text-muted-foreground">—</span>
-                          )}
+                          {r.supplier_name ?? <span className="text-muted-foreground">—</span>}
                         </TableCell>
                         <TableCell className="text-right tabular-nums">
                           {Number(r.actual_qty).toLocaleString()}
@@ -688,7 +667,11 @@ export default function StockPage() {
                           ৳{Number(r.actual_price).toFixed(2)}
                         </TableCell>
                         <TableCell className="text-right tabular-nums font-medium">
-                          ৳{Number(r.actual_total).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          ৳
+                          {Number(r.actual_total).toLocaleString(undefined, {
+                            minimumFractionDigits: 2,
+                            maximumFractionDigits: 2,
+                          })}
                         </TableCell>
                         <TableCell className="text-muted-foreground text-sm max-w-[140px] truncate">
                           {r.note || r.admin_note || "—"}
@@ -702,11 +685,7 @@ export default function StockPage() {
           </div>
 
           <div className="px-4 mt-4 pb-6">
-            <Button
-              variant="outline"
-              className="w-full"
-              onClick={() => setHistoryTarget(null)}
-            >
+            <Button variant="outline" className="w-full" onClick={() => setHistoryTarget(null)}>
               Close
             </Button>
           </div>
@@ -773,19 +752,11 @@ export default function StockPage() {
             </Field>
 
             <Field label="Return Date">
-              <Input
-                type="date"
-                value={sarDate}
-                onChange={(e) => setSarDate(e.target.value)}
-              />
+              <Input type="date" value={sarDate} onChange={(e) => setSarDate(e.target.value)} />
             </Field>
 
             <Field label="Note (optional)">
-              <Textarea
-                rows={2}
-                value={sarNote}
-                onChange={(e) => setSarNote(e.target.value)}
-              />
+              <Textarea rows={2} value={sarNote} onChange={(e) => setSarNote(e.target.value)} />
             </Field>
 
             <div className="flex gap-2 pt-2">

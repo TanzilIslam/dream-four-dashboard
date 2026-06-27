@@ -102,6 +102,20 @@ export default function PurchaseRequestsPage() {
   const [isAdmin, setIsAdmin] = useState(false);
   const [statusFilter, setStatusFilter] = useState("all");
   const [productFilter, setProductFilter] = useState("all");
+  const [supplierFilter, setSupplierFilter] = useState("all");
+  const [dueFilter, setDueFilter] = useState("all");
+  const [sortBy, setSortBy] = useState<
+    | "id_desc"
+    | "id_asc"
+    | "qty_desc"
+    | "qty_asc"
+    | "total_desc"
+    | "total_asc"
+    | "paid_desc"
+    | "paid_asc"
+    | "due_desc"
+    | "due_asc"
+  >("id_desc");
 
   const [createOpen, setCreateOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<PurchaseRequest | null>(null);
@@ -230,6 +244,7 @@ export default function PurchaseRequestsPage() {
 
   useEffect(() => {
     if (!purchaseTarget?.product_id) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setPurchaseTargetAssets([]);
       setPurchaseAssetQtys({});
       return;
@@ -439,9 +454,38 @@ export default function PurchaseRequestsPage() {
     setDeletingPayment(false);
   }
 
-  const filteredRequests = requests.filter((r) =>
-    productFilter === "all" ? true : String(r.product_id) === productFilter
-  );
+  const filteredRequests = requests
+    .filter((r) => {
+      if (productFilter !== "all" && String(r.product_id) !== productFilter) return false;
+      if (supplierFilter !== "all" && String(r.supplier_id) !== supplierFilter) return false;
+      if (dueFilter === "yes" && Number(r.due_amount ?? 0) <= 0) return false;
+      if (dueFilter === "no" && Number(r.due_amount ?? 0) > 0) return false;
+      return true;
+    })
+    .sort((a, b) => {
+      switch (sortBy) {
+        case "id_asc":
+          return a.id - b.id;
+        case "qty_desc":
+          return Number(b.actual_qty ?? b.requested_qty) - Number(a.actual_qty ?? a.requested_qty);
+        case "qty_asc":
+          return Number(a.actual_qty ?? a.requested_qty) - Number(b.actual_qty ?? b.requested_qty);
+        case "total_desc":
+          return Number(b.actual_total ?? 0) - Number(a.actual_total ?? 0);
+        case "total_asc":
+          return Number(a.actual_total ?? 0) - Number(b.actual_total ?? 0);
+        case "paid_desc":
+          return Number(b.paid_total ?? 0) - Number(a.paid_total ?? 0);
+        case "paid_asc":
+          return Number(a.paid_total ?? 0) - Number(b.paid_total ?? 0);
+        case "due_desc":
+          return Number(b.due_amount ?? 0) - Number(a.due_amount ?? 0);
+        case "due_asc":
+          return Number(a.due_amount ?? 0) - Number(b.due_amount ?? 0);
+        default:
+          return b.id - a.id;
+      }
+    });
 
   const summary = filteredRequests.reduce(
     (acc, r) => {
@@ -502,18 +546,89 @@ export default function PurchaseRequestsPage() {
         </div>
       )}
 
-      <div className="flex items-center gap-2">
-        <Label className="text-sm text-muted-foreground">Filter:</Label>
+      <div className="flex items-center gap-2 flex-wrap">
         <Select value={statusFilter} onValueChange={(v) => v != null && setStatusFilter(v)}>
-          <SelectTrigger className="w-40">
-            <SelectValue />
+          <SelectTrigger className="h-8 text-sm w-36">
+            <SelectValue>
+              {
+                {
+                  all: "All statuses",
+                  pending: "Pending",
+                  approved: "Approved",
+                  rejected: "Rejected",
+                  purchased: "Purchased",
+                }[statusFilter]
+              }
+            </SelectValue>
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">All</SelectItem>
+            <SelectItem value="all">All statuses</SelectItem>
             <SelectItem value="pending">Pending</SelectItem>
             <SelectItem value="approved">Approved</SelectItem>
             <SelectItem value="rejected">Rejected</SelectItem>
             <SelectItem value="purchased">Purchased</SelectItem>
+          </SelectContent>
+        </Select>
+
+        <Select value={supplierFilter} onValueChange={(v) => setSupplierFilter(v ?? "all")}>
+          <SelectTrigger className="h-8 text-sm w-36">
+            <SelectValue>
+              {supplierFilter === "all"
+                ? "All suppliers"
+                : (suppliers.find((s) => String(s.id) === supplierFilter)?.name ?? "All suppliers")}
+            </SelectValue>
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All suppliers</SelectItem>
+            {suppliers.map((s) => (
+              <SelectItem key={s.id} value={String(s.id)}>
+                {s.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+        <Select value={dueFilter} onValueChange={(v) => setDueFilter(v ?? "all")}>
+          <SelectTrigger className="h-8 text-sm w-32">
+            <SelectValue>{{ all: "All due", yes: "Has due", no: "No due" }[dueFilter]}</SelectValue>
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All due</SelectItem>
+            <SelectItem value="yes">Has due</SelectItem>
+            <SelectItem value="no">No due</SelectItem>
+          </SelectContent>
+        </Select>
+
+        <Select value={sortBy} onValueChange={(v) => setSortBy(v as typeof sortBy)}>
+          <SelectTrigger className="h-8 text-sm w-44">
+            <SelectValue>
+              {
+                {
+                  id_desc: "Newest first",
+                  id_asc: "Oldest first",
+                  qty_desc: "Qty: high to low",
+                  qty_asc: "Qty: low to high",
+                  total_desc: "Total: high to low",
+                  total_asc: "Total: low to high",
+                  paid_desc: "Paid: high to low",
+                  paid_asc: "Paid: low to high",
+                  due_desc: "Due: high to low",
+                  due_asc: "Due: low to high",
+                }[sortBy]
+              }
+            </SelectValue>
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="id_desc">Newest first</SelectItem>
+            <SelectItem value="id_asc">Oldest first</SelectItem>
+            <SelectItem value="qty_desc">Qty: high to low</SelectItem>
+            <SelectItem value="qty_asc">Qty: low to high</SelectItem>
+            <SelectItem value="total_desc">Total: high to low</SelectItem>
+            <SelectItem value="total_asc">Total: low to high</SelectItem>
+            <SelectItem value="paid_desc">Paid: high to low</SelectItem>
+            <SelectItem value="paid_asc">Paid: low to high</SelectItem>
+            <SelectItem value="due_desc">Due: high to low</SelectItem>
+            <SelectItem value="due_asc">Due: low to high</SelectItem>
           </SelectContent>
         </Select>
       </div>

@@ -11,7 +11,10 @@ export const createCustomerSchema = z.object({
   max_due: z.number().min(0).default(1000),
   delivery_frequency: z.enum(["daily", "alternate", "weekly"]).default("daily"),
   delivery_interval: z.number().int().min(1).default(1),
-  customer_type: z.enum(["home", "confectionery", "hotel", "restaurant"]).optional().nullable(),
+  customer_type: z
+    .enum(["home", "confectionery", "hotel", "restaurant", "madrasha"])
+    .optional()
+    .nullable(),
   notes: z.string().optional().or(z.literal("")),
   is_active: z.boolean().default(true),
 });

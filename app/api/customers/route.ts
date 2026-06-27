@@ -20,7 +20,16 @@ export async function GET(request: Request) {
                  pt.unit_price AS tier_unit_price,
                  pt.min_qty    AS tier_min_qty,
                  p.unit        AS tier_product_unit,
-                 u.name        AS partner_name
+                 u.name        AS partner_name,
+                 COALESCE((SELECT COUNT(*) FROM orders o WHERE o.customer_id = c.id AND o.status != 'cancelled'), 0)::int AS total_orders,
+                 COALESCE((SELECT SUM(o.quantity) FROM orders o WHERE o.customer_id = c.id AND o.status != 'cancelled'), 0)::int AS total_quantity,
+                 COALESCE((SELECT SUM(o.paid_amount) FROM orders o WHERE o.customer_id = c.id AND o.status != 'cancelled'), 0)::numeric AS total_paid,
+                 COALESCE((SELECT SUM(o.due_amount) FROM orders o WHERE o.customer_id = c.id AND o.status != 'cancelled'), 0)::numeric AS total_due,
+                 GREATEST(0,
+                   COALESCE((SELECT SUM(oa.quantity) FROM order_assets oa JOIN orders o ON o.id = oa.order_id WHERE o.customer_id = c.id), 0)
+                   - COALESCE((SELECT SUM(oar.quantity) FROM order_asset_returns oar JOIN orders o ON o.id = oar.order_id WHERE o.customer_id = c.id), 0)
+                 )::int AS unreturned_assets,
+                 (SELECT MAX(o.ordered_at)::date FROM orders o WHERE o.customer_id = c.id AND o.status != 'cancelled') AS last_order_date
           FROM customers c
           LEFT JOIN areas a          ON a.id = c.area_id
           LEFT JOIN pricing_tiers pt ON pt.id = c.pricing_tier_id
@@ -35,7 +44,16 @@ export async function GET(request: Request) {
                  pt.name       AS tier_name,
                  pt.unit_price AS tier_unit_price,
                  pt.min_qty    AS tier_min_qty,
-                 p.unit        AS tier_product_unit
+                 p.unit        AS tier_product_unit,
+                 COALESCE((SELECT COUNT(*) FROM orders o WHERE o.customer_id = c.id AND o.status != 'cancelled'), 0)::int AS total_orders,
+                 COALESCE((SELECT SUM(o.quantity) FROM orders o WHERE o.customer_id = c.id AND o.status != 'cancelled'), 0)::int AS total_quantity,
+                 COALESCE((SELECT SUM(o.paid_amount) FROM orders o WHERE o.customer_id = c.id AND o.status != 'cancelled'), 0)::numeric AS total_paid,
+                 COALESCE((SELECT SUM(o.due_amount) FROM orders o WHERE o.customer_id = c.id AND o.status != 'cancelled'), 0)::numeric AS total_due,
+                 GREATEST(0,
+                   COALESCE((SELECT SUM(oa.quantity) FROM order_assets oa JOIN orders o ON o.id = oa.order_id WHERE o.customer_id = c.id), 0)
+                   - COALESCE((SELECT SUM(oar.quantity) FROM order_asset_returns oar JOIN orders o ON o.id = oar.order_id WHERE o.customer_id = c.id), 0)
+                 )::int AS unreturned_assets,
+                 (SELECT MAX(o.ordered_at)::date FROM orders o WHERE o.customer_id = c.id AND o.status != 'cancelled') AS last_order_date
           FROM customers c
           LEFT JOIN areas a          ON a.id = c.area_id
           LEFT JOIN pricing_tiers pt ON pt.id = c.pricing_tier_id

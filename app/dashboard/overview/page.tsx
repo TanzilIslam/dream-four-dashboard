@@ -2,16 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import {
-  TrendingUp,
-  TrendingDown,
-  Minus,
-  AlertTriangle,
-  Phone,
-  Calendar,
-  CheckSquare,
-  Clock,
-} from "lucide-react";
+import { TrendingUp, TrendingDown, Minus, AlertTriangle, Phone, Calendar } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 
@@ -40,6 +31,16 @@ type AdminData = {
     delivered_qty: string;
     reserved_qty: string;
     returned_qty: string;
+    available_qty: string;
+  }[];
+  assets: {
+    asset_id: number;
+    product_id: number;
+    asset_name: string;
+    sent: number;
+    returned_by_customers: number;
+    returned_to_suppliers: number;
+    unreturned: number;
   }[];
   partners: {
     id: number;
@@ -527,146 +528,67 @@ function AdminDashboard() {
         </section>
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Stock */}
-        <section className="space-y-2">
-          <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-            Stock
-          </h2>
-          <div className="rounded-lg border border-border divide-y divide-border">
-            {data.stock.map((p) => {
-              const available =
-                Number(p.purchased_qty) -
-                Number(p.delivered_qty) -
-                Number(p.reserved_qty) +
-                Number(p.returned_qty);
+      {/* Stock + Assets */}
+      <section className="space-y-2 md:w-1/2">
+        <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+          Stock
+        </h2>
+        <div className="rounded-lg border border-border divide-y divide-border">
+          {data.stock
+            .filter((p) => p.id === selectedProductId)
+            .map((p) => {
+              const available = Number(p.available_qty);
               const low = available <= p.low_stock_threshold;
+              const productAssets = data.assets.filter((a) => a.product_id === p.id);
               return (
-                <div key={p.id} className="flex items-center justify-between px-4 py-3">
-                  <div>
-                    <p className="text-sm font-medium">{p.name}</p>
-                    <p className="text-xs text-muted-foreground">{p.unit}</p>
-                  </div>
-                  <div className="text-right">
-                    <p className={`text-lg font-bold ${low ? "text-red-600" : ""}`}>
-                      {available.toLocaleString()}
-                    </p>
-                    {low && (
-                      <p className="text-xs text-red-500 flex items-center gap-0.5 justify-end">
-                        <AlertTriangle className="size-3" /> Low stock
+                <div key={p.id}>
+                  {/* Product stock row */}
+                  <div className="flex items-center justify-between px-4 py-3">
+                    <div>
+                      <p className="text-sm font-medium">{p.name}</p>
+                      <p className="text-xs text-muted-foreground">{p.unit}</p>
+                    </div>
+                    <div className="text-right">
+                      <p className={`text-lg font-bold ${low ? "text-red-600" : ""}`}>
+                        {available.toLocaleString()}
                       </p>
-                    )}
+                      {low && (
+                        <p className="text-xs text-red-500 flex items-center gap-0.5 justify-end">
+                          <AlertTriangle className="size-3" /> Low stock
+                        </p>
+                      )}
+                    </div>
                   </div>
+                  {/* Asset rows under this product */}
+                  {productAssets.map((a) => (
+                    <div
+                      key={a.asset_id}
+                      className="flex items-center justify-between px-4 py-2 bg-muted/30 border-t border-border"
+                    >
+                      <div className="pl-3">
+                        <p className="text-xs font-medium text-muted-foreground">{a.asset_name}</p>
+                        <p className="text-[11px] text-muted-foreground/70">
+                          Sent {a.sent} · Returned {a.returned_by_customers}
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        <p
+                          className={`text-sm font-bold ${a.unreturned > 0 ? "text-amber-600" : "text-muted-foreground"}`}
+                        >
+                          {a.unreturned.toLocaleString()}
+                        </p>
+                        <p className="text-[11px] text-muted-foreground/70">unreturned</p>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               );
             })}
-            {data.stock.length === 0 && (
-              <p className="px-4 py-6 text-sm text-muted-foreground text-center">No products</p>
-            )}
-          </div>
-        </section>
-
-        {/* Outstanding dues */}
-        <section className="space-y-2">
-          <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-            Outstanding Dues
-          </h2>
-          <div className="rounded-lg border border-border divide-y divide-border">
-            <div className="flex items-center justify-between px-4 py-3 bg-muted/30">
-              <p className="text-sm text-muted-foreground">
-                {data.dues.summary.debtor_count} customer(s)
-              </p>
-              <p className="font-bold text-red-600">
-                ৳{Number(data.dues.summary.total_due).toFixed(2)}
-              </p>
-            </div>
-            {data.dues.topDebtors.map((d) => (
-              <div key={d.name} className="flex items-center justify-between px-4 py-2.5">
-                <p className="text-sm">{d.name}</p>
-                <p className="text-sm font-medium text-red-600">
-                  ৳{Number(d.total_due).toFixed(2)}
-                </p>
-              </div>
-            ))}
-            {data.dues.topDebtors.length === 0 && (
-              <p className="px-4 py-4 text-sm text-muted-foreground text-center">
-                No outstanding dues
-              </p>
-            )}
-          </div>
-        </section>
-      </div>
-
-      {/* Partner table */}
-      <section className="space-y-2">
-        <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-          Partners Today
-        </h2>
-        <div className="rounded-lg border border-border overflow-hidden">
-          <table className="w-full text-sm">
-            <thead className="bg-muted/50">
-              <tr>
-                <th className="text-left px-4 py-2.5 font-medium text-muted-foreground">Partner</th>
-                <th className="text-left px-4 py-2.5 font-medium text-muted-foreground">
-                  Punch In
-                </th>
-                <th className="text-right px-4 py-2.5 font-medium text-muted-foreground">Eggs</th>
-                <th className="text-right px-4 py-2.5 font-medium text-muted-foreground">Cash</th>
-                <th className="text-right px-4 py-2.5 font-medium text-muted-foreground">
-                  Expenses
-                </th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border">
-              {data.partners.map((p) => (
-                <tr key={p.id}>
-                  <td className="px-4 py-3 font-medium">{p.name}</td>
-                  <td className="px-4 py-3 text-muted-foreground">
-                    {p.punch_in_at ? (
-                      <span className="flex items-center gap-1 text-green-600">
-                        <Clock className="size-3" />
-                        {new Date(p.punch_in_at).toLocaleTimeString([], {
-                          hour: "2-digit",
-                          minute: "2-digit",
-                        })}
-                      </span>
-                    ) : (
-                      <Badge variant="outline" className="text-xs">
-                        Absent
-                      </Badge>
-                    )}
-                  </td>
-                  <td className="px-4 py-3 text-right">
-                    {Number(p.eggs_delivered).toLocaleString()}
-                  </td>
-                  <td className="px-4 py-3 text-right">৳{Number(p.cash_collected).toFixed(2)}</td>
-                  <td className="px-4 py-3 text-right text-muted-foreground">
-                    ৳{Number(p.expenses).toFixed(2)}
-                  </td>
-                </tr>
-              ))}
-              {data.partners.length === 0 && (
-                <tr>
-                  <td colSpan={5} className="px-4 py-6 text-center text-muted-foreground">
-                    No partners
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
+          {data.stock.filter((p) => p.id === selectedProductId).length === 0 && (
+            <p className="px-4 py-6 text-sm text-muted-foreground text-center">No products</p>
+          )}
         </div>
       </section>
-
-      {/* Tasks shortcut */}
-      <div className="flex items-center gap-2">
-        <CheckSquare className="size-4 text-muted-foreground" />
-        <Link href="/dashboard/tasks" className="text-sm text-blue-600 hover:underline">
-          View all tasks →
-        </Link>
-        <Link href="/dashboard/dues" className="text-sm text-blue-600 hover:underline ml-4">
-          View all dues →
-        </Link>
-      </div>
     </div>
   );
 }

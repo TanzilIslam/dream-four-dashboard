@@ -9,9 +9,7 @@ export const createOrderSchema = z
     paid_amount: z.number().min(0, "Paid amount must be non-negative").default(0),
     note: z.string().optional().or(z.literal("")),
     assets: z
-      .array(
-        z.object({ asset_id: z.number().int().positive(), quantity: z.number().int().min(1) })
-      )
+      .array(z.object({ asset_id: z.number().int().positive(), quantity: z.number().int().min(1) }))
       .optional()
       .default([]),
   })
