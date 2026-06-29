@@ -20,6 +20,8 @@ import {
   Wallet,
   Boxes,
   HardDrive,
+  CalendarDays,
+  HandCoins,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -45,7 +47,10 @@ type NavSection = { label?: string; adminOnly?: boolean; items: NavItem[] };
 
 const navSections: NavSection[] = [
   {
-    items: [{ label: "Overview", href: "/dashboard/overview", icon: LayoutDashboard }],
+    items: [
+      { label: "Overview", href: "/dashboard/overview", icon: LayoutDashboard },
+      { label: "Calendar", href: "/dashboard/calendar", icon: CalendarDays },
+    ],
   },
   {
     label: "Operations",
@@ -61,9 +66,9 @@ const navSections: NavSection[] = [
     label: "Finance",
     items: [
       { label: "Expenses", href: "/dashboard/expenses", icon: Wallet },
+      { label: "Loans", href: "/dashboard/loans", icon: HandCoins },
       // { label: "Cash Remittances", href: "/dashboard/cash-remittances", icon: Banknote },
       // { label: "Dues", href: "/dashboard/dues", icon: AlertCircle },
-      // { label: "Partner Loans", href: "/dashboard/partner-loans", icon: HandCoins },
     ],
   },
   // {

@@ -27,7 +27,8 @@ export async function GET(request: Request) {
                  GREATEST(0,
                    COALESCE((SELECT SUM(oa.quantity) FROM order_assets oa WHERE oa.order_id = o.id), 0)
                    - COALESCE((SELECT SUM(oar.quantity) FROM order_asset_returns oar WHERE oar.order_id = o.id), 0)
-                 )::int AS unreturned_assets
+                 )::int AS unreturned_assets,
+                 (SELECT MAX(py.paid_at) FROM payments py WHERE py.order_id = o.id) AS last_payment_date
           FROM orders o
           LEFT JOIN customers c ON c.id = o.customer_id
           LEFT JOIN areas a     ON a.id = o.area_id
@@ -45,7 +46,8 @@ export async function GET(request: Request) {
                  GREATEST(0,
                    COALESCE((SELECT SUM(oa.quantity) FROM order_assets oa WHERE oa.order_id = o.id), 0)
                    - COALESCE((SELECT SUM(oar.quantity) FROM order_asset_returns oar WHERE oar.order_id = o.id), 0)
-                 )::int AS unreturned_assets
+                 )::int AS unreturned_assets,
+                 (SELECT MAX(py.paid_at) FROM payments py WHERE py.order_id = o.id) AS last_payment_date
           FROM orders o
           LEFT JOIN customers c ON c.id = o.customer_id
           LEFT JOIN areas a     ON a.id = o.area_id

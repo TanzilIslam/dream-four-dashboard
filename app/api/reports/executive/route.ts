@@ -152,13 +152,15 @@ export async function GET(request: Request) {
     // Sheet 5: Expense Breakdown
     sql`
       SELECT
-        COALESCE(ec.name, 'Uncategorized')         AS "Category",
-        COALESCE(SUM(e.amount), 0)::numeric         AS "Amount (৳)",
+        COALESCE(ec.name, 'Uncategorized')                      AS "Category",
+        COALESCE(p.name, 'Common (No Product)')                 AS "Product",
+        COALESCE(SUM(e.amount), 0)::numeric                     AS "Amount (৳)",
         ROUND(100 * SUM(e.amount) / NULLIF(SUM(SUM(e.amount)) OVER (), 0))::text || '%' AS "% of Total"
       FROM expenses e
       LEFT JOIN expense_categories ec ON ec.id = e.category_id
+      LEFT JOIN products p            ON p.id = e.product_id
       ${expenseDateFilter}
-      GROUP BY ec.id, ec.name
+      GROUP BY ec.id, ec.name, p.id, p.name
       ORDER BY SUM(e.amount) DESC
     `,
 
@@ -173,7 +175,7 @@ export async function GET(request: Request) {
       FROM orders o
       JOIN customers c ON c.id = o.customer_id
       LEFT JOIN areas a ON a.id = c.area_id
-      WHERE o.status != 'cancelled' AND o.due_amount > 0 ${productFilter} ${dateFilter}
+      WHERE o.status = 'delivered' AND o.due_amount > 0 ${productFilter} ${dateFilter}
       GROUP BY c.id, c.name, a.name
       HAVING SUM(o.due_amount) > 0
       ORDER BY SUM(o.due_amount) DESC

@@ -17,6 +17,7 @@ import {
   Trash2,
   Loader2,
   Undo2,
+  Eye,
 } from "lucide-react";
 
 import { z } from "zod";
@@ -74,6 +75,7 @@ type Order = {
   product_unit: string | null;
   partner_name?: string | null;
   unreturned_assets: number;
+  last_payment_date: string | null;
 };
 
 type Customer = {
@@ -166,6 +168,7 @@ export default function OrdersPage() {
     partner_name: "all",
   });
 
+  const [paidDateFilter, setPaidDateFilter] = useState("");
   const [createOpen, setCreateOpen] = useState(false);
   const [paymentSheetTarget, setPaymentSheetTarget] = useState<Order | null>(null);
   const [orderPayments, setOrderPayments] = useState<OrderPayment[]>([]);
@@ -197,6 +200,11 @@ export default function OrdersPage() {
   const [returnAssetQtys, setReturnAssetQtys] = useState<Record<number, number>>({});
   const [returnAssetDate, setReturnAssetDate] = useState(new Date().toISOString().slice(0, 10));
   const [returnAssetSubmitting, setReturnAssetSubmitting] = useState(false);
+
+  // Order detail view
+  const [viewingOrder, setViewingOrder] = useState<Order | null>(null);
+  const [viewOrderPayments, setViewOrderPayments] = useState<OrderPayment[]>([]);
+  const [viewOrderLoading, setViewOrderLoading] = useState(false);
 
   const createForm = useForm<z.input<typeof createOrderSchema>, unknown, CreateOrderInput>({
     resolver: zodResolver(createOrderSchema),
@@ -374,6 +382,17 @@ export default function OrdersPage() {
       });
   }, [paymentSheetTarget]);
 
+  useEffect(() => {
+    if (!viewingOrder) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setViewOrderLoading(true);
+    setViewOrderPayments([]);
+    fetch(`/api/orders/${viewingOrder.id}/payments`)
+      .then((r) => r.json())
+      .then((data) => setViewOrderPayments(data.payments ?? []))
+      .finally(() => setViewOrderLoading(false));
+  }, [viewingOrder]);
+
   async function refreshOrders() {
     const [ordersRes, stockRes, summaryRes] = await Promise.all([
       fetch(`/api/orders?status=${apiStatus}`),
@@ -397,6 +416,7 @@ export default function OrdersPage() {
       customer_search: "",
       partner_name: "all",
     });
+    setPaidDateFilter("");
   }
 
   // Derive unique areas and partners from loaded orders
@@ -416,6 +436,7 @@ export default function OrdersPage() {
     filters.status !== "due",
     filters.product_id !== "all",
     filters.area_id !== "all",
+    !!paidDateFilter,
     filters.customer_search !== "",
     filters.partner_name !== "all",
   ].filter(Boolean).length;
@@ -431,6 +452,11 @@ export default function OrdersPage() {
       )
         return false;
       if (filters.partner_name !== "all" && o.partner_name !== filters.partner_name) return false;
+      if (paidDateFilter) {
+        if (!o.last_payment_date) return false;
+        const lpd = new Date(o.last_payment_date).toISOString().slice(0, 10);
+        if (lpd !== paidDateFilter) return false;
+      }
       return true;
     })
     .sort((a, b) => {
@@ -709,6 +735,23 @@ export default function OrdersPage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <div className="relative">
+            <Input
+              type="date"
+              value={paidDateFilter}
+              onChange={(e) => setPaidDateFilter(e.target.value)}
+              className="h-8 text-sm w-38 pr-7"
+              title="Filter by paid date"
+            />
+            {paidDateFilter && (
+              <button
+                onClick={() => setPaidDateFilter("")}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+              >
+                <X className="size-3" />
+              </button>
+            )}
+          </div>
           <Select value={orderSort} onValueChange={(v) => setOrderSort(v as typeof orderSort)}>
             <SelectTrigger className="h-8 text-sm w-44">
               <SelectValue>
@@ -976,6 +1019,15 @@ export default function OrdersPage() {
                   </TableCell>
                   <TableCell>
                     <div className="flex items-center gap-1">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => setViewingOrder(o)}
+                        className="size-7 text-muted-foreground hover:text-foreground"
+                        title="View order details"
+                      >
+                        <Eye className="size-3.5" />
+                      </Button>
                       {o.status === "pending" && (
                         <Button
                           variant="ghost"
@@ -1673,6 +1725,151 @@ export default function OrdersPage() {
                 >
                   Close
                 </Button>
+              </div>
+            </div>
+          )}
+        </SheetContent>
+      </Sheet>
+
+      {/* ── Order Detail Sheet ────────────────────────────────────── */}
+      <Sheet open={viewingOrder !== null} onOpenChange={(open) => !open && setViewingOrder(null)}>
+        <SheetContent className="w-full sm:!max-w-lg overflow-y-auto">
+          <SheetHeader>
+            <SheetTitle>Order #{viewingOrder?.id}</SheetTitle>
+          </SheetHeader>
+          {viewingOrder && (
+            <div className="mt-4 px-4 pb-8 space-y-6">
+              {/* Order info */}
+              <div className="rounded-lg border border-border p-4 grid grid-cols-2 gap-x-6 gap-y-3 text-sm">
+                <div>
+                  <p className="text-xs text-muted-foreground">Customer</p>
+                  <p className="font-medium">{viewingOrder.customer_name ?? "—"}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Product</p>
+                  <p className="font-medium">{viewingOrder.product_name ?? "—"}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Order Date</p>
+                  <p>
+                    {new Date(viewingOrder.ordered_at).toLocaleDateString("en-GB", {
+                      day: "numeric",
+                      month: "short",
+                      year: "numeric",
+                    })}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Status</p>
+                  <Badge variant={STATUS_VARIANT[viewingOrder.status] ?? "secondary"}>
+                    {viewingOrder.status}
+                  </Badge>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Quantity</p>
+                  <p>
+                    {viewingOrder.quantity} {viewingOrder.product_unit ?? ""}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Unit Price</p>
+                  <p>৳{Number(viewingOrder.unit_price).toFixed(2)}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Total</p>
+                  <p className="font-semibold">৳{Number(viewingOrder.total_amount).toFixed(2)}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Paid</p>
+                  <p className="text-green-600 font-medium">
+                    ৳{Number(viewingOrder.paid_amount).toFixed(2)}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Due</p>
+                  <p
+                    className={
+                      Number(viewingOrder.due_amount) > 0
+                        ? "text-destructive font-medium"
+                        : "text-muted-foreground"
+                    }
+                  >
+                    ৳{Number(viewingOrder.due_amount).toFixed(2)}
+                  </p>
+                </div>
+                {viewingOrder.area_name && (
+                  <div>
+                    <p className="text-xs text-muted-foreground">Area</p>
+                    <p>{viewingOrder.area_name}</p>
+                  </div>
+                )}
+                {viewingOrder.delivered_at && (
+                  <div>
+                    <p className="text-xs text-muted-foreground">Delivered</p>
+                    <p>
+                      {new Date(viewingOrder.delivered_at).toLocaleDateString("en-GB", {
+                        day: "numeric",
+                        month: "short",
+                        year: "numeric",
+                      })}
+                    </p>
+                  </div>
+                )}
+                {viewingOrder.note && (
+                  <div className="col-span-2">
+                    <p className="text-xs text-muted-foreground">Note</p>
+                    <p className="text-sm">{viewingOrder.note}</p>
+                  </div>
+                )}
+                {viewingOrder.cancellation_reason && (
+                  <div className="col-span-2">
+                    <p className="text-xs text-muted-foreground">Cancellation Reason</p>
+                    <p className="text-sm text-destructive">{viewingOrder.cancellation_reason}</p>
+                  </div>
+                )}
+              </div>
+
+              {/* Payment history */}
+              <div>
+                <h3 className="text-sm font-semibold mb-2">Payment History</h3>
+                {viewOrderLoading ? (
+                  <div className="flex justify-center py-6">
+                    <Loader2 className="size-4 animate-spin text-muted-foreground" />
+                  </div>
+                ) : viewOrderPayments.length === 0 ? (
+                  <p className="text-sm text-muted-foreground text-center py-6">
+                    No payments recorded.
+                  </p>
+                ) : (
+                  <div className="rounded-lg border border-border overflow-hidden">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Date</TableHead>
+                          <TableHead>Method</TableHead>
+                          <TableHead className="text-right">Amount</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {viewOrderPayments.map((p) => (
+                          <TableRow key={p.id}>
+                            <TableCell className="text-muted-foreground text-xs whitespace-nowrap">
+                              {new Date(p.paid_at).toLocaleDateString("en-GB", {
+                                day: "numeric",
+                                month: "short",
+                                year: "numeric",
+                              })}
+                            </TableCell>
+                            <TableCell className="text-sm">{p.payment_method ?? "—"}</TableCell>
+                            <TableCell className="text-right font-medium text-green-600">
+                              ৳{Number(p.amount).toFixed(2)}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                )}
               </div>
             </div>
           )}

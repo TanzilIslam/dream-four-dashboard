@@ -262,11 +262,14 @@ export default function ExpensesPage() {
             <SelectValue>
               {productFilter === "all"
                 ? "All products"
-                : (products.find((p) => String(p.id) === productFilter)?.name ?? "All products")}
+                : productFilter === "none"
+                  ? "Common (no product)"
+                  : (products.find((p) => String(p.id) === productFilter)?.name ?? "All products")}
             </SelectValue>
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All products</SelectItem>
+            <SelectItem value="none">Common (no product)</SelectItem>
             {products.map((p) => (
               <SelectItem key={p.id} value={String(p.id)}>
                 {p.name}
