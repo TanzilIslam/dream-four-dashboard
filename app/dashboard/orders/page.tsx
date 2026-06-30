@@ -486,6 +486,8 @@ export default function OrdersPage() {
       }
     });
 
+  const hasUnreturnedAssets = filteredOrders.some((o) => o.unreturned_assets > 0);
+
   function openCreate() {
     createForm.reset({
       customer_id: 0,
@@ -968,19 +970,20 @@ export default function OrdersPage() {
               <TableHead>Paid</TableHead>
               <TableHead>Due</TableHead>
               <TableHead>Status</TableHead>
+              {hasUnreturnedAssets && <TableHead>Assets to Collect</TableHead>}
               <TableHead className="w-25" />
             </TableRow>
           </TableHeader>
           <TableBody>
             {loading ? (
               <TableRow>
-                <TableCell colSpan={11} className="text-center text-muted-foreground py-10">
+                <TableCell colSpan={12} className="text-center text-muted-foreground py-10">
                   Loading…
                 </TableCell>
               </TableRow>
             ) : filteredOrders.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={11} className="text-center text-muted-foreground py-10">
+                <TableCell colSpan={12} className="text-center text-muted-foreground py-10">
                   {activeFilterCount > 0 ? "No orders match your filters" : "No orders"}
                 </TableCell>
               </TableRow>
@@ -1017,6 +1020,15 @@ export default function OrdersPage() {
                   <TableCell>
                     <Badge variant={STATUS_VARIANT[o.status] ?? "secondary"}>{o.status}</Badge>
                   </TableCell>
+                  {hasUnreturnedAssets && (
+                    <TableCell>
+                      {o.unreturned_assets > 0 ? (
+                        <span className="font-medium text-amber-600">{o.unreturned_assets}</span>
+                      ) : (
+                        <span className="text-muted-foreground">—</span>
+                      )}
+                    </TableCell>
+                  )}
                   <TableCell>
                     <div className="flex items-center gap-1">
                       <Button
