@@ -70,6 +70,7 @@ type Customer = {
   total_quantity: number;
   total_paid: string;
   total_due: string;
+  total_assets_sent: number;
   unreturned_assets: number;
   last_order_date: string | null;
 };
@@ -664,6 +665,7 @@ export default function CustomersPage() {
               <TableHead className="text-right">Total Paid</TableHead>
               <TableHead className="text-right">Total Due</TableHead>
               <TableHead className="text-right">Last Order</TableHead>
+              <TableHead className="text-right">Total Assets</TableHead>
               <TableHead className="text-right">Assets to Return</TableHead>
               <TableHead className="w-[80px]">Actions</TableHead>
             </TableRow>
@@ -671,13 +673,13 @@ export default function CustomersPage() {
           <TableBody>
             {loading ? (
               <TableRow>
-                <TableCell colSpan={11} className="text-center text-muted-foreground py-10">
+                <TableCell colSpan={12} className="text-center text-muted-foreground py-10">
                   Loading…
                 </TableCell>
               </TableRow>
             ) : filteredCustomers.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={11} className="text-center text-muted-foreground py-10">
+                <TableCell colSpan={12} className="text-center text-muted-foreground py-10">
                   {activeFilterCount > 0 ? "No customers match your filters" : "No customers yet"}
                 </TableCell>
               </TableRow>
@@ -712,6 +714,9 @@ export default function CustomersPage() {
                           year: "numeric",
                         })
                       : "—"}
+                  </TableCell>
+                  <TableCell className="text-right tabular-nums">
+                    {c.total_assets_sent > 0 ? c.total_assets_sent : "—"}
                   </TableCell>
                   <TableCell className="text-right tabular-nums">
                     {c.unreturned_assets > 0 ? (
@@ -1246,6 +1251,9 @@ export default function CustomersPage() {
                 <div className="grid grid-cols-3 gap-x-4 gap-y-5">
                   <DetailCell label="Orders">{viewingCustomer.total_orders}</DetailCell>
                   <DetailCell label="Total Qty">{viewingCustomer.total_quantity}</DetailCell>
+                  <DetailCell label="Total Assets">
+                    {viewingCustomer.total_assets_sent > 0 ? viewingCustomer.total_assets_sent : "—"}
+                  </DetailCell>
                   <DetailCell label="Assets to Return">
                     {viewingCustomer.unreturned_assets > 0 ? (
                       <span className="text-destructive font-medium">

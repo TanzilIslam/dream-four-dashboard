@@ -25,6 +25,7 @@ export async function GET(request: Request) {
                  COALESCE((SELECT SUM(o.quantity) FROM orders o WHERE o.customer_id = c.id AND o.status != 'cancelled'), 0)::int AS total_quantity,
                  COALESCE((SELECT SUM(o.paid_amount) FROM orders o WHERE o.customer_id = c.id AND o.status != 'cancelled'), 0)::numeric AS total_paid,
                  COALESCE((SELECT SUM(o.due_amount) FROM orders o WHERE o.customer_id = c.id AND o.status != 'cancelled'), 0)::numeric AS total_due,
+                 COALESCE((SELECT SUM(oa.quantity) FROM order_assets oa JOIN orders o ON o.id = oa.order_id WHERE o.customer_id = c.id), 0)::int AS total_assets_sent,
                  GREATEST(0,
                    COALESCE((SELECT SUM(oa.quantity) FROM order_assets oa JOIN orders o ON o.id = oa.order_id WHERE o.customer_id = c.id), 0)
                    - COALESCE((SELECT SUM(oar.quantity) FROM order_asset_returns oar JOIN orders o ON o.id = oar.order_id WHERE o.customer_id = c.id), 0)
@@ -49,6 +50,7 @@ export async function GET(request: Request) {
                  COALESCE((SELECT SUM(o.quantity) FROM orders o WHERE o.customer_id = c.id AND o.status != 'cancelled'), 0)::int AS total_quantity,
                  COALESCE((SELECT SUM(o.paid_amount) FROM orders o WHERE o.customer_id = c.id AND o.status != 'cancelled'), 0)::numeric AS total_paid,
                  COALESCE((SELECT SUM(o.due_amount) FROM orders o WHERE o.customer_id = c.id AND o.status != 'cancelled'), 0)::numeric AS total_due,
+                 COALESCE((SELECT SUM(oa.quantity) FROM order_assets oa JOIN orders o ON o.id = oa.order_id WHERE o.customer_id = c.id), 0)::int AS total_assets_sent,
                  GREATEST(0,
                    COALESCE((SELECT SUM(oa.quantity) FROM order_assets oa JOIN orders o ON o.id = oa.order_id WHERE o.customer_id = c.id), 0)
                    - COALESCE((SELECT SUM(oar.quantity) FROM order_asset_returns oar JOIN orders o ON o.id = oar.order_id WHERE o.customer_id = c.id), 0)
