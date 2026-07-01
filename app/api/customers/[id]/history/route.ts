@@ -81,7 +81,9 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
     g.total_qty += Number(o.quantity);
     g.total_amount += Number(o.total_amount);
     g.total_paid += Number(o.paid_amount);
-    g.total_due += Number(o.due_amount);
+    if (o.status === "delivered" || o.status === "paid") {
+      g.total_due += Number(o.due_amount);
+    }
     g.orders.push(o);
   }
 

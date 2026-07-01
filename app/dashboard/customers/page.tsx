@@ -167,6 +167,8 @@ export default function CustomersPage() {
     | "paid_asc"
     | "last_order_desc"
     | "last_order_asc"
+    | "assets_desc"
+    | "assets_asc"
   >("none");
 
   // Fetch inactive from API when status filter requires it
@@ -330,6 +332,10 @@ export default function CustomersPage() {
           return (b.last_order_date ?? "").localeCompare(a.last_order_date ?? "");
         case "last_order_asc":
           return (a.last_order_date ?? "").localeCompare(b.last_order_date ?? "");
+        case "assets_desc":
+          return b.unreturned_assets - a.unreturned_assets;
+        case "assets_asc":
+          return a.unreturned_assets - b.unreturned_assets;
         default:
           return nameSortDir === "asc"
             ? a.name.localeCompare(b.name)
@@ -459,7 +465,7 @@ export default function CustomersPage() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-y-2">
         <div>
           <h1 className="text-xl font-semibold">Customers</h1>
           <p className="text-sm text-muted-foreground">
@@ -475,7 +481,7 @@ export default function CustomersPage() {
             )}
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <Select value={orderSort} onValueChange={(v) => setOrderSort(v as typeof orderSort)}>
             <SelectTrigger className="h-8 text-sm w-48">
               <SelectValue>
@@ -492,6 +498,8 @@ export default function CustomersPage() {
                     paid_asc: "Paid: low to high",
                     last_order_desc: "Last order: newest",
                     last_order_asc: "Last order: oldest",
+                    assets_desc: "Assets: high to low",
+                    assets_asc: "Assets: low to high",
                   }[orderSort]
                 }
               </SelectValue>
@@ -508,6 +516,8 @@ export default function CustomersPage() {
               <SelectItem value="paid_asc">Paid: low to high</SelectItem>
               <SelectItem value="last_order_desc">Last order: newest</SelectItem>
               <SelectItem value="last_order_asc">Last order: oldest</SelectItem>
+              <SelectItem value="assets_desc">Assets: high to low</SelectItem>
+              <SelectItem value="assets_asc">Assets: low to high</SelectItem>
             </SelectContent>
           </Select>
           <Button
@@ -1252,7 +1262,9 @@ export default function CustomersPage() {
                   <DetailCell label="Orders">{viewingCustomer.total_orders}</DetailCell>
                   <DetailCell label="Total Qty">{viewingCustomer.total_quantity}</DetailCell>
                   <DetailCell label="Total Assets">
-                    {viewingCustomer.total_assets_sent > 0 ? viewingCustomer.total_assets_sent : "—"}
+                    {viewingCustomer.total_assets_sent > 0
+                      ? viewingCustomer.total_assets_sent
+                      : "—"}
                   </DetailCell>
                   <DetailCell label="Assets to Return">
                     {viewingCustomer.unreturned_assets > 0 ? (

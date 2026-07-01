@@ -500,7 +500,7 @@ export default function PurchaseRequestsPage() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-y-2">
         <div>
           <h1 className="text-xl font-semibold">Purchase Requests</h1>
           <p className="text-sm text-muted-foreground">Request stock purchases from admin.</p>
