@@ -1,5 +1,6 @@
 import { sql } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
+import { getPartnerPnL } from "@/lib/data/pnl";
 
 export async function GET(request: Request) {
   const auth = await requireUser();
@@ -11,39 +12,10 @@ export async function GET(request: Request) {
   const to = url.searchParams.get("to");
 
   // Per-partner P&L
-  const partners = await sql`
-    SELECT
-      u.id   AS partner_id,
-      u.name AS partner_name,
-
-      COALESCE((
-        SELECT SUM(o.total_amount)
-        FROM orders o
-        WHERE o.partner_id = u.id AND o.status IN ('delivered','paid')
-          AND (${from ?? null}::date IS NULL OR DATE(o.delivered_at) >= ${from ?? null})
-          AND (${to ?? null}::date   IS NULL OR DATE(o.delivered_at) <= ${to ?? null})
-      ), 0) AS revenue,
-
-      COALESCE((
-        SELECT SUM(pr.actual_total)
-        FROM purchase_requests pr
-        WHERE pr.partner_id = u.id AND pr.status = 'purchased'
-          AND (${from ?? null}::date IS NULL OR pr.purchased_at >= ${from ?? null})
-          AND (${to ?? null}::date   IS NULL OR pr.purchased_at <= ${to ?? null})
-      ), 0) AS stock_cost,
-
-      COALESCE((
-        SELECT SUM(e.amount)
-        FROM expenses e
-        WHERE e.partner_id = u.id
-          AND (${from ?? null}::date IS NULL OR e.date >= ${from ?? null})
-          AND (${to ?? null}::date   IS NULL OR e.date <= ${to ?? null})
-      ), 0) AS expenses
-
-    FROM users u
-    WHERE ${user.role === "admin" ? sql`u.role = 'partner'` : sql`u.id = ${user.id}`}
-    ORDER BY u.name ASC
-  `;
+  const enriched = await getPartnerPnL(
+    { from, to },
+    user.role === "admin" ? "all-partners" : { partnerId: user.id }
+  );
 
   // Per-area P&L (admin only)
   const areas =
@@ -64,14 +36,6 @@ export async function GET(request: Request) {
     ORDER BY revenue DESC
   `
       : [];
-
-  const enriched = partners.map((p) => {
-    const revenue = Number(p.revenue);
-    const stockCost = Number(p.stock_cost);
-    const expenses = Number(p.expenses);
-    const net = revenue - stockCost - expenses;
-    return { ...p, revenue, stock_cost: stockCost, expenses, net };
-  });
 
   const totals = enriched.reduce(
     (acc, p) => ({

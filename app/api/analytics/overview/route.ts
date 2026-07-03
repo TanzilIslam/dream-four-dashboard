@@ -1,5 +1,6 @@
 import { sql } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
+import { getAssetStock, getProductStock } from "@/lib/data/stock";
 
 // GET /api/analytics/overview
 // Admin: full business overview. Partner: their own daily summary.
@@ -58,50 +59,7 @@ export async function GET(request: Request) {
     });
 
     // ── Stock per product ─────────────────────────────────────────
-    const stock = await sql`
-      SELECT
-        p.id,
-        p.name,
-        p.unit,
-        p.low_stock_threshold,
-        COALESCE(purchased.qty, 0)  AS purchased_qty,
-        COALESCE(delivered.qty, 0)  AS delivered_qty,
-        COALESCE(reserved.qty, 0)   AS reserved_qty,
-        COALESCE(returned.qty, 0)   AS returned_qty,
-        COALESCE(adjusted.qty, 0)   AS adjusted_qty,
-        COALESCE(purchased.qty, 0)
-          - COALESCE(reserved.qty, 0)
-          - COALESCE(delivered.qty, 0)
-          + COALESCE(returned.qty, 0)
-          + COALESCE(adjusted.qty, 0) AS available_qty
-      FROM products p
-      LEFT JOIN (
-        SELECT product_id, SUM(actual_qty) AS qty
-        FROM purchase_requests WHERE status = 'purchased'
-        GROUP BY product_id
-      ) purchased ON purchased.product_id = p.id
-      LEFT JOIN (
-        SELECT product_id, SUM(quantity) AS qty
-        FROM orders WHERE status IN ('delivered', 'paid')
-        GROUP BY product_id
-      ) delivered ON delivered.product_id = p.id
-      LEFT JOIN (
-        SELECT product_id, SUM(quantity) AS qty
-        FROM orders WHERE status = 'pending'
-        GROUP BY product_id
-      ) reserved ON reserved.product_id = p.id
-      LEFT JOIN (
-        SELECT product_id, SUM(quantity) AS qty
-        FROM returns GROUP BY product_id
-      ) returned ON returned.product_id = p.id
-      LEFT JOIN (
-        SELECT product_id, COALESCE(SUM(quantity), 0) AS qty
-        FROM stock_adjustments
-        GROUP BY product_id
-      ) adjusted ON adjusted.product_id = p.id
-      WHERE p.is_active = true
-      ORDER BY p.name ASC
-    `;
+    const stock = await getProductStock();
 
     // ── Partner performance table (today) ─────────────────────────
     const partners = await sql`
@@ -130,25 +88,7 @@ export async function GET(request: Request) {
     `;
 
     // ── Asset stock ───────────────────────────────────────────────
-    const assets = await sql`
-      SELECT
-        pa.id                                                                  AS asset_id,
-        pa.product_id,
-        pa.name                                                                AS asset_name,
-        COALESCE(SUM(oa.quantity), 0)::int                                     AS sent,
-        COALESCE(SUM(oar.quantity), 0)::int                                    AS returned_by_customers,
-        COALESCE((SELECT SUM(sar.quantity) FROM supplier_asset_returns sar WHERE sar.asset_id = pa.id), 0)::int AS returned_to_suppliers,
-        (
-          COALESCE(SUM(oa.quantity), 0)
-          - COALESCE(SUM(oar.quantity), 0)
-          - COALESCE((SELECT SUM(sar.quantity) FROM supplier_asset_returns sar WHERE sar.asset_id = pa.id), 0)
-        )::int AS unreturned
-      FROM product_assets pa
-      LEFT JOIN order_assets oa  ON oa.asset_id = pa.id
-      LEFT JOIN order_asset_returns oar ON oar.asset_id = pa.id
-      GROUP BY pa.id, pa.product_id, pa.name
-      ORDER BY pa.name ASC
-    `;
+    const assets = await getAssetStock();
 
     // ── Outstanding dues ──────────────────────────────────────────
     const [duesSummary] = await sql`
