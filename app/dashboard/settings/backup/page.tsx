@@ -92,9 +92,50 @@ export default function ExportPage() {
     return params;
   }
 
+  function addTotalsRow(
+    rows: Record<string, unknown>[],
+    sumCols: string[],
+    labelCol: string
+  ): Record<string, unknown>[] {
+    if (rows.length === 0) return rows;
+    const total: Record<string, unknown> = {};
+    const keys = Object.keys(rows[0]);
+    for (const key of keys) {
+      if (key === labelCol) total[key] = "TOTAL";
+      else if (sumCols.includes(key)) {
+        const sum = rows.reduce((acc, r) => acc + (Number(r[key]) || 0), 0);
+        total[key] = Math.round(sum * 100) / 100;
+      } else {
+        total[key] = "";
+      }
+    }
+    return [...rows, total];
+  }
+
   function buildSheets(data: Record<SheetKey, Record<string, unknown>[]>): SheetData[] {
     return REPORT_SHEETS.filter((s) => selectedSheets.has(s.key))
-      .map((s) => ({ key: s.key, label: SHEET_LABELS[s.key], rows: data[s.key] ?? [] }))
+      .map((s) => {
+        let rows = data[s.key] ?? [];
+        if (s.key === "customers")
+          rows = addTotalsRow(
+            rows,
+            ["Qty Sold", "Revenue (৳)", "Collected (৳)", "Due (৳)"],
+            "Customer"
+          );
+        if (s.key === "dailyTrend")
+          rows = addTotalsRow(rows, ["Orders", "Qty", "Revenue (৳)", "Collected (৳)"], "Date");
+        if (s.key === "products")
+          rows = addTotalsRow(
+            rows,
+            ["Qty Sold", "Revenue (৳)", "Purchase Cost (৳)", "Gross Profit (৳)"],
+            "Product"
+          );
+        if (s.key === "expenseBreakdown") rows = addTotalsRow(rows, ["Amount (৳)"], "Category");
+        if (s.key === "dues") rows = addTotalsRow(rows, ["Due (৳)", "Orders"], "Customer");
+        if (s.key === "supplies")
+          rows = addTotalsRow(rows, ["Qty", "Total (৳)", "Paid (৳)", "Due (৳)"], "Date");
+        return { key: s.key, label: SHEET_LABELS[s.key], rows };
+      })
       .filter((s) => s.rows.length > 0);
   }
 
@@ -409,18 +450,21 @@ export default function ExportPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {activeSheet.rows.map((row, i) => (
-                      <tr key={i} className="hover:bg-muted/40">
-                        {columns.map((col) => (
-                          <td
-                            key={col}
-                            className="px-3 py-1.5 border border-border text-foreground whitespace-nowrap"
-                          >
-                            {String(row[col] ?? "—")}
-                          </td>
-                        ))}
-                      </tr>
-                    ))}
+                    {activeSheet.rows.map((row, i) => {
+                      const isTotalRow = Object.values(row).includes("TOTAL");
+                      return (
+                        <tr key={i} className={isTotalRow ? "bg-muted/60" : "hover:bg-muted/40"}>
+                          {columns.map((col) => (
+                            <td
+                              key={col}
+                              className={`px-3 py-1.5 border border-border text-foreground whitespace-nowrap${isTotalRow ? " font-bold" : ""}`}
+                            >
+                              {String(row[col] ?? "—")}
+                            </td>
+                          ))}
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               ) : (

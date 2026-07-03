@@ -188,9 +188,9 @@ export async function GET(request: Request) {
         pr.purchased_at::date                                   AS "Date",
         COALESCE(s.name, '—')                                   AS "Supplier",
         p.name                                                  AS "Product",
-        pr.quantity::int                                        AS "Qty",
+        pr.actual_qty::int                                      AS "Qty",
         p.unit                                                  AS "Unit",
-        pr.unit_price::numeric                                  AS "Unit Price (৳)",
+        pr.actual_price::numeric                                AS "Unit Price (৳)",
         pr.actual_total::numeric                                AS "Total (৳)",
         COALESCE((
           SELECT SUM(sp.amount)
