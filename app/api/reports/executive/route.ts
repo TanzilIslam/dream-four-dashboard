@@ -49,9 +49,10 @@ export async function GET(request: Request) {
   const productLabel =
     productNameResult.length > 0 ? (productNameResult[0] as { name: string }).name : "All Products";
 
-  const [summary, customers, dailyTrend, products, expenseBreakdown, dues] = await Promise.all([
-    // Sheet 1: Summary KPIs
-    sql`
+  const [summary, customers, dailyTrend, products, expenseBreakdown, dues, supplies] =
+    await Promise.all([
+      // Sheet 1: Summary KPIs
+      sql`
       WITH order_stats AS (
         SELECT
           COUNT(*)::int                    AS total_orders,
@@ -86,8 +87,8 @@ export async function GET(request: Request) {
       FROM order_stats os, purchase_stats ps, expense_stats es
     `,
 
-    // Sheet 2: Customer Performance
-    sql`
+      // Sheet 2: Customer Performance
+      sql`
       SELECT
         c.name                                  AS "Customer",
         COALESCE(a.name, '—')                   AS "Area",
@@ -108,8 +109,8 @@ export async function GET(request: Request) {
       ORDER BY SUM(o.total_amount) DESC
     `,
 
-    // Sheet 3: Daily Sales Trend
-    sql`
+      // Sheet 3: Daily Sales Trend
+      sql`
       SELECT
         o.ordered_at::date                        AS "Date",
         COUNT(o.id)::int                          AS "Orders",
@@ -122,8 +123,8 @@ export async function GET(request: Request) {
       ORDER BY o.ordered_at::date
     `,
 
-    // Sheet 4: Product Performance
-    sql`
+      // Sheet 4: Product Performance
+      sql`
       SELECT
         p.name                                                AS "Product",
         COALESCE(SUM(o.quantity) FILTER (WHERE o.status != 'cancelled'), 0)::int        AS "Qty Sold",
@@ -149,8 +150,8 @@ export async function GET(request: Request) {
       ORDER BY SUM(o.total_amount) DESC NULLS LAST
     `,
 
-    // Sheet 5: Expense Breakdown
-    sql`
+      // Sheet 5: Expense Breakdown
+      sql`
       SELECT
         COALESCE(ec.name, 'Uncategorized')                      AS "Category",
         COALESCE(p.name, 'Common (No Product)')                 AS "Product",
@@ -164,8 +165,8 @@ export async function GET(request: Request) {
       ORDER BY SUM(e.amount) DESC
     `,
 
-    // Sheet 6: Outstanding Dues
-    sql`
+      // Sheet 6: Outstanding Dues
+      sql`
       SELECT
         c.name                                   AS "Customer",
         COALESCE(a.name, '—')                    AS "Area",
@@ -180,7 +181,35 @@ export async function GET(request: Request) {
       HAVING SUM(o.due_amount) > 0
       ORDER BY SUM(o.due_amount) DESC
     `,
-  ]);
+
+      // Sheet 7: Supply / Purchase History
+      sql`
+      SELECT
+        pr.purchased_at::date                                   AS "Date",
+        COALESCE(s.name, '—')                                   AS "Supplier",
+        p.name                                                  AS "Product",
+        pr.quantity::int                                        AS "Qty",
+        p.unit                                                  AS "Unit",
+        pr.unit_price::numeric                                  AS "Unit Price (৳)",
+        pr.actual_total::numeric                                AS "Total (৳)",
+        COALESCE((
+          SELECT SUM(sp.amount)
+          FROM supplier_payments sp
+          WHERE sp.purchase_request_id = pr.id
+        ), 0)::numeric                                          AS "Paid (৳)",
+        (pr.actual_total - COALESCE((
+          SELECT SUM(sp.amount)
+          FROM supplier_payments sp
+          WHERE sp.purchase_request_id = pr.id
+        ), 0))::numeric                                         AS "Due (৳)",
+        pr.note                                                 AS "Note"
+      FROM purchase_requests pr
+      JOIN products p ON p.id = pr.product_id
+      LEFT JOIN suppliers s ON s.id = pr.supplier_id
+      WHERE pr.status = 'purchased' ${purchaseProductFilter} ${purchaseDateFilter}
+      ORDER BY pr.purchased_at DESC
+    `,
+    ]);
 
   const fmt = (d: unknown) =>
     d
@@ -230,6 +259,11 @@ export async function GET(request: Request) {
     "Last Order": fmt(r["Last Order"]),
   }));
 
+  const formattedSupplies = supplies.map((r: Record<string, unknown>) => ({
+    ...r,
+    Date: fmt(r["Date"]),
+  }));
+
   return Response.json({
     summary: summaryRows,
     customers,
@@ -237,5 +271,6 @@ export async function GET(request: Request) {
     products,
     expenseBreakdown,
     dues: formattedDues,
+    supplies: formattedSupplies,
   });
 }

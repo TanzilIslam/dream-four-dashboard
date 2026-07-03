@@ -24,6 +24,7 @@ const REPORT_SHEETS = [
   { key: "products", label: "Product Performance" },
   { key: "expenseBreakdown", label: "Expense Breakdown" },
   { key: "dues", label: "Outstanding Dues" },
+  { key: "supplies", label: "Supply History" },
 ] as const;
 
 type SheetKey = (typeof REPORT_SHEETS)[number]["key"];
@@ -35,6 +36,7 @@ const SHEET_LABELS: Record<SheetKey, string> = {
   products: "Product Performance",
   expenseBreakdown: "Expense Breakdown",
   dues: "Outstanding Dues",
+  supplies: "Supply History",
 };
 
 const DB_TABLES = [
