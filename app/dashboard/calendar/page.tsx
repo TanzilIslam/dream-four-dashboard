@@ -114,7 +114,7 @@ export default function CalendarPage() {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setLoading(true);
     setDayData(null);
-    const dateStr = selected.toISOString().slice(0, 10);
+    const dateStr = `${selected.getFullYear()}-${String(selected.getMonth() + 1).padStart(2, "0")}-${String(selected.getDate()).padStart(2, "0")}`;
     fetch(`/api/calendar/day?date=${dateStr}&product_id=${productFilter}`)
       .then((r) => r.json())
       .then((data) => setDayData(data))

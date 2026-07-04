@@ -1,8 +1,12 @@
 import { sql } from "@/lib/db";
+import { requireAdmin } from "@/lib/auth";
 import { updateUserSchema } from "@/lib/schemas/user";
 import bcrypt from "bcryptjs";
 
 export async function PUT(request: Request, { params }: { params: Promise<{ id: string }> }) {
+  const auth = await requireAdmin();
+  if ("error" in auth) return auth.error;
+
   const { id } = await params;
   const body = await request.json();
   const parsed = updateUserSchema.safeParse(body);
@@ -36,6 +40,9 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
 }
 
 export async function DELETE(_request: Request, { params }: { params: Promise<{ id: string }> }) {
+  const auth = await requireAdmin();
+  if ("error" in auth) return auth.error;
+
   const { id } = await params;
   await sql`DELETE FROM users WHERE id=${id}`;
   return Response.json({ ok: true });

@@ -90,10 +90,11 @@ export default function ReturnsPage() {
       .then((res) => (res.ok ? res.json() : { user: null }))
       .then((data) => setIsAdmin(data.user?.role === "admin"))
       .catch(() => setIsAdmin(false));
-    // Load delivered/paid orders as returnable
-    fetch("/api/orders?status=delivered")
-      .then((res) => res.json())
-      .then((data: Order[]) => setOrders(data));
+    // Load delivered + paid orders as returnable
+    Promise.all([
+      fetch("/api/orders?status=delivered").then((res) => res.json()),
+      fetch("/api/orders?status=paid").then((res) => res.json()),
+    ]).then(([delivered, paid]: [Order[], Order[]]) => setOrders([...delivered, ...paid]));
   }, []);
 
   async function refreshReturns() {

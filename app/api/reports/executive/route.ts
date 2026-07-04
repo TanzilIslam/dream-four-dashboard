@@ -41,13 +41,66 @@ export async function GET(request: Request) {
           : sql``;
   const purchaseProductFilter =
     productId && productId !== "all" ? sql`AND pr.product_id = ${Number(productId)}` : sql``;
+  const loanDateFilter =
+    from && to
+      ? sql`AND sl.loaned_at BETWEEN ${from}::DATE AND ${to}::DATE`
+      : from
+        ? sql`AND sl.loaned_at >= ${from}::DATE`
+        : to
+          ? sql`AND sl.loaned_at <= ${to}::DATE`
+          : sql``;
 
   const productNameResult =
     productId && productId !== "all"
       ? await sql`SELECT name FROM products WHERE id = ${Number(productId)} LIMIT 1`
-      : [];
+      : await sql`SELECT name FROM products ORDER BY name`;
   const productLabel =
-    productNameResult.length > 0 ? (productNameResult[0] as { name: string }).name : "All Products";
+    productId && productId !== "all"
+      ? (productNameResult[0] as { name: string }).name
+      : productNameResult.map((p: Record<string, unknown>) => p.name as string).join(", ");
+
+  // Ensure simple_loans table exists (created lazily by /api/loans)
+  await sql`
+    CREATE TABLE IF NOT EXISTS simple_loans (
+      id          SERIAL PRIMARY KEY,
+      person_name TEXT    NOT NULL,
+      amount      NUMERIC(12,2) NOT NULL CHECK (amount > 0),
+      reason      TEXT,
+      note        TEXT,
+      loaned_at   DATE    NOT NULL DEFAULT CURRENT_DATE,
+      status      TEXT    NOT NULL DEFAULT 'outstanding',
+      returned_at DATE,
+      created_by  INTEGER REFERENCES users(id),
+      created_at  TIMESTAMPTZ DEFAULT NOW()
+    )
+  `;
+
+  // Earliest order date for period display when no `from` is given
+  const minDateProductFilter =
+    productId && productId !== "all" ? sql`AND product_id = ${Number(productId)}` : sql``;
+  const [{ earliest_date }] = await sql`
+    SELECT MIN(ordered_at)::date AS earliest_date FROM orders
+    WHERE status != 'cancelled'
+      AND ordered_at >= NOW() - INTERVAL '2 years'
+      ${minDateProductFilter}
+  `;
+  const actualFrom: Date | string | null = from ?? earliest_date ?? null;
+  const actualTo: Date | string = to ?? new Date();
+
+  // Per-product order/qty breakdown when all products selected
+  const perProductStats =
+    !productId || productId === "all"
+      ? await sql`
+          SELECT p.name,
+                 COUNT(o.id)::int                    AS orders,
+                 COALESCE(SUM(o.quantity), 0)::int   AS qty
+          FROM orders o
+          JOIN products p ON p.id = o.product_id
+          WHERE o.status != 'cancelled' ${dateFilter}
+          GROUP BY p.id, p.name
+          ORDER BY p.name
+        `
+      : [];
 
   const [summary, customers, dailyTrend, products, expenseBreakdown, dues, supplies] =
     await Promise.all([
@@ -72,6 +125,19 @@ export async function GET(request: Request) {
       expense_stats AS (
         SELECT COALESCE(SUM(e.amount), 0) AS total_expenses
         FROM expenses e ${expenseDateFilter}
+      ),
+      loan_stats AS (
+        SELECT
+          COALESCE(SUM(sl.amount), 0)                                          AS total_loans_issued,
+          COALESCE(SUM(sl.amount) FILTER (WHERE sl.status = 'outstanding'), 0) AS outstanding_loans
+        FROM simple_loans sl
+        WHERE 1=1 ${loanDateFilter}
+      ),
+      customer_stats AS (
+        SELECT COUNT(*)::int AS total_customers FROM customers WHERE is_active = true
+      ),
+      supplier_stats AS (
+        SELECT COUNT(*)::int AS total_suppliers FROM suppliers WHERE is_active = true
       )
       SELECT
         os.total_orders,
@@ -81,10 +147,13 @@ export async function GET(request: Request) {
         os.outstanding_due::numeric,
         os.active_customers,
         ps.total_purchase_cost::numeric,
-        (os.gross_revenue - ps.total_purchase_cost)::numeric AS gross_profit,
         es.total_expenses::numeric,
+        ls.total_loans_issued::numeric,
+        ls.outstanding_loans::numeric,
+        cs.total_customers,
+        ss.total_suppliers,
         (os.gross_revenue - ps.total_purchase_cost - es.total_expenses)::numeric AS net_position
-      FROM order_stats os, purchase_stats ps, expense_stats es
+      FROM order_stats os, purchase_stats ps, expense_stats es, loan_stats ls, customer_stats cs, supplier_stats ss
     `,
 
       // Sheet 2: Customer Performance
@@ -222,30 +291,50 @@ export async function GET(request: Request) {
 
   // Format summary as a label-value table for Excel
   const s = summary[0];
+
+  const daysDiff =
+    actualFrom && actualTo
+      ? Math.round(
+          (new Date(actualTo).getTime() - new Date(actualFrom).getTime()) / (1000 * 60 * 60 * 24)
+        ) + 1
+      : null;
+  const periodValue = actualFrom
+    ? `${fmt(actualFrom)} – ${fmt(actualTo)}${daysDiff !== null ? ` (${daysDiff} Days)` : ""}`
+    : "All Time";
+
+  const formatBreakdown = (key: "orders" | "qty", total: number): string => {
+    if ((perProductStats as Record<string, unknown>[]).length === 0) return String(total);
+    const parts = (perProductStats as Record<string, unknown>[])
+      .map((p) => `${p.name}: ${p[key]}`)
+      .join(" | ");
+    return `${parts} | Total: ${total}`;
+  };
+
   const summaryRows = s
     ? [
         { Metric: "Product", Value: productLabel },
-        {
-          Metric: "Period",
-          Value:
-            from && to
-              ? `${fmt(from)} – ${fmt(to)}`
-              : from
-                ? `From ${fmt(from)}`
-                : to
-                  ? `Up to ${fmt(to)}`
-                  : "All Time",
-        },
-        { Metric: "Total Orders", Value: s.total_orders },
-        { Metric: "Total Qty Sold", Value: s.total_qty },
-        { Metric: "Gross Revenue (৳)", Value: Number(s.gross_revenue).toFixed(2) },
-        { Metric: "Total Collected (৳)", Value: Number(s.total_collected).toFixed(2) },
-        { Metric: "Outstanding Due (৳)", Value: Number(s.outstanding_due).toFixed(2) },
-        { Metric: "Active Customers", Value: s.active_customers },
-        { Metric: "Purchase Cost (৳)", Value: Number(s.total_purchase_cost).toFixed(2) },
-        { Metric: "Gross Profit (৳)", Value: Number(s.gross_profit).toFixed(2) },
+        { Metric: "Period", Value: periodValue },
+        { Metric: "Total Orders", Value: formatBreakdown("orders", s.total_orders as number) },
+        { Metric: "Total Qty Sold", Value: formatBreakdown("qty", s.total_qty as number) },
+        { Metric: "Total Customers", Value: s.total_customers },
+        { Metric: "Total Suppliers", Value: s.total_suppliers },
+        // { Metric: "Gross Revenue (৳)", Value: Number(s.gross_revenue).toFixed(2) },
+        // { Metric: "Total Collected (৳)", Value: Number(s.total_collected).toFixed(2) },
+        // { Metric: "Outstanding Due (৳)", Value: Number(s.outstanding_due).toFixed(2) },
+        // { Metric: "Active Customers", Value: s.active_customers },
+        // { Metric: "Purchase Cost (৳)", Value: Number(s.total_purchase_cost).toFixed(2) },
+        // { Metric: "Gross Profit (৳)", Value: Number(s.gross_profit).toFixed(2) },
+        // { Metric: "Total Expenses (৳)", Value: Number(s.total_expenses).toFixed(2) },
+        // { Metric: "Net Position (৳)", Value: Number(s.net_position).toFixed(2) },
+        { Metric: "Total Purchased (৳)", Value: Number(s.total_purchase_cost).toFixed(2) },
+        { Metric: "Total Sell (৳)", Value: Number(s.gross_revenue).toFixed(2) },
+        { Metric: "Total Due (৳)", Value: Number(s.outstanding_due).toFixed(2) },
         { Metric: "Total Expenses (৳)", Value: Number(s.total_expenses).toFixed(2) },
-        { Metric: "Net Position (৳)", Value: Number(s.net_position).toFixed(2) },
+        { Metric: "Total Loans Issued (৳)", Value: Number(s.total_loans_issued).toFixed(2) },
+        {
+          Metric: "Total Net Profit (৳)",
+          Value: `Sell - Purchased - Expenses = ${Number(s.net_position).toFixed(2)}`,
+        },
       ]
     : [];
 

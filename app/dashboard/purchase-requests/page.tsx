@@ -904,7 +904,9 @@ export default function PurchaseRequestsPage() {
                 type="number"
                 step="0.01"
                 placeholder="Optional"
-                {...createForm.register("estimated_price", { valueAsNumber: true })}
+                {...createForm.register("estimated_price", {
+                  setValueAs: (v) => (v === "" || v === undefined ? null : Number(v)),
+                })}
               />
             </Field>
 

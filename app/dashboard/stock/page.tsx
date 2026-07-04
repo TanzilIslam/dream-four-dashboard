@@ -5,6 +5,7 @@ import { useForm } from "react-hook-form";
 import { useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
+import { extractError } from "@/lib/utils";
 import { PlusIcon, Trash2Icon, HistoryIcon, Loader2, ArrowLeftRight } from "lucide-react";
 
 import {
@@ -261,7 +262,7 @@ export default function StockPage() {
     });
     if (!res.ok) {
       const err = await res.json();
-      toast.error(err.error ?? "Failed to save adjustment");
+      toast.error(extractError(err.error, "Failed to save adjustment"));
       return;
     }
     toast.success("Adjustment logged");
@@ -306,7 +307,7 @@ export default function StockPage() {
       await Promise.all([loadAssetStock(), loadSupplierAssetReturns()]);
     } else {
       const err = await res.json();
-      toast.error(err.error ?? "Failed to record return");
+      toast.error(extractError(err.error, "Failed to record return"));
     }
     setSarSubmitting(false);
   }

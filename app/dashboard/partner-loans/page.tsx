@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
+import { extractError } from "@/lib/utils";
 
 import {
   createLoanRepaymentSchema,
@@ -91,7 +92,7 @@ export default function PartnerLoansPage() {
       refreshLoans();
     } else {
       const json = await res.json();
-      toast.error(json.error ?? "Failed to record repayment");
+      toast.error(extractError(json.error, "Failed to record repayment"));
     }
     setRepaying(false);
   }

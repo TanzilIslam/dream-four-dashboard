@@ -60,7 +60,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     const newDue = Math.max(0, Number(order.total_amount) - newPaid);
     const newStatus = newDue === 0 ? "paid" : order.status;
 
-    const [updated] = await sql`
+    await sql`
       UPDATE orders SET
         paid_amount           = ${newPaid},
         due_amount            = ${newDue},
@@ -69,7 +69,6 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
         status                = ${newStatus},
         note                  = ${d.note || order.note}
       WHERE id = ${id}
-      RETURNING *
     `;
 
     // Record payment
@@ -87,6 +86,26 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
         `;
       }
     }
+
+    const [updated] = await sql`
+      SELECT o.*,
+             c.name  AS customer_name,
+             a.name  AS area_name,
+             p.name  AS product_name,
+             p.unit  AS product_unit,
+             u.name  AS partner_name,
+             GREATEST(0,
+               COALESCE((SELECT SUM(oa.quantity) FROM order_assets oa WHERE oa.order_id = o.id), 0)
+               - COALESCE((SELECT SUM(oar.quantity) FROM order_asset_returns oar WHERE oar.order_id = o.id), 0)
+             )::int AS unreturned_assets,
+             (SELECT MAX(py.paid_at) FROM payments py WHERE py.order_id = o.id) AS last_payment_date
+      FROM orders o
+      LEFT JOIN customers c ON c.id = o.customer_id
+      LEFT JOIN areas a     ON a.id = o.area_id
+      LEFT JOIN products p  ON p.id = o.product_id
+      LEFT JOIN users u     ON u.id = o.partner_id
+      WHERE o.id = ${id}
+    `;
 
     return Response.json(updated);
   }

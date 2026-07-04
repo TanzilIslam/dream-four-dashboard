@@ -9,7 +9,7 @@ export async function GET(request: Request) {
   const onlyInactive = new URL(request.url).searchParams.get("inactive") === "true";
 
   const suppliers = onlyInactive
-    ? await sql`SELECT * FROM suppliers WHERE is_active = false ORDER BY name ASC`
+    ? await sql`SELECT * FROM suppliers ORDER BY name ASC`
     : await sql`SELECT * FROM suppliers WHERE is_active = true ORDER BY name ASC`;
 
   return Response.json(suppliers);

@@ -1,9 +1,13 @@
 import { sql } from "@/lib/db";
+import { requireAdmin } from "@/lib/auth";
 import { sessionOptions, AppSession } from "@/lib/session";
 import { getIronSession } from "iron-session";
 import { cookies } from "next/headers";
 
 export async function POST(request: Request) {
+  const auth = await requireAdmin();
+  if ("error" in auth) return auth.error;
+
   const { id } = await request.json();
 
   const [user] = await sql`

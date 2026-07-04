@@ -44,14 +44,17 @@ export async function PUT(request: Request) {
 
   const { name, email, phone, whatsapp, avatar_url, documents } = parsed.data;
 
+  const [existing] =
+    await sql`SELECT avatar_url, documents FROM users WHERE id = ${session.user.id}`;
+
   const [user] = await sql`
     UPDATE users SET
       name       = ${name},
       email      = ${email},
       phone      = ${phone ?? null},
       whatsapp   = ${whatsapp ?? null},
-      avatar_url = ${avatar_url ?? null},
-      documents  = ${JSON.stringify(documents ?? [])},
+      avatar_url = ${avatar_url ?? existing.avatar_url ?? null},
+      documents  = ${JSON.stringify(documents ?? existing.documents ?? [])},
       updated_at = NOW()
     WHERE id = ${session.user.id}
     RETURNING id, name, email, phone, whatsapp, avatar_url, documents, role

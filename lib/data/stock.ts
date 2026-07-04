@@ -72,6 +72,10 @@ export async function getAssetStock() {
 
   return rows.map((r: Record<string, unknown>) => ({
     ...r,
+    received: Number(r.received),
+    sent: Number(r.sent),
+    returned_by_customers: Number(r.returned_by_customers),
+    returned_to_suppliers: Number(r.returned_to_suppliers),
     available:
       Number(r.received) -
       Number(r.sent) +

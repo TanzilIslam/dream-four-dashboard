@@ -5,6 +5,18 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
+/** Extracts a readable string from a Zod fieldErrors object or plain string error. */
+export function extractError(error: unknown, fallback = "An error occurred"): string {
+  if (typeof error === "string") return error;
+  if (error && typeof error === "object") {
+    const messages = Object.values(error as Record<string, unknown>)
+      .flat()
+      .filter((v) => typeof v === "string") as string[];
+    if (messages.length > 0) return messages.join(", ");
+  }
+  return fallback;
+}
+
 /** Format a BDT amount with the ৳ symbol. Accepts numbers or numeric strings. */
 export function formatTaka(value: number | string | null | undefined): string {
   if (value === null || value === undefined || value === "") return "৳0";

@@ -11,7 +11,14 @@ export async function GET(request: Request) {
   const from = url.searchParams.get("from");
   const to = url.searchParams.get("to");
 
-  const dateFilter = from && to ? sql`AND e.date BETWEEN ${from} :: DATE AND ${to} :: DATE` : sql``;
+  const dateFilter =
+    from && to
+      ? sql`AND e.date BETWEEN ${from} :: DATE AND ${to} :: DATE`
+      : from
+        ? sql`AND e.date >= ${from} :: DATE`
+        : to
+          ? sql`AND e.date <= ${to} :: DATE`
+          : sql``;
 
   const expenses =
     user.role === "admin"

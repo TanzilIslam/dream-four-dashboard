@@ -88,9 +88,11 @@ export default function TasksPage() {
 
     fetch("/api/users")
       .then((res) => res.json())
-      .then((data: (Partner & { role: string })[]) =>
-        setPartners(data.filter((u) => u.role === "partner"))
-      );
+      .then((data) => {
+        if (Array.isArray(data)) {
+          setPartners((data as (Partner & { role: string })[]).filter((u) => u.role === "partner"));
+        }
+      });
   }, []);
 
   useEffect(() => {

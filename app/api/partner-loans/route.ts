@@ -9,10 +9,7 @@ export async function GET(request: Request) {
   const url = new URL(request.url);
   const status = url.searchParams.get("status"); // outstanding | settled | all
 
-  const statusFilter =
-    status && status !== "all"
-      ? sql`AND pl.status = ${status}`
-      : sql`AND pl.status = 'outstanding'`;
+  const statusFilter = status === "all" || !status ? sql`` : sql`AND pl.status = ${status}`;
 
   const loans =
     user.role === "admin"

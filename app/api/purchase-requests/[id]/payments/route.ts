@@ -1,5 +1,5 @@
 import { sql } from "@/lib/db";
-import { requireAdmin } from "@/lib/auth";
+import { requireAdmin, requireUser } from "@/lib/auth";
 import { addSupplierPaymentSchema } from "@/lib/schemas/purchase-request";
 
 async function getPurchaseRequest(id: number) {
@@ -9,12 +9,17 @@ async function getPurchaseRequest(id: number) {
 
 // GET /api/purchase-requests/[id]/payments
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const auth = await requireAdmin();
+  const auth = await requireUser();
   if ("error" in auth) return auth.error;
 
+  const { user } = auth;
   const { id } = await params;
   const pr = await getPurchaseRequest(Number(id));
   if (!pr) return Response.json({ error: "Not found" }, { status: 404 });
+
+  if (user.role !== "admin" && pr.requested_by !== user.id) {
+    return Response.json({ error: "Forbidden" }, { status: 403 });
+  }
 
   const payments = await sql`
     SELECT sp.*, u.name AS created_by_name

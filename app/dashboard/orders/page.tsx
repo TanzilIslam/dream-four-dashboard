@@ -638,7 +638,7 @@ export default function OrdersPage() {
         });
       setReturnAssetQtys({});
       // Refresh orders list
-      fetch(`/api/orders?status=${filters.status !== "all" ? filters.status : "all"}`)
+      fetch(`/api/orders?status=${apiStatus}`)
         .then((r) => r.json())
         .then(setOrders);
     } else {
@@ -843,7 +843,7 @@ export default function OrdersPage() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="due">Due</SelectItem>
-                  <SelectItem value="all">All</SelectItem>
+                  <SelectItem value="all">All Active</SelectItem>
                   <SelectItem value="pending">Pending</SelectItem>
                   <SelectItem value="delivered">Delivered</SelectItem>
                   <SelectItem value="paid">Paid</SelectItem>
@@ -1121,7 +1121,7 @@ export default function OrdersPage() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="due">Due</SelectItem>
-                  <SelectItem value="all">All</SelectItem>
+                  <SelectItem value="all">All Active</SelectItem>
                   <SelectItem value="pending">Pending</SelectItem>
                   <SelectItem value="delivered">Delivered</SelectItem>
                   <SelectItem value="paid">Paid</SelectItem>
