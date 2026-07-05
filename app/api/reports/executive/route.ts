@@ -238,15 +238,20 @@ export async function GET(request: Request) {
       sql`
       SELECT
         c.name                                   AS "Customer",
+        COALESCE(c.phone, '—')                   AS "Phone",
         COALESCE(a.name, '—')                    AS "Area",
         COALESCE(SUM(o.due_amount), 0)::numeric  AS "Due (৳)",
+        GREATEST(0,
+          COALESCE((SELECT SUM(oa.quantity) FROM order_assets oa JOIN orders ox ON ox.id = oa.order_id WHERE ox.customer_id = c.id), 0)
+          - COALESCE((SELECT SUM(oar.quantity) FROM order_asset_returns oar JOIN orders ox ON ox.id = oar.order_id WHERE ox.customer_id = c.id), 0)
+        )::int                                   AS "Assets to Return",
         COUNT(o.id)::int                         AS "Orders",
         MAX(o.ordered_at)::date                  AS "Last Order"
       FROM orders o
       JOIN customers c ON c.id = o.customer_id
       LEFT JOIN areas a ON a.id = c.area_id
       WHERE o.status = 'delivered' AND o.due_amount > 0 ${productFilter} ${dateFilter}
-      GROUP BY c.id, c.name, a.name
+      GROUP BY c.id, c.name, c.phone, a.name
       HAVING SUM(o.due_amount) > 0
       ORDER BY SUM(o.due_amount) DESC
     `,

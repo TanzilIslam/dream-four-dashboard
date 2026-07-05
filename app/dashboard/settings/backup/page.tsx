@@ -131,7 +131,8 @@ export default function ExportPage() {
             "Product"
           );
         if (s.key === "expenseBreakdown") rows = addTotalsRow(rows, ["Amount (৳)"], "Category");
-        if (s.key === "dues") rows = addTotalsRow(rows, ["Due (৳)", "Orders"], "Customer");
+        if (s.key === "dues")
+          rows = addTotalsRow(rows, ["Due (৳)", "Assets to Return", "Orders"], "Customer");
         if (s.key === "supplies")
           rows = addTotalsRow(rows, ["Qty", "Total (৳)", "Paid (৳)", "Due (৳)"], "Date");
         return { key: s.key, label: SHEET_LABELS[s.key], rows };
