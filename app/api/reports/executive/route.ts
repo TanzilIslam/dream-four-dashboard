@@ -163,23 +163,23 @@ export async function GET(request: Request) {
         CASE WHEN c.phone IS NOT NULL AND c.phone != '' THEN c.name || E'\n' || c.phone ELSE c.name END AS "Customer",
         p.name                                                    AS "Product",
         COALESCE(o.unit, p.unit)                                  AS "Unit",
-        o.quantity::int                                           AS "Qty",
         COALESCE(o.unit_cost, 0)::numeric                        AS "Unit Cost",
+        COALESCE(o.unit_label_cost, 0)::numeric                  AS "Label Cost",
+        COALESCE(o.unit_other_cost, 0)::numeric                  AS "Other Cost",
+        o.quantity::int                                           AS "Qty",
+        COALESCE(o.total_cost, 0)::numeric                       AS "Total Cost",
         o.total_amount::numeric                                   AS "Sales",
-        COALESCE(o.collection, 0)::numeric                       AS "Collection",
+        COALESCE(o.net_value, 0)::numeric                        AS "Net Value",
         o.due_amount::numeric                                     AS "Due",
         COALESCE((SELECT SUM(py.amount) FROM payments py WHERE py.order_id = o.id), 0)::numeric AS "Due Collection",
-        COALESCE(o.unit_label_cost, 0)::numeric                  AS "Labels",
-        COALESCE(o.unit_other_cost, 0)::numeric                  AS "Other Cost",
-        COALESCE(o.total_cost, 0)::numeric                       AS "Total Cost",
-        COALESCE(o.net_value, 0)::numeric                        AS "Net Value",
+        COALESCE(o.collection, 0)::numeric                       AS "Collection",
         COALESCE(o.note, '')                                     AS "Remarks"
       FROM orders o
       JOIN customers c ON c.id = o.customer_id
       JOIN products p  ON p.id = o.product_id
       LEFT JOIN areas a ON a.id = c.area_id
       WHERE o.status != 'cancelled' ${productFilter} ${dateFilter}
-      ORDER BY o.ordered_at DESC
+      ORDER BY o.ordered_at ASC
     `,
 
       // Sheet 3: Daily Sales Trend
@@ -245,23 +245,23 @@ export async function GET(request: Request) {
         CASE WHEN c.phone IS NOT NULL AND c.phone != '' THEN c.name || E'\n' || c.phone ELSE c.name END AS "Customer",
         p.name                                                    AS "Product",
         COALESCE(o.unit, p.unit)                                  AS "Unit",
-        o.quantity::int                                           AS "Qty",
         COALESCE(o.unit_cost, 0)::numeric                        AS "Unit Cost",
+        COALESCE(o.unit_label_cost, 0)::numeric                  AS "Label Cost",
+        COALESCE(o.unit_other_cost, 0)::numeric                  AS "Other Cost",
+        o.quantity::int                                           AS "Qty",
+        COALESCE(o.total_cost, 0)::numeric                       AS "Total Cost",
         o.total_amount::numeric                                   AS "Sales",
-        COALESCE(o.collection, 0)::numeric                       AS "Collection",
+        COALESCE(o.net_value, 0)::numeric                        AS "Net Value",
         o.due_amount::numeric                                     AS "Due",
         COALESCE((SELECT SUM(py.amount) FROM payments py WHERE py.order_id = o.id), 0)::numeric AS "Due Collection",
-        COALESCE(o.unit_label_cost, 0)::numeric                  AS "Labels",
-        COALESCE(o.unit_other_cost, 0)::numeric                  AS "Other Cost",
-        COALESCE(o.total_cost, 0)::numeric                       AS "Total Cost",
-        COALESCE(o.net_value, 0)::numeric                        AS "Net Value",
+        COALESCE(o.collection, 0)::numeric                       AS "Collection",
         COALESCE(o.note, '')                                     AS "Remarks"
       FROM orders o
       JOIN customers c ON c.id = o.customer_id
       JOIN products p  ON p.id = o.product_id
       LEFT JOIN areas a ON a.id = c.area_id
       WHERE o.due_amount > 0 AND o.status != 'cancelled' ${productFilter} ${dateFilter}
-      ORDER BY o.due_amount DESC
+      ORDER BY o.ordered_at ASC
     `,
 
       // Sheet 7: Purchases

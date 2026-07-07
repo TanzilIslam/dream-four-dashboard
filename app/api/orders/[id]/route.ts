@@ -143,17 +143,16 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
         paid_amount           = ${newPaid},
         due_amount            = ${newDue},
         payment_method        = ${d.payment_method || null},
-        promised_payment_date = ${d.promised_payment_date || null} :: DATE,
         status                = ${newStatus},
         note                  = ${d.note || order.note}
       WHERE id = ${id}
     `;
 
-    // Record payment
+    // Record payment — use user-provided paid_at date or default to NOW()
     await sql`
-      INSERT INTO payments (partner_id, customer_id, order_id, amount, payment_method, promised_payment_date, note)
+      INSERT INTO payments (partner_id, customer_id, order_id, amount, payment_method, paid_at, note)
       VALUES (${order.partner_id}, ${order.customer_id}, ${order.id}, ${d.paid_amount},
-              ${d.payment_method || null}, ${d.promised_payment_date || null} :: DATE, ${d.note || null})
+              ${d.payment_method || null}, COALESCE(${d.paid_at || null} :: TIMESTAMPTZ, NOW()), ${d.note || null})
     `;
 
     if (d.asset_returns && d.asset_returns.length > 0) {

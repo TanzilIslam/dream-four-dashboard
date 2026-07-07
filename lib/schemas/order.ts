@@ -46,7 +46,7 @@ export const deliverOrderSchema = z.object({
 export const payOrderSchema = z.object({
   paid_amount: z.number().min(0, "Amount must be non-negative"),
   payment_method: z.string().optional().or(z.literal("")),
-  promised_payment_date: z.string().optional().or(z.literal("")),
+  paid_at: z.string().optional().or(z.literal("")),
   note: z.string().optional().or(z.literal("")),
   asset_returns: z
     .array(

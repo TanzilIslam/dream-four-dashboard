@@ -47,16 +47,16 @@ const SAMPLE_TEMPLATES = [
       "Customer",
       "Product",
       "Unit",
-      "Qty",
       "Unit Cost",
+      "Label Cost",
+      "Other Cost",
+      "Qty",
+      "Total Cost",
       "Sales",
-      "Collection",
+      "Net Value",
       "Due",
       "Due Collection",
-      "Labels",
-      "Other Cost",
-      "Total Cost",
-      "Net Value",
+      "Collection",
       "Remarks",
     ],
   },
@@ -235,7 +235,7 @@ export default function ExportPage() {
         if (s.key === "customers")
           rows = addTotalsRow(
             rows,
-            ["Qty", "Sales", "Collection", "Due", "Due Collection", "Total Cost", "Net Value"],
+            ["Qty", "Total Cost", "Sales", "Net Value", "Due", "Due Collection", "Collection"],
             "Date"
           );
         if (s.key === "dailyTrend")
@@ -250,7 +250,7 @@ export default function ExportPage() {
         if (s.key === "dues")
           rows = addTotalsRow(
             rows,
-            ["Qty", "Sales", "Collection", "Due", "Due Collection", "Total Cost", "Net Value"],
+            ["Qty", "Total Cost", "Sales", "Net Value", "Due", "Due Collection", "Collection"],
             "Date"
           );
         if (s.key === "supplies")

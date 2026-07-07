@@ -149,5 +149,28 @@ export async function GET(request: Request) {
     ORDER BY o.id
   `;
 
-  return Response.json({ stock, purchases, orders });
+  // ── Tab 4: Collections (payments received on this date) ───────
+  const collections = await sql`
+    SELECT
+      py.id,
+      py.amount,
+      py.payment_method,
+      py.note,
+      py.order_id,
+      c.name   AS customer_name,
+      c.phone  AS customer_phone,
+      p.name   AS product_name,
+      o.quantity,
+      o.total_amount,
+      o.unit_price
+    FROM payments py
+    JOIN orders o    ON o.id = py.order_id
+    JOIN customers c ON c.id = py.customer_id
+    LEFT JOIN products p ON p.id = o.product_id
+    WHERE py.paid_at::date = ${date}::date
+      ${productFilterO}
+    ORDER BY py.id
+  `;
+
+  return Response.json({ stock, purchases, orders, collections });
 }

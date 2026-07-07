@@ -61,10 +61,25 @@ type OrderRow = {
   status: string;
 };
 
+type CollectionRow = {
+  id: number;
+  amount: string;
+  payment_method: string | null;
+  note: string | null;
+  order_id: number;
+  customer_name: string | null;
+  customer_phone: string | null;
+  product_name: string | null;
+  quantity: number;
+  total_amount: string;
+  unit_price: string;
+};
+
 type DayData = {
   stock: StockRow[];
   purchases: PurchaseRow[];
   orders: OrderRow[];
+  collections: CollectionRow[];
 };
 
 const STATUS_VARIANT: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
@@ -94,7 +109,9 @@ function SummaryCard({ label, value, sub }: { label: string; value: string; sub?
 export default function CalendarPage() {
   const [selected, setSelected] = useState<Date | undefined>(undefined);
   const [sheetOpen, setSheetOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState<"stock" | "purchases" | "orders">("stock");
+  const [activeTab, setActiveTab] = useState<"stock" | "purchases" | "orders" | "collection">(
+    "stock"
+  );
 
   const [products, setProducts] = useState<Product[]>([]);
   const [productFilter, setProductFilter] = useState("all");
@@ -117,7 +134,7 @@ export default function CalendarPage() {
     const dateStr = `${selected.getFullYear()}-${String(selected.getMonth() + 1).padStart(2, "0")}-${String(selected.getDate()).padStart(2, "0")}`;
     fetch(`/api/calendar/day?date=${dateStr}&product_id=${productFilter}`)
       .then((r) => r.json())
-      .then((data) => setDayData(data))
+      .then((data) => setDayData({ ...data, collections: data.collections ?? [] }))
       .finally(() => setLoading(false));
   }, [selected, sheetOpen, productFilter]);
 
@@ -137,6 +154,8 @@ export default function CalendarPage() {
   const orderTotal = dayData?.orders.reduce((s, r) => s + Number(r.total_amount), 0) ?? 0;
   const orderPaid = dayData?.orders.reduce((s, r) => s + Number(r.paid_amount), 0) ?? 0;
   const orderDue = dayData?.orders.reduce((s, r) => s + Number(r.due_amount), 0) ?? 0;
+
+  const collectionTotal = dayData?.collections.reduce((s, r) => s + Number(r.amount), 0) ?? 0;
 
   return (
     <div className="p-6 space-y-4">
@@ -220,29 +239,34 @@ export default function CalendarPage() {
           {/* Tabs */}
           <div className="px-4 pt-3 shrink-0">
             <div className="flex border-b border-border">
-              {(["stock", "purchases", "orders"] as const).map((tab) => (
-                <button
-                  key={tab}
-                  onClick={() => setActiveTab(tab)}
-                  className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors capitalize ${
-                    activeTab === tab
-                      ? "border-primary text-primary"
-                      : "border-transparent text-muted-foreground hover:text-foreground"
-                  }`}
-                >
-                  {tab}
-                  {tab === "purchases" && dayData && dayData.purchases.length > 0 && (
-                    <span className="ml-1.5 text-xs bg-muted rounded-full px-1.5 py-0.5">
-                      {dayData.purchases.length}
-                    </span>
-                  )}
-                  {tab === "orders" && dayData && dayData.orders.length > 0 && (
-                    <span className="ml-1.5 text-xs bg-muted rounded-full px-1.5 py-0.5">
-                      {dayData.orders.length}
-                    </span>
-                  )}
-                </button>
-              ))}
+              {(["stock", "purchases", "orders", "collection"] as const).map((tab) => {
+                const count =
+                  tab === "purchases"
+                    ? dayData?.purchases.length
+                    : tab === "orders"
+                      ? dayData?.orders.length
+                      : tab === "collection"
+                        ? dayData?.collections.length
+                        : 0;
+                return (
+                  <button
+                    key={tab}
+                    onClick={() => setActiveTab(tab)}
+                    className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors capitalize ${
+                      activeTab === tab
+                        ? "border-primary text-primary"
+                        : "border-transparent text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    {tab}
+                    {dayData && count != null && count > 0 && (
+                      <span className="ml-1.5 text-xs bg-muted rounded-full px-1.5 py-0.5">
+                        {count}
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
             </div>
           </div>
 
@@ -444,6 +468,64 @@ export default function CalendarPage() {
                                   >
                                     {o.status}
                                   </Badge>
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* ── Collection Tab ── */}
+                {activeTab === "collection" && (
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-2 gap-2">
+                      <SummaryCard label="Payments" value={String(dayData.collections.length)} />
+                      <SummaryCard label="Total Collected" value={`৳${fmt(collectionTotal)}`} />
+                    </div>
+
+                    {dayData.collections.length === 0 ? (
+                      <p className="text-sm text-muted-foreground text-center py-6">
+                        No collections on this date.
+                      </p>
+                    ) : (
+                      <div className="rounded-lg border border-border overflow-x-auto">
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead>Customer</TableHead>
+                              <TableHead>Product</TableHead>
+                              <TableHead className="text-right">Amount</TableHead>
+                              <TableHead>Method</TableHead>
+                              <TableHead>Note</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {dayData.collections.map((c) => (
+                              <TableRow key={c.id}>
+                                <TableCell className="font-medium text-sm whitespace-nowrap">
+                                  <div>
+                                    {c.customer_name ?? "—"}
+                                    {c.customer_phone && (
+                                      <p className="text-xs text-muted-foreground">
+                                        {c.customer_phone}
+                                      </p>
+                                    )}
+                                  </div>
+                                </TableCell>
+                                <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
+                                  {c.product_name ?? "—"}
+                                </TableCell>
+                                <TableCell className="text-right tabular-nums text-sm font-medium text-green-600">
+                                  ৳{fmt(c.amount)}
+                                </TableCell>
+                                <TableCell className="text-sm text-muted-foreground">
+                                  {c.payment_method ?? "—"}
+                                </TableCell>
+                                <TableCell className="text-sm text-muted-foreground">
+                                  {c.note ?? "—"}
                                 </TableCell>
                               </TableRow>
                             ))}

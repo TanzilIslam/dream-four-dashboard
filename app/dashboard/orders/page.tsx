@@ -115,7 +115,6 @@ type OrderPayment = {
   amount: string;
   payment_method: string | null;
   paid_at: string;
-  promised_payment_date: string | null;
   note: string | null;
   recorded_by_name: string | null;
 };
@@ -242,7 +241,7 @@ export default function OrdersPage() {
     defaultValues: {
       paid_amount: 0,
       payment_method: "",
-      promised_payment_date: "",
+      paid_at: new Date().toISOString().slice(0, 10),
       note: "",
       asset_returns: [],
     },
@@ -304,21 +303,11 @@ export default function OrdersPage() {
   const orderNetValue = orderSales - orderTotalCost;
   const selectedProductName = products.find((p) => p.id === productId)?.name;
 
-  // Auto-fill unit price and unit based on customer's pricing tier or product default
+  // Auto-calculate sales price (unit_price) = unit_cost + label_cost + other_cost
   useEffect(() => {
-    if (!customerId || !productId) return;
-    const customer = customers.find((c) => c.id === customerId);
-    const product = products.find((p) => p.id === productId);
-    if (!customer || !product) return;
-
-    const tier = tiers.find((t) => t.id === customer.pricing_tier_id && t.product_id === productId);
-    const price = tier
-      ? Number(tier.unit_price)
-      : product.default_price
-        ? Number(product.default_price)
-        : 0;
-    createForm.setValue("unit_price", price);
-  }, [customerId, productId, customers, products, tiers, createForm]);
+    const salesPrice = (watchUnitCost || 0) + (watchUnitLabelCost || 0) + (watchUnitOtherCost || 0);
+    createForm.setValue("unit_price", salesPrice);
+  }, [watchUnitCost, watchUnitLabelCost, watchUnitOtherCost, createForm]);
 
   // Auto-fill unit from product
   useEffect(() => {
@@ -570,7 +559,8 @@ export default function OrdersPage() {
       product_id: order.product_id,
       quantity: order.quantity,
       unit: order.unit || "",
-      unit_price: Number(order.unit_price),
+      unit_price:
+        Number(order.unit_cost) + Number(order.unit_label_cost) + Number(order.unit_other_cost),
       unit_cost: Number(order.unit_cost),
       unit_label_cost: Number(order.unit_label_cost),
       unit_other_cost: Number(order.unit_other_cost),
@@ -688,7 +678,7 @@ export default function OrdersPage() {
       payForm.reset({
         paid_amount: Number(updatedOrder.due_amount) > 0 ? Number(updatedOrder.due_amount) : 0,
         payment_method: "",
-        promised_payment_date: "",
+        paid_at: new Date().toISOString().slice(0, 10),
         note: "",
       });
       await reloadPaymentSheet(paymentSheetTarget.id);
@@ -800,7 +790,7 @@ export default function OrdersPage() {
         payForm.reset({
           paid_amount: newDue,
           payment_method: "",
-          promised_payment_date: "",
+          paid_at: new Date().toISOString().slice(0, 10),
           note: "",
         });
       }
@@ -1010,21 +1000,16 @@ export default function OrdersPage() {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>ID</TableHead>
               <TableHead>Customer</TableHead>
               <TableHead>Product</TableHead>
-              <TableHead>Date</TableHead>
-              <TableHead>Unit</TableHead>
-              <TableHead>Qty</TableHead>
+              <TableHead>Order Date</TableHead>
               <TableHead>Unit Cost</TableHead>
-              <TableHead>Sales</TableHead>
-              <TableHead>Collection</TableHead>
-              <TableHead>Due</TableHead>
-              <TableHead>Due Coll.</TableHead>
-              <TableHead>Label</TableHead>
-              <TableHead>Other</TableHead>
               <TableHead>Total Cost</TableHead>
+              <TableHead>Qty</TableHead>
+              <TableHead>Sales</TableHead>
               <TableHead>Net Value</TableHead>
+              <TableHead>Collection</TableHead>
+              <TableHead>Due Coll.</TableHead>
               <TableHead>Status</TableHead>
               {hasUnreturnedAssets && <TableHead>Assets</TableHead>}
               <TableHead className="w-28" />
@@ -1046,7 +1031,6 @@ export default function OrdersPage() {
             ) : (
               filteredOrders.map((o) => (
                 <TableRow key={o.id}>
-                  <TableCell className="text-muted-foreground text-xs">#{o.id}</TableCell>
                   <TableCell className="font-medium">{o.customer_name ?? "—"}</TableCell>
                   <TableCell className="text-sm">{o.product_name ?? "—"}</TableCell>
                   <TableCell className="text-muted-foreground text-xs whitespace-nowrap">
@@ -1056,20 +1040,16 @@ export default function OrdersPage() {
                       year: "numeric",
                     })}
                   </TableCell>
-                  <TableCell className="text-xs">{o.unit || o.product_unit || "—"}</TableCell>
-                  <TableCell>{o.quantity}</TableCell>
                   <TableCell>৳{Number(o.unit_cost).toFixed(2)}</TableCell>
+                  <TableCell>৳{Number(o.total_cost).toFixed(2)}</TableCell>
+                  <TableCell>{o.quantity}</TableCell>
                   <TableCell>৳{Number(o.total_amount).toFixed(2)}</TableCell>
+                  <TableCell className={Number(o.net_value) < 0 ? "text-destructive" : ""}>
+                    ৳{Number(o.net_value).toFixed(2)}
+                  </TableCell>
                   <TableCell>
                     {Number(o.collection) > 0 ? (
                       <span className="text-green-600">৳{Number(o.collection).toFixed(2)}</span>
-                    ) : (
-                      <span className="text-muted-foreground">—</span>
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    {Number(o.due_amount) > 0 ? (
-                      <span className="text-destructive">৳{Number(o.due_amount).toFixed(2)}</span>
                     ) : (
                       <span className="text-muted-foreground">—</span>
                     )}
@@ -1080,12 +1060,6 @@ export default function OrdersPage() {
                     ) : (
                       <span className="text-muted-foreground">—</span>
                     )}
-                  </TableCell>
-                  <TableCell>৳{Number(o.unit_label_cost).toFixed(2)}</TableCell>
-                  <TableCell>৳{Number(o.unit_other_cost).toFixed(2)}</TableCell>
-                  <TableCell>৳{Number(o.total_cost).toFixed(2)}</TableCell>
-                  <TableCell className={Number(o.net_value) < 0 ? "text-destructive" : ""}>
-                    ৳{Number(o.net_value).toFixed(2)}
                   </TableCell>
                   <TableCell>
                     <Badge variant={STATUS_VARIANT[o.status] ?? "secondary"}>{o.status}</Badge>
@@ -1142,7 +1116,7 @@ export default function OrdersPage() {
                             payForm.reset({
                               paid_amount: Number(o.due_amount),
                               payment_method: "",
-                              promised_payment_date: "",
+                              paid_at: new Date().toISOString().slice(0, 10),
                               note: "",
                             });
                             setPaymentSheetTarget(o);
@@ -1411,17 +1385,6 @@ export default function OrdersPage() {
             </Field>
 
             <Field
-              label="Unit Price / Sales Price (৳)"
-              error={createForm.formState.errors.unit_price?.message}
-            >
-              <Input
-                type="number"
-                step="0.01"
-                {...createForm.register("unit_price", { valueAsNumber: true })}
-              />
-            </Field>
-
-            <Field
               label="Label Cost per Unit (৳)"
               error={createForm.formState.errors.unit_label_cost?.message}
             >
@@ -1442,6 +1405,15 @@ export default function OrdersPage() {
                 step="0.01"
                 min={0}
                 {...createForm.register("unit_other_cost", { valueAsNumber: true })}
+              />
+            </Field>
+
+            <Field label="Sales Price (৳)" error={createForm.formState.errors.unit_price?.message}>
+              <Input
+                type="number"
+                step="0.01"
+                min={0}
+                {...createForm.register("unit_price", { valueAsNumber: true })}
               />
             </Field>
 
@@ -1648,8 +1620,8 @@ export default function OrdersPage() {
                         {...payForm.register("payment_method")}
                       />
                     </Field>
-                    <Field label="Promised Payment Date">
-                      <Input type="date" {...payForm.register("promised_payment_date")} />
+                    <Field label="Paid At">
+                      <Input type="date" {...payForm.register("paid_at")} />
                     </Field>
                     <Field label="Note">
                       <Textarea {...payForm.register("note")} />
@@ -2062,7 +2034,7 @@ export default function OrdersPage() {
                     <Table>
                       <TableHeader>
                         <TableRow>
-                          <TableHead>Date</TableHead>
+                          <TableHead>Order Date</TableHead>
                           <TableHead>Method</TableHead>
                           <TableHead className="text-right">Amount</TableHead>
                         </TableRow>

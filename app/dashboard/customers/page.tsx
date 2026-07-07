@@ -176,7 +176,9 @@ export default function CustomersPage() {
     | "last_order_asc"
     | "assets_desc"
     | "assets_asc"
-  >("none");
+    | "created_desc"
+    | "created_asc"
+  >("created_desc");
 
   const statusParam = filters.status; // "all" | "active" | "inactive"
 
@@ -347,6 +349,10 @@ export default function CustomersPage() {
           return b.unreturned_assets - a.unreturned_assets;
         case "assets_asc":
           return a.unreturned_assets - b.unreturned_assets;
+        case "created_desc":
+          return b.id - a.id;
+        case "created_asc":
+          return a.id - b.id;
         default:
           return nameSortDir === "asc"
             ? a.name.localeCompare(b.name)
@@ -514,6 +520,8 @@ export default function CustomersPage() {
                     last_order_asc: "Last order: oldest",
                     assets_desc: "Assets: high to low",
                     assets_asc: "Assets: low to high",
+                    created_desc: "Created: newest first",
+                    created_asc: "Created: oldest first",
                   }[orderSort]
                 }
               </SelectValue>
@@ -532,6 +540,8 @@ export default function CustomersPage() {
               <SelectItem value="last_order_asc">Last order: oldest</SelectItem>
               <SelectItem value="assets_desc">Assets: high to low</SelectItem>
               <SelectItem value="assets_asc">Assets: low to high</SelectItem>
+              <SelectItem value="created_desc">Created: newest first</SelectItem>
+              <SelectItem value="created_asc">Created: oldest first</SelectItem>
             </SelectContent>
           </Select>
           <Button
@@ -582,11 +592,11 @@ export default function CustomersPage() {
                   )}
                 </button>
               </TableHead>
-              <TableHead>Type</TableHead>
-              <TableHead>Area</TableHead>
+              {/* <TableHead>Type</TableHead> */}
+              {/* <TableHead>Area</TableHead> */}
               <TableHead>Phone</TableHead>
-              <TableHead className="text-right">Orders</TableHead>
-              <TableHead className="text-right">Qty</TableHead>
+              {/* <TableHead className="text-right">Orders</TableHead> */}
+              {/* <TableHead className="text-right">Qty</TableHead> */}
               <TableHead className="text-right">Total Paid</TableHead>
               <TableHead className="text-right">Total Due</TableHead>
               <TableHead className="text-right">Last Order</TableHead>
@@ -598,13 +608,13 @@ export default function CustomersPage() {
           <TableBody>
             {loading ? (
               <TableRow>
-                <TableCell colSpan={12} className="text-center text-muted-foreground py-10">
+                <TableCell colSpan={8} className="text-center text-muted-foreground py-10">
                   Loading…
                 </TableCell>
               </TableRow>
             ) : filteredCustomers.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={12} className="text-center text-muted-foreground py-10">
+                <TableCell colSpan={8} className="text-center text-muted-foreground py-10">
                   {activeFilterCount > 0 ? "No customers match your filters" : "No customers yet"}
                 </TableCell>
               </TableRow>
@@ -612,7 +622,7 @@ export default function CustomersPage() {
               filteredCustomers.map((c) => (
                 <TableRow key={c.id}>
                   <TableCell className="font-medium">{c.name}</TableCell>
-                  <TableCell>
+                  {/* <TableCell>
                     {c.customer_type ? (
                       <Badge variant="outline" className="capitalize">
                         {c.customer_type}
@@ -620,11 +630,11 @@ export default function CustomersPage() {
                     ) : (
                       "—"
                     )}
-                  </TableCell>
-                  <TableCell>{c.area_name ?? "—"}</TableCell>
+                  </TableCell> */}
+                  {/* <TableCell>{c.area_name ?? "—"}</TableCell> */}
                   <TableCell>{c.phone ?? "—"}</TableCell>
-                  <TableCell className="text-right tabular-nums">{c.total_orders}</TableCell>
-                  <TableCell className="text-right tabular-nums">{c.total_quantity}</TableCell>
+                  {/* <TableCell className="text-right tabular-nums">{c.total_orders}</TableCell> */}
+                  {/* <TableCell className="text-right tabular-nums">{c.total_quantity}</TableCell> */}
                   <TableCell className="text-right tabular-nums text-green-600">
                     {Number(c.total_paid) > 0 ? `৳${Number(c.total_paid).toFixed(0)}` : "—"}
                   </TableCell>

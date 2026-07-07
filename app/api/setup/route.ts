@@ -403,13 +403,36 @@ export async function GET() {
   await sql`
     UPDATE orders SET
       unit = (SELECT p.unit FROM products p WHERE p.id = orders.product_id),
-      collection = paid_amount,
-      unit_cost = 0,
+      collection = 0,
+      unit_cost = unit_price,
       unit_label_cost = 0,
       unit_other_cost = 0,
-      total_cost = 0,
-      net_value = total_amount
+      total_cost = total_amount,
+      net_value = 0
     WHERE unit IS NULL
+  `;
+  // Backfill unit_cost from unit_price for old records that had unit_cost = 0
+  await sql`
+    UPDATE orders SET
+      unit_cost = unit_price,
+      total_cost = unit_price * quantity,
+      net_value = total_amount - (unit_price * quantity)
+    WHERE unit_cost = 0 AND unit_price > 0
+  `;
+  // Insert payment records for old orders that have paid_amount > 0 but no payment records
+  // This makes due_collection (SUM of payments) show correctly
+  await sql`
+    INSERT INTO payments (partner_id, customer_id, order_id, amount, paid_at)
+    SELECT o.partner_id, o.customer_id, o.id, o.paid_amount, COALESCE(o.delivered_at, o.ordered_at)
+    FROM orders o
+    WHERE o.paid_amount > 0
+      AND NOT EXISTS (SELECT 1 FROM payments p WHERE p.order_id = o.id)
+  `;
+  // Set collection = 0 for old orders that had no payment records (now backfilled above)
+  await sql`
+    UPDATE orders SET collection = 0
+    WHERE collection = paid_amount AND paid_amount > 0
+      AND (SELECT COUNT(*) FROM payments p WHERE p.order_id = orders.id) = 1
   `;
 
   await sql`
