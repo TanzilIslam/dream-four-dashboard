@@ -39,6 +39,27 @@ const SAMPLE_TEMPLATES = [
       "Remarks",
     ],
   },
+  {
+    key: "customer",
+    label: "Customer",
+    headers: [
+      "Date",
+      "Customer",
+      "Product",
+      "Unit",
+      "Qty",
+      "Unit Cost",
+      "Sales",
+      "Collection",
+      "Due",
+      "Due Collection",
+      "Labels",
+      "Other Cost",
+      "Total Cost",
+      "Net Value",
+      "Remarks",
+    ],
+  },
 ] as const;
 
 type SampleKey = (typeof SAMPLE_TEMPLATES)[number]["key"];
