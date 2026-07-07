@@ -82,7 +82,7 @@ export async function GET(request: Request) {
     // ── Pending actions ───────────────────────────────────────────
     const [pending] = await sql`
       SELECT
-        (SELECT COUNT(*) FROM purchase_requests WHERE status = 'pending')   AS purchase_requests,
+        (SELECT 0)   AS purchase_requests,
         (SELECT COUNT(*) FROM cash_remittances  WHERE status = 'pending')   AS remittances,
         (SELECT COUNT(*) FROM daily_reports     WHERE status = 'submitted') AS reports
     `;

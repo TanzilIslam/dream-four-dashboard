@@ -410,10 +410,7 @@ function AdminDashboard() {
   const y = data.kpi.yesterday;
   const at = data.kpi.allTime;
 
-  const pendingCount =
-    Number(data.pending.purchase_requests) +
-    Number(data.pending.remittances) +
-    Number(data.pending.reports);
+  const pendingCount = Number(data.pending.remittances) + Number(data.pending.reports);
 
   const selectedProductName = products.find((p) => p.id === selectedProductId)?.name ?? "";
 
@@ -507,13 +504,6 @@ function AdminDashboard() {
             Pending Actions ({pendingCount})
           </h2>
           <div className="flex flex-wrap gap-2">
-            {Number(data.pending.purchase_requests) > 0 && (
-              <Link href="/dashboard/purchase-requests">
-                <Badge variant="secondary">
-                  {data.pending.purchase_requests} Purchase Request(s)
-                </Badge>
-              </Link>
-            )}
             {Number(data.pending.remittances) > 0 && (
               <Link href="/dashboard/cash-remittances">
                 <Badge variant="secondary">{data.pending.remittances} Remittance(s)</Badge>

@@ -18,6 +18,7 @@ import {
   Loader2,
   Undo2,
   Eye,
+  Pencil,
 } from "lucide-react";
 
 import { z } from "zod";
@@ -70,12 +71,21 @@ type Order = {
   cancellation_reason: string | null;
   note: string | null;
   customer_name: string | null;
+  customer_phone: string | null;
   area_name: string | null;
   product_name: string | null;
   product_unit: string | null;
   partner_name?: string | null;
   unreturned_assets: number;
   last_payment_date: string | null;
+  unit: string | null;
+  unit_cost: string;
+  unit_label_cost: string;
+  unit_other_cost: string;
+  collection: string;
+  total_cost: string;
+  net_value: string;
+  due_collection: number;
 };
 
 type Customer = {
@@ -134,6 +144,8 @@ const STATUS_VARIANT: Record<string, "default" | "secondary" | "destructive" | "
   cancelled: "destructive",
 };
 
+const UNIT_OPTIONS = ["piece", "dozen", "box", "kg", "liter", "pack", "bag", "crate", "tray"];
+
 export default function OrdersPage() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
@@ -161,7 +173,7 @@ export default function OrdersPage() {
     () => typeof window !== "undefined" && window.matchMedia("(max-width: 767px)").matches
   );
   const [filters, setFilters] = useState({
-    status: "due",
+    status: "all",
     product_id: "all",
     area_id: "all",
     customer_search: "",
@@ -169,7 +181,9 @@ export default function OrdersPage() {
   });
 
   const [paidDateFilter, setPaidDateFilter] = useState("");
-  const [createOpen, setCreateOpen] = useState(false);
+  const [formOpen, setFormOpen] = useState(false);
+  const [formMode, setFormMode] = useState<"create" | "edit">("create");
+  const [editingId, setEditingId] = useState<number | null>(null);
   const [paymentSheetTarget, setPaymentSheetTarget] = useState<Order | null>(null);
   const [orderPayments, setOrderPayments] = useState<OrderPayment[]>([]);
   const [orderPaymentsLoading, setOrderPaymentsLoading] = useState(false);
@@ -181,9 +195,9 @@ export default function OrdersPage() {
   const [deliverTarget, setDeliverTarget] = useState<Order | null>(null);
   const [delivering, setDelivering] = useState(false);
 
-  // Assets for create order form
-  const [createOrderAssets, setCreateOrderAssets] = useState<ProductAsset[]>([]);
-  const [createOrderAssetQtys, setCreateOrderAssetQtys] = useState<Record<number, number>>({});
+  // Assets for create/edit order form
+  const [formOrderAssets, setFormOrderAssets] = useState<ProductAsset[]>([]);
+  const [formOrderAssetQtys, setFormOrderAssetQtys] = useState<Record<number, number>>({});
 
   // Assets for payment sheet (asset returns from customer)
   const [orderAssetsSent, setOrderAssetsSent] = useState<OrderAssetSent[]>([]);
@@ -212,8 +226,13 @@ export default function OrdersPage() {
       customer_id: 0,
       product_id: 0,
       quantity: 1,
+      unit: "",
       unit_price: 0,
+      unit_cost: 0,
+      unit_label_cost: 0,
+      unit_other_cost: 0,
       paid_amount: 0,
+      ordered_at: new Date().toISOString().slice(0, 10),
       note: "",
     },
   });
@@ -255,11 +274,37 @@ export default function OrdersPage() {
     name: "paid_amount",
     defaultValue: 0,
   });
-  const orderTotal = (watchQuantity || 0) * (watchUnitPrice || 0);
-  const orderDue = Math.max(0, orderTotal - (watchPaidAmount || 0));
+  const watchUnitCost = useWatch({
+    control: createForm.control,
+    name: "unit_cost",
+    defaultValue: 0,
+  });
+  const watchUnitLabelCost = useWatch({
+    control: createForm.control,
+    name: "unit_label_cost",
+    defaultValue: 0,
+  });
+  const watchUnitOtherCost = useWatch({
+    control: createForm.control,
+    name: "unit_other_cost",
+    defaultValue: 0,
+  });
+  const watchUnit = useWatch({
+    control: createForm.control,
+    name: "unit",
+    defaultValue: "",
+  });
+
+  const orderSales = (watchQuantity || 0) * (watchUnitPrice || 0);
+  const orderCollection = watchPaidAmount || 0;
+  const orderDue = Math.max(0, orderSales - orderCollection);
+  const orderTotalCost =
+    ((watchUnitCost || 0) + (watchUnitLabelCost || 0) + (watchUnitOtherCost || 0)) *
+    (watchQuantity || 0);
+  const orderNetValue = orderSales - orderTotalCost;
   const selectedProductName = products.find((p) => p.id === productId)?.name;
 
-  // Auto-fill unit price based on customer's pricing tier or product default
+  // Auto-fill unit price and unit based on customer's pricing tier or product default
   useEffect(() => {
     if (!customerId || !productId) return;
     const customer = customers.find((c) => c.id === customerId);
@@ -274,6 +319,15 @@ export default function OrdersPage() {
         : 0;
     createForm.setValue("unit_price", price);
   }, [customerId, productId, customers, products, tiers, createForm]);
+
+  // Auto-fill unit from product
+  useEffect(() => {
+    if (!productId) return;
+    const product = products.find((p) => p.id === productId);
+    if (product) {
+      createForm.setValue("unit", product.unit);
+    }
+  }, [productId, products, createForm]);
 
   const apiStatus = filters.status === "due" ? "all" : filters.status;
 
@@ -304,7 +358,6 @@ export default function OrdersPage() {
       .then((res) => res.json())
       .then((data: Product[]) => {
         setProducts(data);
-        if (data.length > 0) setFilters((prev) => ({ ...prev, product_id: String(data[0].id) }));
       });
     fetch("/api/settings/pricing-tiers")
       .then((res) => res.json())
@@ -344,19 +397,19 @@ export default function OrdersPage() {
   useEffect(() => {
     if (!productId) {
       // eslint-disable-next-line react-hooks/set-state-in-effect
-      setCreateOrderAssets([]);
-      setCreateOrderAssetQtys({});
+      setFormOrderAssets([]);
+      setFormOrderAssetQtys({});
       return;
     }
     fetch(`/api/products/${productId}/assets`)
       .then((res) => (res.ok ? res.json() : []))
       .then((data: ProductAsset[]) => {
-        setCreateOrderAssets(data);
-        setCreateOrderAssetQtys({});
+        setFormOrderAssets(data);
+        setFormOrderAssetQtys({});
       })
       .catch(() => {
-        setCreateOrderAssets([]);
-        setCreateOrderAssetQtys({});
+        setFormOrderAssets([]);
+        setFormOrderAssetQtys({});
       });
   }, [productId]);
 
@@ -410,8 +463,8 @@ export default function OrdersPage() {
 
   function clearFilters() {
     setFilters({
-      status: "due",
-      product_id: products.length > 0 ? String(products[0].id) : "all",
+      status: "all",
+      product_id: "all",
       area_id: "all",
       customer_search: "",
       partner_name: "all",
@@ -489,35 +542,92 @@ export default function OrdersPage() {
   const hasUnreturnedAssets = filteredOrders.some((o) => o.unreturned_assets > 0);
 
   function openCreate() {
+    setFormMode("create");
+    setEditingId(null);
     createForm.reset({
       customer_id: 0,
       product_id: 0,
       quantity: 1,
+      unit: "",
       unit_price: 0,
+      unit_cost: 0,
+      unit_label_cost: 0,
+      unit_other_cost: 0,
       paid_amount: 0,
+      ordered_at: new Date().toISOString().slice(0, 10),
       note: "",
     });
-    setCreateOrderAssets([]);
-    setCreateOrderAssetQtys({});
-    setCreateOpen(true);
+    setFormOrderAssets([]);
+    setFormOrderAssetQtys({});
+    setFormOpen(true);
   }
 
-  async function onCreateSubmit(data: CreateOrderInput) {
-    const assets = createOrderAssets
-      .map((a) => ({ asset_id: a.id, quantity: createOrderAssetQtys[a.id] ?? 0 }))
-      .filter((a) => a.quantity > 0);
-    const res = await fetch("/api/orders", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ...data, assets }),
+  function openEdit(order: Order) {
+    setFormMode("edit");
+    setEditingId(order.id);
+    createForm.reset({
+      customer_id: order.customer_id,
+      product_id: order.product_id,
+      quantity: order.quantity,
+      unit: order.unit || "",
+      unit_price: Number(order.unit_price),
+      unit_cost: Number(order.unit_cost),
+      unit_label_cost: Number(order.unit_label_cost),
+      unit_other_cost: Number(order.unit_other_cost),
+      paid_amount: Number(order.paid_amount),
+      ordered_at: new Date(order.ordered_at).toISOString().slice(0, 10),
+      note: order.note || "",
     });
-    if (res.ok) {
-      toast.success("Order created");
-      setCreateOpen(false);
-      refreshOrders();
+    // Load assets for edit
+    fetch(`/api/orders/${order.id}/asset-returns`)
+      .then((r) => (r.ok ? r.json() : { sent: [], returned: [] }))
+      .then((data: { sent: OrderAssetSent[] }) => {
+        const qtys: Record<number, number> = {};
+        for (const s of data.sent ?? []) {
+          qtys[s.asset_id] = s.quantity;
+        }
+        setFormOrderAssetQtys(qtys);
+      })
+      .catch(() => {});
+    setFormOpen(true);
+  }
+
+  async function onFormSubmit(data: CreateOrderInput) {
+    const assets = formOrderAssets
+      .map((a) => ({ asset_id: a.id, quantity: formOrderAssetQtys[a.id] ?? 0 }))
+      .filter((a) => a.quantity > 0);
+
+    if (formMode === "edit" && editingId) {
+      const { customer_id: _cid, paid_amount: _pa, ...editData } = data;
+      void _cid;
+      void _pa;
+      const res = await fetch(`/api/orders/${editingId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "edit", ...editData, assets }),
+      });
+      if (res.ok) {
+        toast.success("Order updated");
+        setFormOpen(false);
+        refreshOrders();
+      } else {
+        const json = await res.json();
+        toast.error(json.error ?? "Failed to update order");
+      }
     } else {
-      const json = await res.json();
-      toast.error(json.error ?? "Failed to create order");
+      const res = await fetch("/api/orders", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...data, assets }),
+      });
+      if (res.ok) {
+        toast.success("Order created");
+        setFormOpen(false);
+        refreshOrders();
+      } else {
+        const json = await res.json();
+        toast.error(json.error ?? "Failed to create order");
+      }
     }
   }
 
@@ -791,7 +901,7 @@ export default function OrdersPage() {
             variant="outline"
             size="sm"
             onClick={() => setFilterOpen((v) => !v)}
-            className="relative"
+            className="relative md:hidden"
           >
             <SlidersHorizontal className="size-4" />
             Filters
@@ -832,114 +942,54 @@ export default function OrdersPage() {
         </div>
       )}
 
-      {/* Desktop inline filter panel */}
-      {filterOpen && !isMobile && (
-        <div className="hidden md:block rounded-lg border border-border bg-card p-4 space-y-4">
-          <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4 items-start">
-            <OrderFilterSection label="Status">
-              <Select value={filters.status} onValueChange={(v) => setFilter("status", v ?? "all")}>
-                <SelectTrigger className="w-full">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="due">Due</SelectItem>
-                  <SelectItem value="all">All Active</SelectItem>
-                  <SelectItem value="pending">Pending</SelectItem>
-                  <SelectItem value="delivered">Delivered</SelectItem>
-                  <SelectItem value="paid">Paid</SelectItem>
-                  <SelectItem value="cancelled">Cancelled</SelectItem>
-                </SelectContent>
-              </Select>
-            </OrderFilterSection>
-            <OrderFilterSection label="Customer">
-              <Input
-                placeholder="Search customer…"
-                value={filters.customer_search}
-                onChange={(e) => setFilter("customer_search", e.target.value)}
-              />
-            </OrderFilterSection>
-            <OrderFilterSection label="Product">
-              <Select
-                value={filters.product_id}
-                onValueChange={(v) => setFilter("product_id", v ?? "all")}
-              >
-                <SelectTrigger className="w-full">
-                  <SelectValue>
-                    {filters.product_id === "all"
-                      ? "All products"
-                      : (products.find((p) => String(p.id) === filters.product_id)?.name ??
-                        "All products")}
-                  </SelectValue>
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All products</SelectItem>
-                  {products.map((p) => (
-                    <SelectItem key={p.id} value={String(p.id)}>
-                      {p.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </OrderFilterSection>
-            <OrderFilterSection label="Area">
-              <Select
-                value={filters.area_id}
-                onValueChange={(v) => setFilter("area_id", v ?? "all")}
-              >
-                <SelectTrigger className="w-full">
-                  <SelectValue>
-                    {filters.area_id === "all"
-                      ? "All areas"
-                      : (uniqueAreas.find((a) => String(a.id) === filters.area_id)?.name ??
-                        "All areas")}
-                  </SelectValue>
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All areas</SelectItem>
-                  {uniqueAreas.map((a) => (
-                    <SelectItem key={a.id} value={String(a.id)}>
-                      {a.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </OrderFilterSection>
-            {isAdmin && uniquePartners.length > 0 && (
-              <OrderFilterSection label="Partner">
-                <Select
-                  value={filters.partner_name}
-                  onValueChange={(v) => setFilter("partner_name", v ?? "all")}
-                >
-                  <SelectTrigger className="w-full">
-                    <SelectValue>
-                      {filters.partner_name === "all" ? "All partners" : filters.partner_name}
-                    </SelectValue>
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All partners</SelectItem>
-                    {uniquePartners.map((p) => (
-                      <SelectItem key={p} value={p}>
-                        {p}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </OrderFilterSection>
-            )}
-          </div>
-          {activeFilterCount > 0 && (
-            <div className="flex justify-end">
-              <button
-                onClick={clearFilters}
-                className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1 transition-colors"
-              >
-                <X className="size-3" />
-                Clear all
-              </button>
-            </div>
-          )}
-        </div>
-      )}
+      {/* Desktop inline filter bar */}
+      <div className="hidden md:grid md:grid-cols-12 items-start gap-4">
+        <OrderFilterSection label="Customer" className="md:col-span-6">
+          <Input
+            placeholder="Search customer…"
+            value={filters.customer_search}
+            onChange={(e) => setFilter("customer_search", e.target.value)}
+          />
+        </OrderFilterSection>
+        <OrderFilterSection label="Status" className="md:col-span-3">
+          <Select value={filters.status} onValueChange={(v) => setFilter("status", v ?? "all")}>
+            <SelectTrigger className="w-full">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Active</SelectItem>
+              <SelectItem value="due">Due</SelectItem>
+              <SelectItem value="pending">Pending</SelectItem>
+              <SelectItem value="delivered">Delivered</SelectItem>
+              <SelectItem value="paid">Paid</SelectItem>
+              <SelectItem value="cancelled">Cancelled</SelectItem>
+            </SelectContent>
+          </Select>
+        </OrderFilterSection>
+        <OrderFilterSection label="Product" className="md:col-span-3">
+          <Select
+            value={filters.product_id}
+            onValueChange={(v) => setFilter("product_id", v ?? "all")}
+          >
+            <SelectTrigger className="w-full">
+              <SelectValue>
+                {filters.product_id === "all"
+                  ? "All products"
+                  : (products.find((p) => String(p.id) === filters.product_id)?.name ??
+                    "All products")}
+              </SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All products</SelectItem>
+              {products.map((p) => (
+                <SelectItem key={p.id} value={String(p.id)}>
+                  {p.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </OrderFilterSection>
+      </div>
       {!loading && orders.length > 0 && (
         <div className="flex items-center gap-4 flex-wrap text-sm px-1">
           <span className="text-muted-foreground">
@@ -956,7 +1006,7 @@ export default function OrdersPage() {
         </div>
       )}
 
-      <div className="rounded-lg border border-border overflow-hidden">
+      <div className="rounded-lg border border-border overflow-x-auto">
         <Table>
           <TableHeader>
             <TableRow>
@@ -964,26 +1014,32 @@ export default function OrdersPage() {
               <TableHead>Customer</TableHead>
               <TableHead>Product</TableHead>
               <TableHead>Date</TableHead>
+              <TableHead>Unit</TableHead>
               <TableHead>Qty</TableHead>
-              <TableHead>Unit Price</TableHead>
-              <TableHead>Total</TableHead>
-              <TableHead>Paid</TableHead>
+              <TableHead>Unit Cost</TableHead>
+              <TableHead>Sales</TableHead>
+              <TableHead>Collection</TableHead>
               <TableHead>Due</TableHead>
+              <TableHead>Due Coll.</TableHead>
+              <TableHead>Label</TableHead>
+              <TableHead>Other</TableHead>
+              <TableHead>Total Cost</TableHead>
+              <TableHead>Net Value</TableHead>
               <TableHead>Status</TableHead>
-              {hasUnreturnedAssets && <TableHead>Assets to Collect</TableHead>}
-              <TableHead className="w-25" />
+              {hasUnreturnedAssets && <TableHead>Assets</TableHead>}
+              <TableHead className="w-28" />
             </TableRow>
           </TableHeader>
           <TableBody>
             {loading ? (
               <TableRow>
-                <TableCell colSpan={12} className="text-center text-muted-foreground py-10">
+                <TableCell colSpan={18} className="text-center text-muted-foreground py-10">
                   Loading…
                 </TableCell>
               </TableRow>
             ) : filteredOrders.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={12} className="text-center text-muted-foreground py-10">
+                <TableCell colSpan={18} className="text-center text-muted-foreground py-10">
                   {activeFilterCount > 0 ? "No orders match your filters" : "No orders"}
                 </TableCell>
               </TableRow>
@@ -1000,12 +1056,13 @@ export default function OrdersPage() {
                       year: "numeric",
                     })}
                   </TableCell>
+                  <TableCell className="text-xs">{o.unit || o.product_unit || "—"}</TableCell>
                   <TableCell>{o.quantity}</TableCell>
-                  <TableCell>৳{Number(o.unit_price).toFixed(2)}</TableCell>
+                  <TableCell>৳{Number(o.unit_cost).toFixed(2)}</TableCell>
                   <TableCell>৳{Number(o.total_amount).toFixed(2)}</TableCell>
                   <TableCell>
-                    {Number(o.paid_amount) > 0 ? (
-                      <span className="text-green-600">৳{Number(o.paid_amount).toFixed(2)}</span>
+                    {Number(o.collection) > 0 ? (
+                      <span className="text-green-600">৳{Number(o.collection).toFixed(2)}</span>
                     ) : (
                       <span className="text-muted-foreground">—</span>
                     )}
@@ -1016,6 +1073,19 @@ export default function OrdersPage() {
                     ) : (
                       <span className="text-muted-foreground">—</span>
                     )}
+                  </TableCell>
+                  <TableCell>
+                    {Number(o.due_collection) > 0 ? (
+                      <span className="text-green-600">৳{Number(o.due_collection).toFixed(2)}</span>
+                    ) : (
+                      <span className="text-muted-foreground">—</span>
+                    )}
+                  </TableCell>
+                  <TableCell>৳{Number(o.unit_label_cost).toFixed(2)}</TableCell>
+                  <TableCell>৳{Number(o.unit_other_cost).toFixed(2)}</TableCell>
+                  <TableCell>৳{Number(o.total_cost).toFixed(2)}</TableCell>
+                  <TableCell className={Number(o.net_value) < 0 ? "text-destructive" : ""}>
+                    ৳{Number(o.net_value).toFixed(2)}
                   </TableCell>
                   <TableCell>
                     <Badge variant={STATUS_VARIANT[o.status] ?? "secondary"}>{o.status}</Badge>
@@ -1040,6 +1110,17 @@ export default function OrdersPage() {
                       >
                         <Eye className="size-3.5" />
                       </Button>
+                      {(o.status === "pending" || o.status === "delivered") && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => openEdit(o)}
+                          className="size-7 text-muted-foreground hover:text-foreground"
+                          title="Edit order"
+                        >
+                          <Pencil className="size-3.5" />
+                        </Button>
+                      )}
                       {o.status === "pending" && (
                         <Button
                           variant="ghost"
@@ -1228,16 +1309,20 @@ export default function OrdersPage() {
         </SheetContent>
       </Sheet>
 
-      {/* Create order sheet */}
-      <Sheet open={createOpen} onOpenChange={setCreateOpen}>
+      {/* Create / Edit order sheet */}
+      <Sheet open={formOpen} onOpenChange={setFormOpen}>
         <SheetContent className="w-full sm:max-w-md overflow-y-auto">
           <SheetHeader>
-            <SheetTitle>New Order</SheetTitle>
+            <SheetTitle>{formMode === "edit" ? "Edit Order" : "New Order"}</SheetTitle>
           </SheetHeader>
           <form
-            onSubmit={createForm.handleSubmit(onCreateSubmit)}
+            onSubmit={createForm.handleSubmit(onFormSubmit)}
             className="mt-6 space-y-5 px-4 pb-8"
           >
+            <Field label="Date" error={createForm.formState.errors.ordered_at?.message}>
+              <Input type="date" {...createForm.register("ordered_at")} />
+            </Field>
+
             <Field
               label="Customer"
               error={
@@ -1245,11 +1330,21 @@ export default function OrdersPage() {
                   ?.message
               }
             >
-              <CustomerSearch
-                customers={customers}
-                value={customerId}
-                onChange={(id) => createForm.setValue("customer_id", id, { shouldValidate: true })}
-              />
+              {formMode === "edit" ? (
+                <Input
+                  value={customers.find((c) => c.id === customerId)?.name ?? ""}
+                  disabled
+                  className="bg-muted"
+                />
+              ) : (
+                <CustomerSearch
+                  customers={customers}
+                  value={customerId}
+                  onChange={(id) =>
+                    createForm.setValue("customer_id", id, { shouldValidate: true })
+                  }
+                />
+              )}
             </Field>
 
             <Field
@@ -1280,6 +1375,24 @@ export default function OrdersPage() {
               </Select>
             </Field>
 
+            <Field label="Unit">
+              <Select
+                value={String(watchUnit ?? "")}
+                onValueChange={(v) => createForm.setValue("unit", v ?? "")}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Select unit" />
+                </SelectTrigger>
+                <SelectContent>
+                  {UNIT_OPTIONS.map((u) => (
+                    <SelectItem key={u} value={u}>
+                      {u}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </Field>
+
             <Field label="Quantity" error={createForm.formState.errors.quantity?.message}>
               <Input
                 type="number"
@@ -1288,7 +1401,19 @@ export default function OrdersPage() {
               />
             </Field>
 
-            <Field label="Unit Price (৳)" error={createForm.formState.errors.unit_price?.message}>
+            <Field label="Unit Cost (৳)" error={createForm.formState.errors.unit_cost?.message}>
+              <Input
+                type="number"
+                step="0.01"
+                min={0}
+                {...createForm.register("unit_cost", { valueAsNumber: true })}
+              />
+            </Field>
+
+            <Field
+              label="Unit Price / Sales Price (৳)"
+              error={createForm.formState.errors.unit_price?.message}
+            >
               <Input
                 type="number"
                 step="0.01"
@@ -1297,30 +1422,68 @@ export default function OrdersPage() {
             </Field>
 
             <Field
-              label="Paid Now (৳)"
-              error={
-                (createForm.formState.errors as Record<string, { message?: string }>).paid_amount
-                  ?.message
-              }
+              label="Label Cost per Unit (৳)"
+              error={createForm.formState.errors.unit_label_cost?.message}
             >
               <Input
                 type="number"
                 step="0.01"
                 min={0}
-                {...createForm.register("paid_amount", { valueAsNumber: true })}
+                {...createForm.register("unit_label_cost", { valueAsNumber: true })}
               />
             </Field>
 
-            {orderTotal > 0 && (
+            <Field
+              label="Other Cost per Unit (৳)"
+              error={createForm.formState.errors.unit_other_cost?.message}
+            >
+              <Input
+                type="number"
+                step="0.01"
+                min={0}
+                {...createForm.register("unit_other_cost", { valueAsNumber: true })}
+              />
+            </Field>
+
+            {formMode !== "edit" && (
+              <Field
+                label="Paid Now / Collection (৳)"
+                error={
+                  (createForm.formState.errors as Record<string, { message?: string }>).paid_amount
+                    ?.message
+                }
+              >
+                <Input
+                  type="number"
+                  step="0.01"
+                  min={0}
+                  {...createForm.register("paid_amount", { valueAsNumber: true })}
+                />
+              </Field>
+            )}
+
+            {orderSales > 0 && (
               <div className="rounded-md bg-muted/50 px-3 py-2 text-sm space-y-1">
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground">Order total</span>
-                  <span>৳{orderTotal.toFixed(2)}</span>
+                  <span className="text-muted-foreground">Sales</span>
+                  <span>৳{orderSales.toFixed(2)}</span>
+                </div>
+                {formMode !== "edit" && (
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Due</span>
+                    <span className={orderDue > 0 ? "text-destructive" : "text-green-600"}>
+                      ৳{orderDue.toFixed(2)}
+                    </span>
+                  </div>
+                )}
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Total Cost</span>
+                  <span>৳{orderTotalCost.toFixed(2)}</span>
                 </div>
                 <div className="flex justify-between font-medium">
-                  <span className="text-muted-foreground">Due after payment</span>
-                  <span className={orderDue > 0 ? "text-destructive" : "text-green-600"}>
-                    ৳{orderDue.toFixed(2)}
+                  <span className="text-muted-foreground">Net Value</span>
+                  <span className={orderNetValue < 0 ? "text-destructive" : "text-green-600"}>
+                    ৳{orderNetValue.toFixed(2)}
                   </span>
                 </div>
               </div>
@@ -1330,21 +1493,21 @@ export default function OrdersPage() {
               <Textarea placeholder="Optional note…" {...createForm.register("note")} />
             </Field>
 
-            {createOrderAssets.length > 0 && (
+            {formOrderAssets.length > 0 && (
               <div className="border-t border-border pt-4">
                 <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-3">
                   Assets Sent to Customer (Optional)
                 </p>
                 <div className="space-y-3">
-                  {createOrderAssets.map((a) => (
+                  {formOrderAssets.map((a) => (
                     <Field key={a.id} label={a.name}>
                       <Input
                         type="number"
                         min={0}
                         placeholder="0"
-                        value={createOrderAssetQtys[a.id] ?? ""}
+                        value={formOrderAssetQtys[a.id] ?? ""}
                         onChange={(e) =>
-                          setCreateOrderAssetQtys((prev) => ({
+                          setFormOrderAssetQtys((prev) => ({
                             ...prev,
                             [a.id]: Number(e.target.value),
                           }))
@@ -1358,12 +1521,18 @@ export default function OrdersPage() {
 
             <div className="flex gap-2 pt-2">
               <Button type="submit" disabled={createForm.formState.isSubmitting} className="w-1/2">
-                {createForm.formState.isSubmitting ? "Creating…" : "Create Order"}
+                {createForm.formState.isSubmitting
+                  ? formMode === "edit"
+                    ? "Saving…"
+                    : "Creating…"
+                  : formMode === "edit"
+                    ? "Save Changes"
+                    : "Create Order"}
               </Button>
               <Button
                 type="button"
                 variant="outline"
-                onClick={() => setCreateOpen(false)}
+                onClick={() => setFormOpen(false)}
                 className="w-1/2"
               >
                 Cancel
@@ -1628,7 +1797,7 @@ export default function OrdersPage() {
         </SheetContent>
       </Sheet>
 
-      {/* ── Standalone Asset Return Sheet ────────────────────────── */}
+      {/* Standalone Asset Return Sheet */}
       <Sheet
         open={returnAssetTarget !== null}
         onOpenChange={(open) => !open && setReturnAssetTarget(null)}
@@ -1743,7 +1912,7 @@ export default function OrdersPage() {
         </SheetContent>
       </Sheet>
 
-      {/* ── Order Detail Sheet ────────────────────────────────────── */}
+      {/* Order Detail Sheet */}
       <Sheet open={viewingOrder !== null} onOpenChange={(open) => !open && setViewingOrder(null)}>
         <SheetContent className="w-full sm:!max-w-lg overflow-y-auto">
           <SheetHeader>
@@ -1778,23 +1947,29 @@ export default function OrdersPage() {
                   </Badge>
                 </div>
                 <div>
+                  <p className="text-xs text-muted-foreground">Unit</p>
+                  <p>{viewingOrder.unit || viewingOrder.product_unit || "—"}</p>
+                </div>
+                <div>
                   <p className="text-xs text-muted-foreground">Quantity</p>
-                  <p>
-                    {viewingOrder.quantity} {viewingOrder.product_unit ?? ""}
-                  </p>
+                  <p>{viewingOrder.quantity}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Unit Cost</p>
+                  <p>৳{Number(viewingOrder.unit_cost).toFixed(2)}</p>
                 </div>
                 <div>
                   <p className="text-xs text-muted-foreground">Unit Price</p>
                   <p>৳{Number(viewingOrder.unit_price).toFixed(2)}</p>
                 </div>
                 <div>
-                  <p className="text-xs text-muted-foreground">Total</p>
+                  <p className="text-xs text-muted-foreground">Sales</p>
                   <p className="font-semibold">৳{Number(viewingOrder.total_amount).toFixed(2)}</p>
                 </div>
                 <div>
-                  <p className="text-xs text-muted-foreground">Paid</p>
+                  <p className="text-xs text-muted-foreground">Collection</p>
                   <p className="text-green-600 font-medium">
-                    ৳{Number(viewingOrder.paid_amount).toFixed(2)}
+                    ৳{Number(viewingOrder.collection).toFixed(2)}
                   </p>
                 </div>
                 <div>
@@ -1807,6 +1982,36 @@ export default function OrdersPage() {
                     }
                   >
                     ৳{Number(viewingOrder.due_amount).toFixed(2)}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Due Collection</p>
+                  <p className="text-green-600">
+                    ৳{Number(viewingOrder.due_collection ?? 0).toFixed(2)}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Label Cost</p>
+                  <p>৳{Number(viewingOrder.unit_label_cost).toFixed(2)}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Other Cost</p>
+                  <p>৳{Number(viewingOrder.unit_other_cost).toFixed(2)}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Total Cost</p>
+                  <p>৳{Number(viewingOrder.total_cost).toFixed(2)}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Net Value</p>
+                  <p
+                    className={
+                      Number(viewingOrder.net_value) < 0
+                        ? "text-destructive font-medium"
+                        : "font-medium"
+                    }
+                  >
+                    ৳{Number(viewingOrder.net_value).toFixed(2)}
                   </p>
                 </div>
                 {viewingOrder.area_name && (
@@ -1992,9 +2197,17 @@ function Field({
   );
 }
 
-function OrderFilterSection({ label, children }: { label: string; children: React.ReactNode }) {
+function OrderFilterSection({
+  label,
+  children,
+  className,
+}: {
+  label: string;
+  children: React.ReactNode;
+  className?: string;
+}) {
   return (
-    <div className="space-y-2">
+    <div className={`space-y-2 ${className ?? ""}`}>
       <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{label}</p>
       {children}
     </div>

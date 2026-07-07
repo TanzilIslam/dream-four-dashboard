@@ -4,30 +4,18 @@ import { useEffect, useState } from "react";
 import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
-import {
-  PlusIcon,
-  Pencil,
-  Trash2,
-  CheckCircle2,
-  XCircle,
-  ShoppingBag,
-  Eye,
-  Banknote,
-} from "lucide-react";
+import { PlusIcon, Pencil, Trash2, Eye, Banknote } from "lucide-react";
 
 import {
-  createPurchaseRequestSchema,
-  markPurchasedSchema,
+  createPurchaseSchema,
   addSupplierPaymentSchema,
-  type CreatePurchaseRequestInput,
-  type MarkPurchasedInput,
+  type CreatePurchaseInput,
   type AddSupplierPaymentInput,
 } from "@/lib/schemas/purchase-request";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import {
@@ -46,21 +34,25 @@ import {
   TableRow,
 } from "@/components/ui/table";
 
-type PurchaseRequest = {
+const UNIT_OPTIONS = ["piece", "dozen", "box", "kg", "liter", "pack", "bag", "crate", "tray"];
+
+type Purchase = {
   id: number;
   partner_id: number;
   supplier_id: number;
   product_id: number;
-  requested_qty: number;
-  estimated_price: string | null;
-  estimated_total: string | null;
-  status: "pending" | "approved" | "rejected" | "purchased";
-  admin_note: string | null;
   actual_qty: number | null;
   actual_price: string | null;
   actual_total: string | null;
+  unit: string | null;
+  unit_transport_cost: string | null;
+  unit_label_cost: string | null;
+  unit_other_cost: string | null;
   purchased_at: string | null;
+  payment_method: string | null;
+  from_personal: boolean;
   note: string | null;
+  remarks: string | null;
   created_at: string;
   supplier_name: string | null;
   product_name: string | null;
@@ -87,20 +79,11 @@ type Supplier = { id: number; name: string };
 type Product = { id: number; name: string; unit: string };
 type ProductAsset = { id: number; name: string };
 
-const STATUS_VARIANT: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
-  pending: "secondary",
-  approved: "default",
-  rejected: "destructive",
-  purchased: "outline",
-};
-
-export default function PurchaseRequestsPage() {
-  const [requests, setRequests] = useState<PurchaseRequest[]>([]);
+export default function PurchasesPage() {
+  const [purchases, setPurchases] = useState<Purchase[]>([]);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
-  const [isAdmin, setIsAdmin] = useState(false);
-  const [statusFilter, setStatusFilter] = useState("all");
   const [productFilter, setProductFilter] = useState("all");
   const [supplierFilter, setSupplierFilter] = useState("all");
   const [dueFilter, setDueFilter] = useState("all");
@@ -118,21 +101,17 @@ export default function PurchaseRequestsPage() {
   >("id_desc");
 
   const [createOpen, setCreateOpen] = useState(false);
-  const [editTarget, setEditTarget] = useState<PurchaseRequest | null>(null);
-  const [cancelTarget, setCancelTarget] = useState<PurchaseRequest | null>(null);
-  const [cancelling, setCancelling] = useState(false);
+  const [editTarget, setEditTarget] = useState<Purchase | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<Purchase | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
-  const [approveTarget, setApproveTarget] = useState<PurchaseRequest | null>(null);
-  const [approving, setApproving] = useState(false);
-  const [adminNote, setAdminNote] = useState("");
-  const [rejectTarget, setRejectTarget] = useState<PurchaseRequest | null>(null);
-  const [rejecting, setRejecting] = useState(false);
-  const [purchaseTarget, setPurchaseTarget] = useState<PurchaseRequest | null>(null);
-  const [purchaseTargetAssets, setPurchaseTargetAssets] = useState<ProductAsset[]>([]);
-  const [purchaseAssetQtys, setPurchaseAssetQtys] = useState<Record<number, number>>({});
-  const [detailsTarget, setDetailsTarget] = useState<PurchaseRequest | null>(null);
+  // Assets state for create/edit form
+  const [formAssets, setFormAssets] = useState<ProductAsset[]>([]);
+  const [formAssetQtys, setFormAssetQtys] = useState<Record<number, number>>({});
 
-  const [paymentTarget, setPaymentTarget] = useState<PurchaseRequest | null>(null);
+  // Payment states
+  const [paymentTarget, setPaymentTarget] = useState<Purchase | null>(null);
+  const [detailsTarget, setDetailsTarget] = useState<Purchase | null>(null);
   const [detailPayments, setDetailPayments] = useState<SupplierPayment[]>([]);
   const [detailPaymentsLoading, setDetailPaymentsLoading] = useState(false);
   const [detailPaymentSummary, setDetailPaymentSummary] = useState<{
@@ -143,26 +122,24 @@ export default function PurchaseRequestsPage() {
   const [deletePaymentTarget, setDeletePaymentTarget] = useState<SupplierPayment | null>(null);
   const [deletingPayment, setDeletingPayment] = useState(false);
 
-  const createForm = useForm<CreatePurchaseRequestInput>({
-    resolver: zodResolver(createPurchaseRequestSchema),
+  const purchaseForm = useForm<CreatePurchaseInput>({
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    resolver: zodResolver(createPurchaseSchema) as any,
     defaultValues: {
       supplier_id: 0,
       product_id: 0,
-      requested_qty: 1,
-      estimated_price: null,
-      note: "",
-    },
-  });
-
-  const markPurchasedForm = useForm<MarkPurchasedInput>({
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    resolver: zodResolver(markPurchasedSchema) as any,
-    defaultValues: {
       actual_qty: 1,
       actual_price: 0,
+      unit: "",
+      unit_transport_cost: 0,
+      unit_label_cost: 0,
+      unit_other_cost: 0,
       purchased_at: new Date().toISOString().slice(0, 10),
-      admin_note: "",
-      initial_payment_amount: 0,
+      payment_method: "",
+      from_personal: false,
+      note: "",
+      remarks: "",
+      assets: [],
     },
   });
 
@@ -178,41 +155,67 @@ export default function PurchaseRequestsPage() {
     },
   });
 
-  const supplierId = useWatch({
-    control: createForm.control,
-    name: "supplier_id",
-    defaultValue: 0,
-  });
-  const productId = useWatch({ control: createForm.control, name: "product_id", defaultValue: 0 });
-  const selectedSupplierName = suppliers.find((s) => s.id === supplierId)?.name;
-  const selectedProductName = products.find((p) => p.id === productId)?.name;
-
-  const markActualQty = useWatch({
-    control: markPurchasedForm.control,
-    name: "actual_qty",
-    defaultValue: 1,
-  });
-  const markActualPrice = useWatch({
-    control: markPurchasedForm.control,
+  // Watched values for live computed display
+  const watchQty = useWatch({ control: purchaseForm.control, name: "actual_qty", defaultValue: 1 });
+  const watchPrice = useWatch({
+    control: purchaseForm.control,
     name: "actual_price",
     defaultValue: 0,
   });
-  const markComputedTotal = (Number(markActualQty) || 0) * (Number(markActualPrice) || 0);
+  const watchTransport = useWatch({
+    control: purchaseForm.control,
+    name: "unit_transport_cost",
+    defaultValue: 0,
+  });
+  const watchLabel = useWatch({
+    control: purchaseForm.control,
+    name: "unit_label_cost",
+    defaultValue: 0,
+  });
+  const watchOther = useWatch({
+    control: purchaseForm.control,
+    name: "unit_other_cost",
+    defaultValue: 0,
+  });
 
+  const watchProductId = useWatch({
+    control: purchaseForm.control,
+    name: "product_id",
+    defaultValue: 0,
+  });
+  const watchSupplierId = useWatch({
+    control: purchaseForm.control,
+    name: "supplier_id",
+    defaultValue: 0,
+  });
+  const watchUnit = useWatch({
+    control: purchaseForm.control,
+    name: "unit",
+    defaultValue: "",
+  });
+
+  const computedUnitCost =
+    (Number(watchPrice) || 0) +
+    (Number(watchTransport) || 0) +
+    (Number(watchLabel) || 0) +
+    (Number(watchOther) || 0);
+  const computedTotal = computedUnitCost * (Number(watchQty) || 0);
+
+  const selectedSupplierName = suppliers.find((s) => s.id === watchSupplierId)?.name;
+  const selectedProductName = products.find((p) => p.id === watchProductId)?.name;
+
+  // Fetch purchases
   useEffect(() => {
-    fetch(`/api/purchase-requests?status=${statusFilter}`)
+    fetch("/api/purchase-requests")
       .then((res) => res.json())
       .then((data) => {
-        setRequests(data);
+        setPurchases(data);
         setLoading(false);
       });
-  }, [statusFilter]);
+  }, []);
 
+  // Fetch suppliers & products
   useEffect(() => {
-    fetch("/api/auth/me")
-      .then((res) => (res.ok ? res.json() : { user: null }))
-      .then((data) => setIsAdmin(data.user?.role === "admin"))
-      .catch(() => setIsAdmin(false));
     fetch("/api/settings/suppliers")
       .then((res) => res.json())
       .then((data: Supplier[]) => setSuppliers(data));
@@ -224,10 +227,31 @@ export default function PurchaseRequestsPage() {
       });
   }, []);
 
+  // Fetch assets when product changes in form
   useEffect(() => {
-    if (!detailsTarget?.id || detailsTarget.status !== "purchased") {
+    if (!watchProductId) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setFormAssets([]);
+      setFormAssetQtys({});
       return;
     }
+    fetch(`/api/products/${watchProductId}/assets`)
+      .then((res) => (res.ok ? res.json() : []))
+      .then((data: ProductAsset[]) => {
+        setFormAssets(data);
+        if (!editTarget) setFormAssetQtys({});
+      })
+      .catch(() => {
+        setFormAssets([]);
+        setFormAssetQtys({});
+      });
+  }, [watchProductId, editTarget]);
+
+  // Fetch payment details
+  useEffect(() => {
+    if (!detailsTarget?.id) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setDetailPaymentsLoading(true);
     fetch(`/api/purchase-requests/${detailsTarget.id}/payments`)
       .then((res) => res.json())
       .then((data) => {
@@ -240,30 +264,11 @@ export default function PurchaseRequestsPage() {
         setDetailPaymentsLoading(false);
       })
       .catch(() => setDetailPaymentsLoading(false));
-  }, [detailsTarget?.id, detailsTarget?.status]);
+  }, [detailsTarget?.id]);
 
-  useEffect(() => {
-    if (!purchaseTarget?.product_id) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setPurchaseTargetAssets([]);
-      setPurchaseAssetQtys({});
-      return;
-    }
-    fetch(`/api/products/${purchaseTarget.product_id}/assets`)
-      .then((res) => (res.ok ? res.json() : []))
-      .then((data: ProductAsset[]) => {
-        setPurchaseTargetAssets(data);
-        setPurchaseAssetQtys({});
-      })
-      .catch(() => {
-        setPurchaseTargetAssets([]);
-        setPurchaseAssetQtys({});
-      });
-  }, [purchaseTarget?.product_id]);
-
-  async function refreshRequests() {
-    const res = await fetch(`/api/purchase-requests?status=${statusFilter}`);
-    setRequests(await res.json());
+  async function refreshPurchases() {
+    const res = await fetch("/api/purchase-requests");
+    setPurchases(await res.json());
   }
 
   async function refreshDetailPayments() {
@@ -278,52 +283,83 @@ export default function PurchaseRequestsPage() {
     });
   }
 
-  function openDetails(r: PurchaseRequest) {
-    setDetailPayments([]);
-    setDetailPaymentSummary(null);
-    setDetailPaymentsLoading(true);
-    setDetailsTarget(r);
-  }
-
   function openCreate() {
-    createForm.reset({
+    purchaseForm.reset({
       supplier_id: 0,
       product_id: 0,
-      requested_qty: 1,
-      estimated_price: null,
+      actual_qty: 1,
+      actual_price: 0,
+      unit: "",
+      unit_transport_cost: 0,
+      unit_label_cost: 0,
+      unit_other_cost: 0,
+      purchased_at: new Date().toISOString().slice(0, 10),
+      payment_method: "",
+      from_personal: false,
       note: "",
+      remarks: "",
+      assets: [],
     });
+    setFormAssetQtys({});
     setEditTarget(null);
     setCreateOpen(true);
   }
 
-  function openEdit(r: PurchaseRequest) {
-    createForm.reset({
+  function openEdit(r: Purchase) {
+    purchaseForm.reset({
       supplier_id: r.supplier_id,
       product_id: r.product_id,
-      requested_qty: r.requested_qty,
-      estimated_price: r.estimated_price ? Number(r.estimated_price) : null,
+      actual_qty: r.actual_qty ?? 1,
+      actual_price: r.actual_price ? Number(r.actual_price) : 0,
+      unit: r.unit ?? "",
+      unit_transport_cost: r.unit_transport_cost ? Number(r.unit_transport_cost) : 0,
+      unit_label_cost: r.unit_label_cost ? Number(r.unit_label_cost) : 0,
+      unit_other_cost: r.unit_other_cost ? Number(r.unit_other_cost) : 0,
+      purchased_at: r.purchased_at
+        ? r.purchased_at.slice(0, 10)
+        : new Date().toISOString().slice(0, 10),
+      payment_method: r.payment_method ?? "",
+      from_personal: r.from_personal,
       note: r.note ?? "",
+      remarks: r.remarks ?? "",
+      assets: [],
     });
+    setFormAssetQtys({});
     setEditTarget(r);
     setCreateOpen(true);
+
+    // Load existing assets for this purchase
+    fetch(`/api/purchase-requests/${r.id}/assets`)
+      .then((res) => (res.ok ? res.json() : []))
+      .then((assets: { asset_id: number; quantity: number }[]) => {
+        const qtys: Record<number, number> = {};
+        for (const a of assets) qtys[a.asset_id] = a.quantity;
+        setFormAssetQtys(qtys);
+      })
+      .catch(() => {});
   }
 
-  async function onCreateSubmit(data: CreatePurchaseRequestInput) {
+  async function onSubmit(data: CreatePurchaseInput) {
+    const assets = formAssets
+      .map((a) => ({ asset_id: a.id, quantity: formAssetQtys[a.id] ?? 0 }))
+      .filter((a) => a.quantity > 0);
+
+    const payload = { ...data, assets };
+
     if (editTarget) {
       const res = await fetch(`/api/purchase-requests/${editTarget.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "edit", ...data }),
+        body: JSON.stringify(payload),
       });
       if (res.ok) {
-        toast.success("Purchase request updated");
+        toast.success("Purchase updated");
         setCreateOpen(false);
         setEditTarget(null);
-        refreshRequests();
+        refreshPurchases();
       } else {
         const json = await res.json();
-        toast.error(json.error ?? "Failed to update request");
+        toast.error(json.error ?? "Failed to update");
       }
       return;
     }
@@ -331,91 +367,31 @@ export default function PurchaseRequestsPage() {
     const res = await fetch("/api/purchase-requests", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(data),
+      body: JSON.stringify(payload),
     });
     if (res.ok) {
-      toast.success("Purchase request submitted");
+      toast.success("Purchase created");
       setCreateOpen(false);
-      refreshRequests();
+      refreshPurchases();
     } else {
       const json = await res.json();
-      toast.error(json.error ?? "Failed to submit request");
+      toast.error(json.error ?? "Failed to create");
     }
   }
 
-  async function handleCancel() {
-    if (!cancelTarget) return;
-    setCancelling(true);
-    const res = await fetch(`/api/purchase-requests/${cancelTarget.id}`, { method: "DELETE" });
+  async function handleDelete() {
+    if (!deleteTarget) return;
+    setDeleting(true);
+    const res = await fetch(`/api/purchase-requests/${deleteTarget.id}`, { method: "DELETE" });
     if (res.ok) {
-      toast.success("Request deleted");
-      setCancelTarget(null);
-      refreshRequests();
+      toast.success("Purchase deleted");
+      setDeleteTarget(null);
+      refreshPurchases();
     } else {
       const json = await res.json();
       toast.error(json.error ?? "Failed to delete");
     }
-    setCancelling(false);
-  }
-
-  async function handleApprove() {
-    if (!approveTarget) return;
-    setApproving(true);
-    const res = await fetch(`/api/purchase-requests/${approveTarget.id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "approve", admin_note: adminNote }),
-    });
-    if (res.ok) {
-      toast.success("Request approved");
-      setApproveTarget(null);
-      setAdminNote("");
-      refreshRequests();
-    } else {
-      const json = await res.json();
-      toast.error(json.error ?? "Failed to approve");
-    }
-    setApproving(false);
-  }
-
-  async function handleReject() {
-    if (!rejectTarget) return;
-    setRejecting(true);
-    const res = await fetch(`/api/purchase-requests/${rejectTarget.id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "reject", admin_note: adminNote }),
-    });
-    if (res.ok) {
-      toast.success("Request rejected");
-      setRejectTarget(null);
-      setAdminNote("");
-      refreshRequests();
-    } else {
-      const json = await res.json();
-      toast.error(json.error ?? "Failed to reject");
-    }
-    setRejecting(false);
-  }
-
-  async function onMarkPurchased(data: MarkPurchasedInput) {
-    if (!purchaseTarget) return;
-    const assets = purchaseTargetAssets
-      .map((a) => ({ asset_id: a.id, quantity: purchaseAssetQtys[a.id] ?? 0 }))
-      .filter((a) => a.quantity > 0);
-    const res = await fetch(`/api/purchase-requests/${purchaseTarget.id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "mark-purchased", ...data, assets }),
-    });
-    if (res.ok) {
-      toast.success("Marked as purchased");
-      setPurchaseTarget(null);
-      refreshRequests();
-    } else {
-      const json = await res.json();
-      toast.error(json.error ?? "Failed to update");
-    }
+    setDeleting(false);
   }
 
   async function onAddPayment(data: AddSupplierPaymentInput) {
@@ -428,7 +404,7 @@ export default function PurchaseRequestsPage() {
     if (res.ok) {
       toast.success("Payment recorded");
       setPaymentTarget(null);
-      refreshRequests();
+      refreshPurchases();
     } else {
       const json = await res.json();
       toast.error(json.error ?? "Failed to record payment");
@@ -446,7 +422,7 @@ export default function PurchaseRequestsPage() {
       toast.success("Payment deleted");
       setDeletePaymentTarget(null);
       refreshDetailPayments();
-      refreshRequests();
+      refreshPurchases();
     } else {
       const json = await res.json();
       toast.error(json.error ?? "Failed to delete payment");
@@ -454,7 +430,7 @@ export default function PurchaseRequestsPage() {
     setDeletingPayment(false);
   }
 
-  const filteredRequests = requests
+  const filteredPurchases = purchases
     .filter((r) => {
       if (productFilter !== "all" && String(r.product_id) !== productFilter) return false;
       if (supplierFilter !== "all" && String(r.supplier_id) !== supplierFilter) return false;
@@ -467,9 +443,9 @@ export default function PurchaseRequestsPage() {
         case "id_asc":
           return a.id - b.id;
         case "qty_desc":
-          return Number(b.actual_qty ?? b.requested_qty) - Number(a.actual_qty ?? a.requested_qty);
+          return Number(b.actual_qty ?? 0) - Number(a.actual_qty ?? 0);
         case "qty_asc":
-          return Number(a.actual_qty ?? a.requested_qty) - Number(b.actual_qty ?? b.requested_qty);
+          return Number(a.actual_qty ?? 0) - Number(b.actual_qty ?? 0);
         case "total_desc":
           return Number(b.actual_total ?? 0) - Number(a.actual_total ?? 0);
         case "total_asc":
@@ -487,9 +463,9 @@ export default function PurchaseRequestsPage() {
       }
     });
 
-  const summary = filteredRequests.reduce(
+  const summary = filteredPurchases.reduce(
     (acc, r) => {
-      acc.qty += Number(r.actual_qty ?? r.requested_qty);
+      acc.qty += Number(r.actual_qty ?? 0);
       acc.total += Number(r.actual_total ?? 0);
       acc.paid += Number(r.paid_total ?? 0);
       acc.due += Number(r.due_amount ?? 0);
@@ -502,17 +478,16 @@ export default function PurchaseRequestsPage() {
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-y-2">
         <div>
-          <h1 className="text-xl font-semibold">Purchase Requests</h1>
-          <p className="text-sm text-muted-foreground">Request stock purchases from admin.</p>
+          <h1 className="text-xl font-semibold">Purchases</h1>
+          <p className="text-sm text-muted-foreground">Manage stock purchases.</p>
         </div>
-        {isAdmin && (
-          <Button size="sm" onClick={openCreate}>
-            <PlusIcon className="size-4" />
-            New Request
-          </Button>
-        )}
+        <Button size="sm" onClick={openCreate}>
+          <PlusIcon className="size-4" />
+          New Purchase
+        </Button>
       </div>
 
+      {/* Product pill filter */}
       <div className="flex items-center gap-2 flex-wrap">
         {products.map((p) => (
           <button
@@ -529,7 +504,8 @@ export default function PurchaseRequestsPage() {
         ))}
       </div>
 
-      {!loading && filteredRequests.length > 0 && (
+      {/* Summary bar */}
+      {!loading && filteredPurchases.length > 0 && (
         <div className="flex items-center gap-4 flex-wrap text-sm px-1">
           <span className="text-muted-foreground">
             Qty: <span className="font-medium text-foreground">{summary.qty}</span>
@@ -546,30 +522,8 @@ export default function PurchaseRequestsPage() {
         </div>
       )}
 
+      {/* Filters */}
       <div className="flex items-center gap-2 flex-wrap">
-        <Select value={statusFilter} onValueChange={(v) => v != null && setStatusFilter(v)}>
-          <SelectTrigger className="h-8 text-sm w-36">
-            <SelectValue>
-              {
-                {
-                  all: "All statuses",
-                  pending: "Pending",
-                  approved: "Approved",
-                  rejected: "Rejected",
-                  purchased: "Purchased",
-                }[statusFilter]
-              }
-            </SelectValue>
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All statuses</SelectItem>
-            <SelectItem value="pending">Pending</SelectItem>
-            <SelectItem value="approved">Approved</SelectItem>
-            <SelectItem value="rejected">Rejected</SelectItem>
-            <SelectItem value="purchased">Purchased</SelectItem>
-          </SelectContent>
-        </Select>
-
         <Select value={supplierFilter} onValueChange={(v) => setSupplierFilter(v ?? "all")}>
           <SelectTrigger className="h-8 text-sm w-36">
             <SelectValue>
@@ -633,49 +587,41 @@ export default function PurchaseRequestsPage() {
         </Select>
       </div>
 
+      {/* Table */}
       <div className="rounded-lg border border-border overflow-hidden">
         <Table>
           <TableHeader>
             <TableRow>
               <TableHead>ID</TableHead>
-              {isAdmin && <TableHead>Partner</TableHead>}
               <TableHead>Product</TableHead>
               <TableHead>Supplier</TableHead>
               <TableHead>Qty</TableHead>
-              <TableHead>Est. Price</TableHead>
+              <TableHead>Unit Price</TableHead>
               <TableHead>Total</TableHead>
               <TableHead>Paid</TableHead>
               <TableHead>Due</TableHead>
-              <TableHead>Status</TableHead>
               <TableHead>Note</TableHead>
               <TableHead>Date</TableHead>
-              <TableHead className="w-[180px]" />
+              <TableHead className="w-35" />
             </TableRow>
           </TableHeader>
           <TableBody>
             {loading ? (
               <TableRow>
-                <TableCell
-                  colSpan={isAdmin ? 13 : 12}
-                  className="text-center text-muted-foreground py-10"
-                >
+                <TableCell colSpan={11} className="text-center text-muted-foreground py-10">
                   Loading…
                 </TableCell>
               </TableRow>
-            ) : filteredRequests.length === 0 ? (
+            ) : filteredPurchases.length === 0 ? (
               <TableRow>
-                <TableCell
-                  colSpan={isAdmin ? 13 : 12}
-                  className="text-center text-muted-foreground py-10"
-                >
-                  No requests
+                <TableCell colSpan={11} className="text-center text-muted-foreground py-10">
+                  No purchases
                 </TableCell>
               </TableRow>
             ) : (
-              filteredRequests.map((r) => (
+              filteredPurchases.map((r) => (
                 <TableRow key={r.id}>
                   <TableCell className="text-muted-foreground text-xs">#{r.id}</TableCell>
-                  {isAdmin && <TableCell>{r.partner_name ?? "—"}</TableCell>}
                   <TableCell className="font-medium">
                     {r.product_name ?? "—"}
                     {r.product_unit && (
@@ -683,9 +629,9 @@ export default function PurchaseRequestsPage() {
                     )}
                   </TableCell>
                   <TableCell>{r.supplier_name ?? "—"}</TableCell>
-                  <TableCell>{r.requested_qty}</TableCell>
-                  <TableCell>
-                    {r.estimated_price ? `৳${Number(r.estimated_price).toFixed(2)}` : "—"}
+                  <TableCell>{r.actual_qty ?? "—"}</TableCell>
+                  <TableCell className="whitespace-nowrap">
+                    {r.actual_price ? `৳${Number(r.actual_price).toFixed(2)}` : "—"}
                   </TableCell>
                   <TableCell className="whitespace-nowrap">
                     {r.actual_total ? `৳${Number(r.actual_total).toFixed(2)}` : "—"}
@@ -696,88 +642,35 @@ export default function PurchaseRequestsPage() {
                   <TableCell className="whitespace-nowrap text-amber-600">
                     {Number(r.due_amount) > 0 ? `৳${Number(r.due_amount).toFixed(2)}` : "—"}
                   </TableCell>
-                  <TableCell>
-                    <Badge variant={STATUS_VARIANT[r.status] ?? "secondary"}>{r.status}</Badge>
-                  </TableCell>
-                  <TableCell className="text-sm text-muted-foreground max-w-[160px] truncate">
-                    {r.admin_note ?? r.note ?? "—"}
+                  <TableCell className="text-sm text-muted-foreground max-w-40 truncate">
+                    {r.note ?? "—"}
                   </TableCell>
                   <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
-                    {new Date(r.created_at).toLocaleDateString()}
+                    {r.purchased_at
+                      ? new Date(r.purchased_at).toLocaleDateString()
+                      : new Date(r.created_at).toLocaleDateString()}
                   </TableCell>
                   <TableCell>
                     <div className="flex items-center gap-1">
-                      {isAdmin && (
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => openEdit(r)}
-                          className="size-7 text-muted-foreground hover:text-foreground"
-                          title="Edit"
-                        >
-                          <Pencil className="size-3.5" />
-                        </Button>
-                      )}
-                      {isAdmin && (
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => setCancelTarget(r)}
-                          className="size-7 text-destructive hover:bg-destructive/10 hover:text-destructive"
-                          title="Delete"
-                        >
-                          <Trash2 className="size-3.5" />
-                        </Button>
-                      )}
-                      {isAdmin && r.status === "pending" && (
-                        <>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => {
-                              setAdminNote("");
-                              setApproveTarget(r);
-                            }}
-                            className="size-7 text-green-600 hover:bg-green-50 hover:text-green-700"
-                            title="Approve"
-                          >
-                            <CheckCircle2 className="size-3.5" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => {
-                              setAdminNote("");
-                              setRejectTarget(r);
-                            }}
-                            className="size-7 text-destructive hover:bg-destructive/10 hover:text-destructive"
-                            title="Reject"
-                          >
-                            <XCircle className="size-3.5" />
-                          </Button>
-                        </>
-                      )}
-                      {isAdmin && r.status === "approved" && (
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => {
-                            markPurchasedForm.reset({
-                              actual_qty: r.requested_qty,
-                              actual_price: r.estimated_price ? Number(r.estimated_price) : 0,
-                              purchased_at: new Date().toISOString().slice(0, 10),
-                              admin_note: "",
-                              initial_payment_amount: 0,
-                            });
-                            setPurchaseTarget(r);
-                          }}
-                          className="size-7 text-blue-600 hover:bg-blue-50 hover:text-blue-700"
-                          title="Mark as purchased"
-                        >
-                          <ShoppingBag className="size-3.5" />
-                        </Button>
-                      )}
-                      {isAdmin && r.status === "purchased" && Number(r.due_amount) > 0 && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => openEdit(r)}
+                        className="size-7 text-muted-foreground hover:text-foreground"
+                        title="Edit"
+                      >
+                        <Pencil className="size-3.5" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => setDeleteTarget(r)}
+                        className="size-7 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                        title="Delete"
+                      >
+                        <Trash2 className="size-3.5" />
+                      </Button>
+                      {Number(r.due_amount) > 0 && (
                         <Button
                           variant="ghost"
                           size="icon"
@@ -797,17 +690,20 @@ export default function PurchaseRequestsPage() {
                           <Banknote className="size-3.5" />
                         </Button>
                       )}
-                      {r.status === "purchased" && (
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => openDetails(r)}
-                          className="size-7 text-muted-foreground hover:text-foreground"
-                          title="View details"
-                        >
-                          <Eye className="size-3.5" />
-                        </Button>
-                      )}
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => {
+                          setDetailPayments([]);
+                          setDetailPaymentSummary(null);
+                          setDetailPaymentsLoading(true);
+                          setDetailsTarget(r);
+                        }}
+                        className="size-7 text-muted-foreground hover:text-foreground"
+                        title="View details"
+                      >
+                        <Eye className="size-3.5" />
+                      </Button>
                     </div>
                   </TableCell>
                 </TableRow>
@@ -829,23 +725,31 @@ export default function PurchaseRequestsPage() {
       >
         <SheetContent className="w-full sm:max-w-md overflow-y-auto">
           <SheetHeader>
-            <SheetTitle>{editTarget ? "Edit Purchase Request" : "New Purchase Request"}</SheetTitle>
+            <SheetTitle>{editTarget ? "Edit Purchase" : "New Purchase"}</SheetTitle>
           </SheetHeader>
           <form
-            onSubmit={createForm.handleSubmit(onCreateSubmit)}
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            onSubmit={purchaseForm.handleSubmit(onSubmit as any)}
             className="mt-6 space-y-5 px-4 pb-8"
           >
             <Field
+              label="Purchase Date"
+              error={purchaseForm.formState.errors.purchased_at?.message}
+            >
+              <Input type="date" {...purchaseForm.register("purchased_at")} />
+            </Field>
+
+            <Field
               label="Supplier"
               error={
-                (createForm.formState.errors as Record<string, { message?: string }>).supplier_id
+                (purchaseForm.formState.errors as Record<string, { message?: string }>).supplier_id
                   ?.message
               }
             >
               <Select
-                value={supplierId ? String(supplierId) : ""}
+                value={watchSupplierId ? String(watchSupplierId) : ""}
                 onValueChange={(v) =>
-                  createForm.setValue("supplier_id", Number(v), { shouldValidate: true })
+                  purchaseForm.setValue("supplier_id", Number(v), { shouldValidate: true })
                 }
               >
                 <SelectTrigger className="w-full">
@@ -866,14 +770,14 @@ export default function PurchaseRequestsPage() {
             <Field
               label="Product"
               error={
-                (createForm.formState.errors as Record<string, { message?: string }>).product_id
+                (purchaseForm.formState.errors as Record<string, { message?: string }>).product_id
                   ?.message
               }
             >
               <Select
-                value={productId ? String(productId) : ""}
+                value={watchProductId ? String(watchProductId) : ""}
                 onValueChange={(v) =>
-                  createForm.setValue("product_id", Number(v), { shouldValidate: true })
+                  purchaseForm.setValue("product_id", Number(v), { shouldValidate: true })
                 }
               >
                 <SelectTrigger className="w-full">
@@ -891,145 +795,99 @@ export default function PurchaseRequestsPage() {
               </Select>
             </Field>
 
-            <Field label="Requested Qty" error={createForm.formState.errors.requested_qty?.message}>
-              <Input
-                type="number"
-                min={1}
-                {...createForm.register("requested_qty", { valueAsNumber: true })}
-              />
-            </Field>
-
-            <Field label="Estimated Price per Unit (৳)">
-              <Input
-                type="number"
-                step="0.01"
-                placeholder="Optional"
-                {...createForm.register("estimated_price", {
-                  setValueAs: (v) => (v === "" || v === undefined ? null : Number(v)),
-                })}
-              />
-            </Field>
-
-            <Field label="Note">
-              <Textarea placeholder="Any additional info…" {...createForm.register("note")} />
-            </Field>
-
-            <div className="flex gap-2 pt-2">
-              <Button type="submit" disabled={createForm.formState.isSubmitting} className="w-1/2">
-                {createForm.formState.isSubmitting
-                  ? editTarget
-                    ? "Saving…"
-                    : "Submitting…"
-                  : editTarget
-                    ? "Save Changes"
-                    : "Submit Request"}
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => {
-                  setCreateOpen(false);
-                  setEditTarget(null);
-                }}
-                className="w-1/2"
+            <Field label="Unit">
+              <Select
+                value={String(watchUnit ?? "")}
+                onValueChange={(v) => purchaseForm.setValue("unit", v ?? "")}
               >
-                Cancel
-              </Button>
-            </div>
-          </form>
-        </SheetContent>
-      </Sheet>
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Select unit" />
+                </SelectTrigger>
+                <SelectContent>
+                  {UNIT_OPTIONS.map((u) => (
+                    <SelectItem key={u} value={u}>
+                      {u}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </Field>
 
-      {/* Mark as purchased sheet */}
-      <Sheet
-        open={purchaseTarget !== null}
-        onOpenChange={(open) => !open && setPurchaseTarget(null)}
-      >
-        <SheetContent className="w-full sm:max-w-md overflow-y-auto">
-          <SheetHeader>
-            <SheetTitle>Mark as Purchased</SheetTitle>
-          </SheetHeader>
-          <form
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            onSubmit={markPurchasedForm.handleSubmit(onMarkPurchased as any)}
-            className="mt-6 space-y-5 px-4 pb-8"
-          >
-            <Field
-              label="Actual Qty"
-              error={markPurchasedForm.formState.errors.actual_qty?.message}
-            >
+            <Field label="Quantity" error={purchaseForm.formState.errors.actual_qty?.message}>
               <Input
                 type="number"
                 min={1}
-                {...markPurchasedForm.register("actual_qty", { valueAsNumber: true })}
+                {...purchaseForm.register("actual_qty", { valueAsNumber: true })}
               />
             </Field>
 
             <Field
-              label="Actual Price per Unit (৳)"
-              error={markPurchasedForm.formState.errors.actual_price?.message}
+              label="Unit Price / Base (৳)"
+              error={purchaseForm.formState.errors.actual_price?.message}
             >
               <Input
                 type="number"
                 step="0.01"
-                {...markPurchasedForm.register("actual_price", { valueAsNumber: true })}
+                min={0}
+                {...purchaseForm.register("actual_price", { valueAsNumber: true })}
               />
             </Field>
 
-            {markComputedTotal > 0 && (
-              <div className="rounded-md bg-muted px-3 py-2 text-sm">
-                <span className="text-muted-foreground">Total: </span>
-                <span className="font-semibold">৳{markComputedTotal.toFixed(2)}</span>
+            <Field label="Transport Cost per Unit (৳)">
+              <Input
+                type="number"
+                step="0.01"
+                min={0}
+                {...purchaseForm.register("unit_transport_cost", { valueAsNumber: true })}
+              />
+            </Field>
+
+            <Field label="Label Cost per Unit (৳)">
+              <Input
+                type="number"
+                step="0.01"
+                min={0}
+                {...purchaseForm.register("unit_label_cost", { valueAsNumber: true })}
+              />
+            </Field>
+
+            <Field label="Other Cost per Unit (৳)">
+              <Input
+                type="number"
+                step="0.01"
+                min={0}
+                {...purchaseForm.register("unit_other_cost", { valueAsNumber: true })}
+              />
+            </Field>
+
+            {/* Live computed display */}
+            <div className="rounded-md bg-muted px-3 py-2 text-sm space-y-1">
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Unit Cost</span>
+                <span className="font-semibold tabular-nums">৳{computedUnitCost.toFixed(2)}</span>
               </div>
-            )}
-
-            <Field
-              label="Purchase Date"
-              error={markPurchasedForm.formState.errors.purchased_at?.message}
-            >
-              <Input type="date" {...markPurchasedForm.register("purchased_at")} />
-            </Field>
-
-            <Field label="Admin Note">
-              <Textarea {...markPurchasedForm.register("admin_note")} />
-            </Field>
-
-            <div className="border-t border-border pt-4">
-              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-3">
-                Initial Payment (Optional)
-              </p>
-              <Field
-                label="Amount Paid Now (৳)"
-                error={
-                  (markPurchasedForm.formState.errors as Record<string, { message?: string }>)
-                    .initial_payment_amount?.message
-                }
-              >
-                <Input
-                  type="number"
-                  step="0.01"
-                  min={0}
-                  placeholder="0"
-                  {...markPurchasedForm.register("initial_payment_amount", { valueAsNumber: true })}
-                />
-              </Field>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Total</span>
+                <span className="font-semibold tabular-nums">৳{computedTotal.toFixed(2)}</span>
+              </div>
             </div>
 
-            {purchaseTargetAssets.length > 0 && (
+            {/* Assets */}
+            {formAssets.length > 0 && (
               <div className="border-t border-border pt-4">
                 <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-3">
                   Assets Received (Optional)
                 </p>
                 <div className="space-y-3">
-                  {purchaseTargetAssets.map((a) => (
+                  {formAssets.map((a) => (
                     <Field key={a.id} label={a.name}>
                       <Input
                         type="number"
                         min={0}
                         placeholder="0"
-                        value={purchaseAssetQtys[a.id] ?? ""}
+                        value={formAssetQtys[a.id] ?? ""}
                         onChange={(e) =>
-                          setPurchaseAssetQtys((prev) => ({
+                          setFormAssetQtys((prev) => ({
                             ...prev,
                             [a.id]: Number(e.target.value),
                           }))
@@ -1041,18 +899,35 @@ export default function PurchaseRequestsPage() {
               </div>
             )}
 
+            <Field label="Note">
+              <Textarea placeholder="Any additional info…" {...purchaseForm.register("note")} />
+            </Field>
+
+            <Field label="Remarks">
+              <Textarea placeholder="Internal remarks…" {...purchaseForm.register("remarks")} />
+            </Field>
+
             <div className="flex gap-2 pt-2">
               <Button
                 type="submit"
-                disabled={markPurchasedForm.formState.isSubmitting}
+                disabled={purchaseForm.formState.isSubmitting}
                 className="w-1/2"
               >
-                {markPurchasedForm.formState.isSubmitting ? "Saving…" : "Confirm"}
+                {purchaseForm.formState.isSubmitting
+                  ? editTarget
+                    ? "Saving…"
+                    : "Creating…"
+                  : editTarget
+                    ? "Save Changes"
+                    : "Create Purchase"}
               </Button>
               <Button
                 type="button"
                 variant="outline"
-                onClick={() => setPurchaseTarget(null)}
+                onClick={() => {
+                  setCreateOpen(false);
+                  setEditTarget(null);
+                }}
                 className="w-1/2"
               >
                 Cancel
@@ -1150,37 +1025,15 @@ export default function PurchaseRequestsPage() {
         </SheetContent>
       </Sheet>
 
-      {/* Delete request confirm */}
+      {/* Delete confirm */}
       <ConfirmDialog
-        open={cancelTarget !== null}
-        onOpenChange={(open) => !open && setCancelTarget(null)}
-        title="Delete Request"
-        description={`Permanently delete the purchase request for "${cancelTarget?.product_name}"?`}
+        open={deleteTarget !== null}
+        onOpenChange={(open) => !open && setDeleteTarget(null)}
+        title="Delete Purchase"
+        description={`Permanently delete the purchase for "${deleteTarget?.product_name}"?`}
         confirmLabel="Delete"
-        loading={cancelling}
-        onConfirm={handleCancel}
-      />
-
-      {/* Approve confirm */}
-      <ConfirmDialog
-        open={approveTarget !== null}
-        onOpenChange={(open) => !open && setApproveTarget(null)}
-        title="Approve Request"
-        description={`Approve the purchase request for "${approveTarget?.product_name}" (${approveTarget?.requested_qty} ${approveTarget?.product_unit ?? "units"})?`}
-        confirmLabel="Approve"
-        loading={approving}
-        onConfirm={handleApprove}
-      />
-
-      {/* Reject confirm */}
-      <ConfirmDialog
-        open={rejectTarget !== null}
-        onOpenChange={(open) => !open && setRejectTarget(null)}
-        title="Reject Request"
-        description={`Reject the purchase request for "${rejectTarget?.product_name}"?`}
-        confirmLabel="Reject"
-        loading={rejecting}
-        onConfirm={handleReject}
+        loading={deleting}
+        onConfirm={handleDelete}
       />
 
       {/* Delete payment confirm */}
@@ -1208,60 +1061,44 @@ export default function PurchaseRequestsPage() {
             <div className="mt-6 px-4 pb-8 space-y-6">
               <section className="space-y-3">
                 <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                  Request
+                  Purchase Info
                 </h3>
                 <dl className="space-y-2">
-                  {isAdmin && detailsTarget.partner_name && (
-                    <DetailRow label="Partner" value={detailsTarget.partner_name} />
-                  )}
                   <DetailRow
                     label="Product"
                     value={`${detailsTarget.product_name ?? "—"} ${detailsTarget.product_unit ? `(${detailsTarget.product_unit})` : ""}`}
                   />
                   <DetailRow label="Supplier" value={detailsTarget.supplier_name ?? "—"} />
-                  <DetailRow label="Requested Qty" value={String(detailsTarget.requested_qty)} />
+                  <DetailRow label="Qty" value={String(detailsTarget.actual_qty ?? "—")} />
+                  {detailsTarget.unit && <DetailRow label="Unit" value={detailsTarget.unit} />}
                   <DetailRow
-                    label="Est. Price / Unit"
-                    value={
-                      detailsTarget.estimated_price
-                        ? `৳${Number(detailsTarget.estimated_price).toFixed(2)}`
-                        : "—"
-                    }
-                  />
-                  <DetailRow
-                    label="Est. Total"
-                    value={
-                      detailsTarget.estimated_total
-                        ? `৳${Number(detailsTarget.estimated_total).toFixed(2)}`
-                        : "—"
-                    }
-                  />
-                  {detailsTarget.note && <DetailRow label="Note" value={detailsTarget.note} />}
-                  <DetailRow
-                    label="Submitted"
-                    value={new Date(detailsTarget.created_at).toLocaleDateString()}
-                  />
-                </dl>
-              </section>
-
-              <div className="border-t border-border" />
-
-              <section className="space-y-3">
-                <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                  Purchase
-                </h3>
-                <dl className="space-y-2">
-                  <DetailRow label="Actual Qty" value={String(detailsTarget.actual_qty ?? "—")} />
-                  <DetailRow
-                    label="Actual Price / Unit"
+                    label="Unit Price"
                     value={
                       detailsTarget.actual_price
                         ? `৳${Number(detailsTarget.actual_price).toFixed(2)}`
                         : "—"
                     }
                   />
+                  {Number(detailsTarget.unit_transport_cost) > 0 && (
+                    <DetailRow
+                      label="Transport/Unit"
+                      value={`৳${Number(detailsTarget.unit_transport_cost).toFixed(2)}`}
+                    />
+                  )}
+                  {Number(detailsTarget.unit_label_cost) > 0 && (
+                    <DetailRow
+                      label="Label/Unit"
+                      value={`৳${Number(detailsTarget.unit_label_cost).toFixed(2)}`}
+                    />
+                  )}
+                  {Number(detailsTarget.unit_other_cost) > 0 && (
+                    <DetailRow
+                      label="Other/Unit"
+                      value={`৳${Number(detailsTarget.unit_other_cost).toFixed(2)}`}
+                    />
+                  )}
                   <DetailRow
-                    label="Actual Total"
+                    label="Total"
                     value={
                       detailsTarget.actual_total
                         ? `৳${Number(detailsTarget.actual_total).toFixed(2)}`
@@ -1276,8 +1113,9 @@ export default function PurchaseRequestsPage() {
                         : "—"
                     }
                   />
-                  {detailsTarget.admin_note && (
-                    <DetailRow label="Admin Note" value={detailsTarget.admin_note} />
+                  {detailsTarget.note && <DetailRow label="Note" value={detailsTarget.note} />}
+                  {detailsTarget.remarks && (
+                    <DetailRow label="Remarks" value={detailsTarget.remarks} />
                   )}
                 </dl>
               </section>
@@ -1305,17 +1143,15 @@ export default function PurchaseRequestsPage() {
                           </p>
                           {p.note && <p className="text-xs text-muted-foreground">{p.note}</p>}
                         </div>
-                        {isAdmin && (
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="size-6 text-destructive hover:bg-destructive/10 hover:text-destructive shrink-0"
-                            onClick={() => setDeletePaymentTarget(p)}
-                            title="Delete payment"
-                          >
-                            <Trash2 className="size-3" />
-                          </Button>
-                        )}
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="size-6 text-destructive hover:bg-destructive/10 hover:text-destructive shrink-0"
+                          onClick={() => setDeletePaymentTarget(p)}
+                          title="Delete payment"
+                        >
+                          <Trash2 className="size-3" />
+                        </Button>
                       </div>
                     ))}
                   </div>

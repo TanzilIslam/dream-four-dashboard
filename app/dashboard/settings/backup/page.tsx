@@ -17,6 +17,32 @@ import { toast } from "sonner";
 
 type Product = { id: number; name: string };
 
+const SAMPLE_TEMPLATES = [
+  {
+    key: "purchase",
+    label: "Purchase",
+    headers: [
+      "Date",
+      "Supplier",
+      "Product",
+      "Unit",
+      "Unit Price",
+      "Transport Cost",
+      "Label Cost",
+      "Others Cost",
+      "Actual Unit Cost",
+      "Qty",
+      "Total",
+      "Paid",
+      "Due",
+      "Note",
+      "Remarks",
+    ],
+  },
+] as const;
+
+type SampleKey = (typeof SAMPLE_TEMPLATES)[number]["key"];
+
 const REPORT_SHEETS = [
   { key: "summary", label: "Summary KPIs" },
   { key: "customers", label: "Customer Performance" },
@@ -24,7 +50,7 @@ const REPORT_SHEETS = [
   { key: "products", label: "Product Performance" },
   { key: "expenseBreakdown", label: "Expense Breakdown" },
   { key: "dues", label: "Outstanding Dues" },
-  { key: "supplies", label: "Supply History" },
+  { key: "supplies", label: "Purchases" },
 ] as const;
 
 type SheetKey = (typeof REPORT_SHEETS)[number]["key"];
@@ -36,7 +62,7 @@ const SHEET_LABELS: Record<SheetKey, string> = {
   products: "Product Performance",
   expenseBreakdown: "Expense Breakdown",
   dues: "Outstanding Dues",
-  supplies: "Supply History",
+  supplies: "Purchases",
 };
 
 const DB_TABLES = [
@@ -65,6 +91,75 @@ export default function ExportPage() {
   const [viewOpen, setViewOpen] = useState(false);
   const [viewData, setViewData] = useState<SheetData[]>([]);
   const [activeTab, setActiveTab] = useState<SheetKey | null>(null);
+
+  // Sample data state
+  const [selectedSamples, setSelectedSamples] = useState<Set<SampleKey>>(new Set());
+  const [sampleFormat, setSampleFormat] = useState("");
+  const [sampleLoading, setSampleLoading] = useState(false);
+
+  function toggleSample(key: SampleKey) {
+    setSelectedSamples((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  }
+
+  async function handleSampleExport() {
+    const templates = SAMPLE_TEMPLATES.filter((t) => selectedSamples.has(t.key));
+    if (templates.length === 0) return;
+    setSampleLoading(true);
+    try {
+      const baseName = `sample-${templates.map((t) => t.key).join("-")}`;
+
+      if (sampleFormat === "pdf") {
+        const { default: jsPDF } = await import("jspdf");
+        const { default: autoTable } = await import("jspdf-autotable");
+        const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
+
+        templates.forEach((t, idx) => {
+          if (idx > 0) doc.addPage();
+          doc.setFontSize(11);
+          doc.text(t.label, 10, 12);
+          // Empty rows for writing by hand
+          const emptyRows = Array.from({ length: 25 }, () => t.headers.map(() => ""));
+          autoTable(doc, {
+            startY: 16,
+            head: [[...t.headers]],
+            body: emptyRows,
+            styles: { fontSize: 9, cellPadding: 4, overflow: "linebreak", minCellHeight: 8 },
+            headStyles: {
+              fillColor: [30, 30, 30],
+              textColor: 255,
+              fontStyle: "bold",
+              cellPadding: 2.5,
+            },
+            margin: { top: 10, left: 10, right: 10, bottom: 8 },
+            tableWidth: "auto",
+          });
+        });
+
+        doc.save(`${baseName}.pdf`);
+      } else {
+        const { utils, writeFile } = await import("xlsx");
+        const wb = utils.book_new();
+        for (const t of templates) {
+          const ws = utils.aoa_to_sheet([[...t.headers]]);
+          // Set column widths for comfortable writing
+          ws["!cols"] = t.headers.map(() => ({ wch: 16 }));
+          utils.book_append_sheet(wb, ws, t.label);
+        }
+        writeFile(wb, `${baseName}.xlsx`);
+      }
+
+      toast.success("Sample downloaded");
+    } catch {
+      toast.error("Failed to generate sample");
+    } finally {
+      setSampleLoading(false);
+    }
+  }
 
   function toggleSheet(key: SheetKey) {
     setSelectedSheets((prev) => {
@@ -119,8 +214,8 @@ export default function ExportPage() {
         if (s.key === "customers")
           rows = addTotalsRow(
             rows,
-            ["Qty Sold", "Revenue (৳)", "Collected (৳)", "Due (৳)"],
-            "Customer"
+            ["Qty", "Sales", "Collection", "Due", "Due Collection", "Total Cost", "Net Value"],
+            "Date"
           );
         if (s.key === "dailyTrend")
           rows = addTotalsRow(rows, ["Orders", "Qty", "Revenue (৳)", "Collected (৳)"], "Date");
@@ -132,9 +227,13 @@ export default function ExportPage() {
           );
         if (s.key === "expenseBreakdown") rows = addTotalsRow(rows, ["Amount (৳)"], "Category");
         if (s.key === "dues")
-          rows = addTotalsRow(rows, ["Due (৳)", "Assets to Return", "Orders"], "Customer");
+          rows = addTotalsRow(
+            rows,
+            ["Qty", "Sales", "Collection", "Due", "Due Collection", "Total Cost", "Net Value"],
+            "Date"
+          );
         if (s.key === "supplies")
-          rows = addTotalsRow(rows, ["Qty", "Total (৳)", "Paid (৳)", "Due (৳)"], "Date");
+          rows = addTotalsRow(rows, ["Qty", "Total", "Paid", "Due"], "Date");
         return { key: s.key, label: SHEET_LABELS[s.key], rows };
       })
       .filter((s) => s.rows.length > 0);
@@ -268,7 +367,7 @@ export default function ExportPage() {
         </p>
       </div>
 
-      <div className="grid gap-6 md:grid-cols-2 max-w-3xl">
+      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 max-w-5xl">
         {/* Database Export card */}
         <div className="rounded-xl border bg-card p-6 space-y-4">
           <div>
@@ -400,6 +499,66 @@ export default function ExportPage() {
             </Button>
           </div>
         </div>
+
+        {/* Sample Data card */}
+        <div className="rounded-xl border bg-card p-6 space-y-4">
+          <div>
+            <p className="font-semibold">Sample Data</p>
+            <p className="text-sm text-muted-foreground mt-0.5">
+              Blank templates with headers for handwriting.
+            </p>
+          </div>
+
+          <ul className="space-y-1.5">
+            {SAMPLE_TEMPLATES.map((t) => (
+              <li key={t.key}>
+                <label className="flex items-center gap-2.5 cursor-pointer text-sm">
+                  <input
+                    type="checkbox"
+                    checked={selectedSamples.has(t.key)}
+                    onChange={() => toggleSample(t.key)}
+                    className="size-3.5 accent-primary cursor-pointer"
+                  />
+                  <span
+                    className={
+                      selectedSamples.has(t.key) ? "text-foreground" : "text-muted-foreground"
+                    }
+                  >
+                    {t.label}
+                  </span>
+                </label>
+              </li>
+            ))}
+          </ul>
+
+          <div className="space-y-3 pt-1">
+            <div className="space-y-1.5">
+              <Label className="text-xs text-muted-foreground">Format</Label>
+              <Select value={sampleFormat} onValueChange={(v) => setSampleFormat(v ?? "")}>
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Select format…" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="xlsx">Excel (.xlsx)</SelectItem>
+                  <SelectItem value="pdf">PDF (.pdf)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <Button
+            onClick={handleSampleExport}
+            disabled={sampleLoading || selectedSamples.size === 0 || !sampleFormat}
+            className="w-full"
+          >
+            {sampleLoading ? (
+              <Loader2 className="size-4 animate-spin" />
+            ) : (
+              <DownloadIcon className="size-4" />
+            )}
+            {sampleLoading ? "Generating…" : "Download"}
+          </Button>
+        </div>
       </div>
 
       {/* Report Preview Dialog */}
@@ -458,7 +617,7 @@ export default function ExportPage() {
                           {columns.map((col) => (
                             <td
                               key={col}
-                              className={`px-3 py-1.5 border border-border text-foreground whitespace-nowrap${isTotalRow ? " font-bold" : ""}`}
+                              className={`px-3 py-1.5 border border-border text-foreground whitespace-pre-line${isTotalRow ? " font-bold" : ""}`}
                             >
                               {String(row[col] ?? "—")}
                             </td>

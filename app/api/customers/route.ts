@@ -8,8 +8,13 @@ export async function GET(request: Request) {
 
   const { user } = auth;
   const url = new URL(request.url);
-  const onlyInactive = url.searchParams.get("inactive") === "true";
-  const activeFilter = onlyInactive ? sql`c.is_active = false` : sql`c.is_active = true`;
+  const statusParam = url.searchParams.get("status");
+  const activeFilter =
+    statusParam === "all"
+      ? sql`true`
+      : statusParam === "inactive"
+        ? sql`c.is_active = false`
+        : sql`c.is_active = true`;
 
   const customers =
     user.role === "admin"
@@ -20,6 +25,8 @@ export async function GET(request: Request) {
                  pt.unit_price AS tier_unit_price,
                  pt.min_qty    AS tier_min_qty,
                  p.unit        AS tier_product_unit,
+                 pt.product_id AS product_id,
+                 p.name        AS product_name,
                  u.name        AS partner_name,
                  COALESCE((SELECT COUNT(*) FROM orders o WHERE o.customer_id = c.id AND o.status != 'cancelled'), 0)::int AS total_orders,
                  COALESCE((SELECT SUM(o.quantity) FROM orders o WHERE o.customer_id = c.id AND o.status != 'cancelled'), 0)::int AS total_quantity,
@@ -46,6 +53,8 @@ export async function GET(request: Request) {
                  pt.unit_price AS tier_unit_price,
                  pt.min_qty    AS tier_min_qty,
                  p.unit        AS tier_product_unit,
+                 pt.product_id AS product_id,
+                 p.name        AS product_name,
                  COALESCE((SELECT COUNT(*) FROM orders o WHERE o.customer_id = c.id AND o.status != 'cancelled'), 0)::int AS total_orders,
                  COALESCE((SELECT SUM(o.quantity) FROM orders o WHERE o.customer_id = c.id AND o.status != 'cancelled'), 0)::int AS total_quantity,
                  COALESCE((SELECT SUM(o.paid_amount) FROM orders o WHERE o.customer_id = c.id AND o.status != 'cancelled'), 0)::numeric AS total_paid,

@@ -162,6 +162,13 @@ export async function GET() {
     )
   `;
 
+  // ── Purchase request cost-breakdown columns ──────────────────
+  await sql`ALTER TABLE purchase_requests ADD COLUMN IF NOT EXISTS unit TEXT`;
+  await sql`ALTER TABLE purchase_requests ADD COLUMN IF NOT EXISTS unit_transport_cost NUMERIC(12,2) DEFAULT 0`;
+  await sql`ALTER TABLE purchase_requests ADD COLUMN IF NOT EXISTS unit_label_cost NUMERIC(12,2) DEFAULT 0`;
+  await sql`ALTER TABLE purchase_requests ADD COLUMN IF NOT EXISTS unit_other_cost NUMERIC(12,2) DEFAULT 0`;
+  await sql`ALTER TABLE purchase_requests ADD COLUMN IF NOT EXISTS remarks TEXT`;
+
   await sql`
     CREATE TABLE IF NOT EXISTS supplier_payments (
       id                    SERIAL PRIMARY KEY,
@@ -381,6 +388,28 @@ export async function GET() {
       quantity            INTEGER NOT NULL CHECK (quantity > 0),
       created_at          TIMESTAMPTZ DEFAULT NOW()
     )
+  `;
+
+  // ── Order cost-breakdown columns ──────────────────────────
+  await sql`ALTER TABLE orders ADD COLUMN IF NOT EXISTS unit           TEXT`;
+  await sql`ALTER TABLE orders ADD COLUMN IF NOT EXISTS unit_cost      NUMERIC(12,2) DEFAULT 0`;
+  await sql`ALTER TABLE orders ADD COLUMN IF NOT EXISTS unit_label_cost NUMERIC(12,2) DEFAULT 0`;
+  await sql`ALTER TABLE orders ADD COLUMN IF NOT EXISTS unit_other_cost NUMERIC(12,2) DEFAULT 0`;
+  await sql`ALTER TABLE orders ADD COLUMN IF NOT EXISTS collection     NUMERIC(12,2) DEFAULT 0`;
+  await sql`ALTER TABLE orders ADD COLUMN IF NOT EXISTS total_cost     NUMERIC(12,2) DEFAULT 0`;
+  await sql`ALTER TABLE orders ADD COLUMN IF NOT EXISTS net_value      NUMERIC(12,2) DEFAULT 0`;
+
+  // Backfill existing rows
+  await sql`
+    UPDATE orders SET
+      unit = (SELECT p.unit FROM products p WHERE p.id = orders.product_id),
+      collection = paid_amount,
+      unit_cost = 0,
+      unit_label_cost = 0,
+      unit_other_cost = 0,
+      total_cost = 0,
+      net_value = total_amount
+    WHERE unit IS NULL
   `;
 
   await sql`

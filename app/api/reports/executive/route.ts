@@ -159,23 +159,27 @@ export async function GET(request: Request) {
       // Sheet 2: Customer Performance
       sql`
       SELECT
-        c.name                                  AS "Customer",
-        COALESCE(a.name, '—')                   AS "Area",
-        COUNT(o.id)::int                        AS "Orders",
-        COALESCE(SUM(o.quantity), 0)::int       AS "Qty Sold",
-        COALESCE(SUM(o.total_amount), 0)::numeric AS "Revenue (৳)",
-        COALESCE(SUM(o.paid_amount), 0)::numeric  AS "Collected (৳)",
-        COALESCE(SUM(o.due_amount), 0)::numeric   AS "Due (৳)",
-        GREATEST(0,
-          COALESCE((SELECT SUM(oa.quantity) FROM order_assets oa JOIN orders ox ON ox.id = oa.order_id WHERE ox.customer_id = c.id), 0)
-          - COALESCE((SELECT SUM(oar.quantity) FROM order_asset_returns oar JOIN orders ox ON ox.id = oar.order_id WHERE ox.customer_id = c.id), 0)
-        )::int AS "Unreturned Assets"
+        o.ordered_at::date                                        AS "Date",
+        CASE WHEN c.phone IS NOT NULL AND c.phone != '' THEN c.name || E'\n' || c.phone ELSE c.name END AS "Customer",
+        p.name                                                    AS "Product",
+        COALESCE(o.unit, p.unit)                                  AS "Unit",
+        o.quantity::int                                           AS "Qty",
+        COALESCE(o.unit_cost, 0)::numeric                        AS "Unit Cost",
+        o.total_amount::numeric                                   AS "Sales",
+        COALESCE(o.collection, 0)::numeric                       AS "Collection",
+        o.due_amount::numeric                                     AS "Due",
+        COALESCE((SELECT SUM(py.amount) FROM payments py WHERE py.order_id = o.id), 0)::numeric AS "Due Collection",
+        COALESCE(o.unit_label_cost, 0)::numeric                  AS "Labels",
+        COALESCE(o.unit_other_cost, 0)::numeric                  AS "Other Cost",
+        COALESCE(o.total_cost, 0)::numeric                       AS "Total Cost",
+        COALESCE(o.net_value, 0)::numeric                        AS "Net Value",
+        COALESCE(o.note, '')                                     AS "Remarks"
       FROM orders o
       JOIN customers c ON c.id = o.customer_id
+      JOIN products p  ON p.id = o.product_id
       LEFT JOIN areas a ON a.id = c.area_id
       WHERE o.status != 'cancelled' ${productFilter} ${dateFilter}
-      GROUP BY c.id, c.name, a.name
-      ORDER BY SUM(o.total_amount) DESC
+      ORDER BY o.ordered_at DESC
     `,
 
       // Sheet 3: Daily Sales Trend
@@ -234,49 +238,58 @@ export async function GET(request: Request) {
       ORDER BY SUM(e.amount) DESC
     `,
 
-      // Sheet 6: Outstanding Dues
+      // Sheet 6: Outstanding Dues (one row per order with due > 0)
       sql`
       SELECT
-        c.name                                   AS "Customer",
-        COALESCE(c.phone, '—')                   AS "Phone",
-        COALESCE(a.name, '—')                    AS "Area",
-        COALESCE(SUM(o.due_amount), 0)::numeric  AS "Due (৳)",
-        GREATEST(0,
-          COALESCE((SELECT SUM(oa.quantity) FROM order_assets oa JOIN orders ox ON ox.id = oa.order_id WHERE ox.customer_id = c.id), 0)
-          - COALESCE((SELECT SUM(oar.quantity) FROM order_asset_returns oar JOIN orders ox ON ox.id = oar.order_id WHERE ox.customer_id = c.id), 0)
-        )::int                                   AS "Assets to Return",
-        COUNT(o.id)::int                         AS "Orders",
-        MAX(o.ordered_at)::date                  AS "Last Order"
+        o.ordered_at::date                                        AS "Date",
+        CASE WHEN c.phone IS NOT NULL AND c.phone != '' THEN c.name || E'\n' || c.phone ELSE c.name END AS "Customer",
+        p.name                                                    AS "Product",
+        COALESCE(o.unit, p.unit)                                  AS "Unit",
+        o.quantity::int                                           AS "Qty",
+        COALESCE(o.unit_cost, 0)::numeric                        AS "Unit Cost",
+        o.total_amount::numeric                                   AS "Sales",
+        COALESCE(o.collection, 0)::numeric                       AS "Collection",
+        o.due_amount::numeric                                     AS "Due",
+        COALESCE((SELECT SUM(py.amount) FROM payments py WHERE py.order_id = o.id), 0)::numeric AS "Due Collection",
+        COALESCE(o.unit_label_cost, 0)::numeric                  AS "Labels",
+        COALESCE(o.unit_other_cost, 0)::numeric                  AS "Other Cost",
+        COALESCE(o.total_cost, 0)::numeric                       AS "Total Cost",
+        COALESCE(o.net_value, 0)::numeric                        AS "Net Value",
+        COALESCE(o.note, '')                                     AS "Remarks"
       FROM orders o
       JOIN customers c ON c.id = o.customer_id
+      JOIN products p  ON p.id = o.product_id
       LEFT JOIN areas a ON a.id = c.area_id
-      WHERE o.status = 'delivered' AND o.due_amount > 0 ${productFilter} ${dateFilter}
-      GROUP BY c.id, c.name, c.phone, a.name
-      HAVING SUM(o.due_amount) > 0
-      ORDER BY SUM(o.due_amount) DESC
+      WHERE o.due_amount > 0 AND o.status != 'cancelled' ${productFilter} ${dateFilter}
+      ORDER BY o.due_amount DESC
     `,
 
-      // Sheet 7: Supply / Purchase History
+      // Sheet 7: Purchases
       sql`
       SELECT
         pr.purchased_at::date                                   AS "Date",
-        COALESCE(s.name, '—')                                   AS "Supplier",
+        CASE WHEN s.phone IS NOT NULL AND s.phone != '' THEN s.name || E'\n' || s.phone ELSE COALESCE(s.name, '—') END AS "Supplier",
         p.name                                                  AS "Product",
+        COALESCE(pr.unit, p.unit)                               AS "Unit",
+        pr.actual_price::numeric                                AS "Unit Price",
+        COALESCE(pr.unit_transport_cost, 0)::numeric            AS "Transport Cost",
+        COALESCE(pr.unit_label_cost, 0)::numeric                AS "Label Cost",
+        COALESCE(pr.unit_other_cost, 0)::numeric                AS "Others Cost",
+        (pr.actual_price + COALESCE(pr.unit_transport_cost, 0) + COALESCE(pr.unit_label_cost, 0) + COALESCE(pr.unit_other_cost, 0))::numeric AS "Actual Unit Cost",
         pr.actual_qty::int                                      AS "Qty",
-        p.unit                                                  AS "Unit",
-        pr.actual_price::numeric                                AS "Unit Price (৳)",
-        pr.actual_total::numeric                                AS "Total (৳)",
+        pr.actual_total::numeric                                AS "Total",
         COALESCE((
           SELECT SUM(sp.amount)
           FROM supplier_payments sp
           WHERE sp.purchase_request_id = pr.id
-        ), 0)::numeric                                          AS "Paid (৳)",
+        ), 0)::numeric                                          AS "Paid",
         (pr.actual_total - COALESCE((
           SELECT SUM(sp.amount)
           FROM supplier_payments sp
           WHERE sp.purchase_request_id = pr.id
-        ), 0))::numeric                                         AS "Due (৳)",
-        pr.note                                                 AS "Note"
+        ), 0))::numeric                                         AS "Due",
+        pr.note                                                 AS "Note",
+        pr.remarks                                              AS "Remarks"
       FROM purchase_requests pr
       JOIN products p ON p.id = pr.product_id
       LEFT JOIN suppliers s ON s.id = pr.supplier_id
@@ -290,7 +303,7 @@ export async function GET(request: Request) {
       ? new Date(d as string).toLocaleDateString("en-GB", {
           day: "numeric",
           month: "long",
-          year: "numeric",
+          year: "2-digit",
         })
       : "—";
 
@@ -350,7 +363,7 @@ export async function GET(request: Request) {
 
   const formattedDues = dues.map((r: Record<string, unknown>) => ({
     ...r,
-    "Last Order": fmt(r["Last Order"]),
+    Date: fmt(r["Date"]),
   }));
 
   const formattedSupplies = supplies.map((r: Record<string, unknown>) => ({
@@ -358,9 +371,14 @@ export async function GET(request: Request) {
     Date: fmt(r["Date"]),
   }));
 
+  const formattedCustomers = customers.map((r: Record<string, unknown>) => ({
+    ...r,
+    Date: fmt(r["Date"]),
+  }));
+
   return Response.json({
     summary: summaryRows,
-    customers,
+    customers: formattedCustomers,
     dailyTrend: formattedDailyTrend,
     products,
     expenseBreakdown,

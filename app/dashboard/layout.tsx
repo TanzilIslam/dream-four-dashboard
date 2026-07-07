@@ -57,9 +57,8 @@ const navSections: NavSection[] = [
     items: [
       { label: "Customers", href: "/dashboard/customers", icon: ContactRound },
       { label: "Orders", href: "/dashboard/orders", icon: ShoppingCart },
-      { label: "Purchase Requests", href: "/dashboard/purchase-requests", icon: ClipboardList },
+      { label: "Purchases", href: "/dashboard/purchase-requests", icon: ClipboardList },
       { label: "Stock", href: "/dashboard/stock", icon: Boxes },
-      // { label: "Returns", href: "/dashboard/returns", icon: Undo2 },
     ],
   },
   {
@@ -67,22 +66,8 @@ const navSections: NavSection[] = [
     items: [
       { label: "Expenses", href: "/dashboard/expenses", icon: Wallet },
       { label: "Loans", href: "/dashboard/loans", icon: HandCoins },
-      // { label: "Cash Remittances", href: "/dashboard/cash-remittances", icon: Banknote },
-      // { label: "Dues", href: "/dashboard/dues", icon: AlertCircle },
     ],
   },
-  // {
-  //   label: "People",
-  //   items: [
-  //     { label: "Attendance", href: "/dashboard/attendance", icon: CalendarCheck },
-  //     { label: "Tasks", href: "/dashboard/tasks", icon: CheckSquare },
-  //     { label: "Daily Reports", href: "/dashboard/daily-reports", icon: FileText },
-  //   ],
-  // },
-  // {
-  //   label: "Reports",
-  //   items: [{ label: "Reports", href: "/dashboard/reports", icon: BarChart3 }],
-  // },
   {
     label: "Admin",
     adminOnly: true,

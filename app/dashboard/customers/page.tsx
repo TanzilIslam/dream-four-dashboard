@@ -59,6 +59,8 @@ type Customer = {
   tier_min_qty: number | null;
   tier_product_unit: string | null;
   partner_name: string | null;
+  product_id: number | null;
+  product_name: string | null;
   due_allowed: boolean;
   max_due: string;
   delivery_frequency: string;
@@ -112,6 +114,8 @@ type Tier = { id: number; name: string; unit_price: string; min_qty: number; pro
 
 type Mode = "create" | "edit";
 
+type Product = { id: number; name: string };
+
 type Filters = {
   search: string;
   area_id: string;
@@ -120,6 +124,7 @@ type Filters = {
   due_allowed: string;
   status: string;
   delivery_frequency: string;
+  product_id: string;
 };
 
 const DEFAULT_FILTERS: Filters = {
@@ -128,14 +133,16 @@ const DEFAULT_FILTERS: Filters = {
   customer_type: "all",
   pricing_tier_id: "all",
   due_allowed: "all",
-  status: "active",
+  status: "all",
   delivery_frequency: "all",
+  product_id: "all",
 };
 
 export default function CustomersPage() {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [areas, setAreas] = useState<Area[]>([]);
   const [tiers, setTiers] = useState<Tier[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
   const [paymentDefaults, setPaymentDefaults] = useState<{
     due_allowed: boolean;
     max_due_per_customer: string;
@@ -171,8 +178,7 @@ export default function CustomersPage() {
     | "assets_asc"
   >("none");
 
-  // Fetch inactive from API when status filter requires it
-  const showInactive = filters.status !== "active";
+  const statusParam = filters.status; // "all" | "active" | "inactive"
 
   const createForm = useForm<CreateCustomerInput>({
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -274,10 +280,11 @@ export default function CustomersPage() {
   // Active filter count (excludes defaults)
   const activeFilterCount = [
     filters.search !== "",
+    filters.status !== "all",
+    filters.product_id !== "all",
     filters.area_id !== "all",
     filters.customer_type !== "all",
     filters.pricing_tier_id !== "all",
-    filters.status !== "active",
   ].filter(Boolean).length;
 
   // Frontend filtering + sorting
@@ -288,6 +295,8 @@ export default function CustomersPage() {
         !c.name.toLowerCase().includes(filters.search.toLowerCase()) &&
         !(c.phone ?? "").includes(filters.search)
       )
+        return false;
+      if (filters.product_id !== "all" && String(c.product_id ?? "none") !== filters.product_id)
         return false;
       if (filters.area_id !== "all" && String(c.area_id) !== filters.area_id) return false;
       if (filters.customer_type !== "all" && (c.customer_type ?? "none") !== filters.customer_type)
@@ -301,8 +310,10 @@ export default function CustomersPage() {
         if (filters.due_allowed === "yes" && !c.due_allowed) return false;
         if (filters.due_allowed === "no" && c.due_allowed) return false;
       }
-      if (filters.status === "active" && !c.is_active) return false;
-      if (filters.status === "inactive" && c.is_active) return false;
+      if (filters.status !== "all") {
+        if (filters.status === "active" && !c.is_active) return false;
+        if (filters.status === "inactive" && c.is_active) return false;
+      }
       if (
         filters.delivery_frequency !== "all" &&
         c.delivery_frequency !== filters.delivery_frequency
@@ -344,13 +355,13 @@ export default function CustomersPage() {
     });
 
   useEffect(() => {
-    fetch(`/api/customers${showInactive ? "?inactive=true" : ""}`)
+    fetch(`/api/customers?status=${statusParam}`)
       .then((res) => res.json())
       .then((data) => {
         setCustomers(data);
         setLoading(false);
       });
-  }, [showInactive]);
+  }, [statusParam]);
 
   useEffect(() => {
     fetch("/api/settings/areas")
@@ -359,6 +370,9 @@ export default function CustomersPage() {
     fetch("/api/settings/pricing-tiers")
       .then((res) => res.json())
       .then((data) => setTiers(data));
+    fetch("/api/settings/products")
+      .then((res) => res.json())
+      .then((data) => setProducts(data));
     fetch("/api/settings/payment-config")
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => data && setPaymentDefaults(data));
@@ -382,7 +396,7 @@ export default function CustomersPage() {
   }, [viewingCustomer]);
 
   async function refreshCustomers() {
-    const res = await fetch(`/api/customers${showInactive ? "?inactive=true" : ""}`);
+    const res = await fetch(`/api/customers?status=${statusParam}`);
     setCustomers(await res.json());
   }
 
@@ -524,7 +538,7 @@ export default function CustomersPage() {
             variant="outline"
             size="sm"
             onClick={() => setFilterOpen((v) => !v)}
-            className="relative"
+            className="relative md:hidden"
           >
             <SlidersHorizontal className="size-4" />
             Filters
@@ -541,114 +555,15 @@ export default function CustomersPage() {
         </div>
       </div>
 
-      {/* Desktop inline filter panel */}
-      {filterOpen && !isMobile && (
-        <div className="hidden md:block rounded-lg border border-border bg-card p-4 space-y-4">
-          <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4 items-start">
-            <FilterSection label="Search">
-              <Input
-                placeholder="Name or phone…"
-                value={filters.search}
-                onChange={(e) => setFilter("search", e.target.value)}
-              />
-            </FilterSection>
-            <FilterSection label="Status">
-              <Select
-                value={filters.status}
-                onValueChange={(v) => setFilter("status", v ?? "active")}
-              >
-                <SelectTrigger className="w-full">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="active">Active</SelectItem>
-                  <SelectItem value="inactive">Inactive</SelectItem>
-                </SelectContent>
-              </Select>
-            </FilterSection>
-            <FilterSection label="Customer Type">
-              <Select
-                value={filters.customer_type}
-                onValueChange={(v) => setFilter("customer_type", v ?? "all")}
-              >
-                <SelectTrigger className="w-full">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All</SelectItem>
-                  <SelectItem value="home">Home</SelectItem>
-                  <SelectItem value="confectionery">Confectionery</SelectItem>
-                  <SelectItem value="hotel">Hotel</SelectItem>
-                  <SelectItem value="restaurant">Restaurant</SelectItem>
-                  <SelectItem value="madrasha">Madrasha</SelectItem>
-                  <SelectItem value="none">Not set</SelectItem>
-                </SelectContent>
-              </Select>
-            </FilterSection>
-            <FilterSection label="Area">
-              <Select
-                value={filters.area_id}
-                onValueChange={(v) => setFilter("area_id", v ?? "all")}
-              >
-                <SelectTrigger className="w-full">
-                  <SelectValue>
-                    {filters.area_id === "all"
-                      ? "All areas"
-                      : (areas.find((a) => String(a.id) === filters.area_id)?.name ?? "All areas")}
-                  </SelectValue>
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All areas</SelectItem>
-                  {areas.map((a) => (
-                    <SelectItem key={a.id} value={String(a.id)}>
-                      {a.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </FilterSection>
-            <FilterSection label="Pricing Tier">
-              <Select
-                value={filters.pricing_tier_id}
-                onValueChange={(v) => setFilter("pricing_tier_id", v ?? "all")}
-              >
-                <SelectTrigger className="w-full">
-                  <SelectValue>
-                    {filters.pricing_tier_id === "all"
-                      ? "All tiers"
-                      : filters.pricing_tier_id === "none"
-                        ? "No tier"
-                        : (() => {
-                            const t = tiers.find((t) => String(t.id) === filters.pricing_tier_id);
-                            return t ? `${t.name} — ${t.unit_price}tk` : "All tiers";
-                          })()}
-                  </SelectValue>
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All tiers</SelectItem>
-                  <SelectItem value="none">No tier</SelectItem>
-                  {tiers.map((t) => (
-                    <SelectItem key={t.id} value={String(t.id)}>
-                      {t.name} — {t.unit_price}tk
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </FilterSection>
-          </div>
-          {activeFilterCount > 0 && (
-            <div className="flex justify-end">
-              <button
-                onClick={() => setFilters(DEFAULT_FILTERS)}
-                className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1 transition-colors"
-              >
-                <X className="size-3" />
-                Clear all
-              </button>
-            </div>
-          )}
-        </div>
-      )}
+      {/* Desktop inline filter bar */}
+      <div className="hidden md:block">
+        <Input
+          placeholder="Search by name or phone…"
+          value={filters.search}
+          onChange={(e) => setFilter("search", e.target.value)}
+          className="max-w-sm"
+        />
+      </div>
 
       <div className="rounded-lg border border-border overflow-hidden">
         <Table>
@@ -791,89 +706,37 @@ export default function CustomersPage() {
 
             {/* Status */}
             <FilterSection label="Status">
-              <Select
-                value={filters.status}
-                onValueChange={(v) => setFilter("status", v ?? "active")}
-              >
+              <Select value={filters.status} onValueChange={(v) => setFilter("status", v ?? "all")}>
                 <SelectTrigger className="w-full">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="all">All</SelectItem>
                   <SelectItem value="active">Active</SelectItem>
                   <SelectItem value="inactive">Inactive</SelectItem>
                 </SelectContent>
               </Select>
             </FilterSection>
 
-            {/* Customer Type */}
-            <FilterSection label="Customer Type">
+            {/* Product */}
+            <FilterSection label="Product">
               <Select
-                value={filters.customer_type}
-                onValueChange={(v) => setFilter("customer_type", v ?? "all")}
-              >
-                <SelectTrigger className="w-full">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All</SelectItem>
-                  <SelectItem value="home">Home</SelectItem>
-                  <SelectItem value="confectionery">Confectionery</SelectItem>
-                  <SelectItem value="hotel">Hotel</SelectItem>
-                  <SelectItem value="restaurant">Restaurant</SelectItem>
-                  <SelectItem value="madrasha">Madrasha</SelectItem>
-                  <SelectItem value="none">Not set</SelectItem>
-                </SelectContent>
-              </Select>
-            </FilterSection>
-
-            {/* Area */}
-            <FilterSection label="Area">
-              <Select
-                value={filters.area_id}
-                onValueChange={(v) => setFilter("area_id", v ?? "all")}
+                value={filters.product_id}
+                onValueChange={(v) => setFilter("product_id", v ?? "all")}
               >
                 <SelectTrigger className="w-full">
                   <SelectValue>
-                    {filters.area_id === "all"
-                      ? "All areas"
-                      : (areas.find((a) => String(a.id) === filters.area_id)?.name ?? "All areas")}
+                    {filters.product_id === "all"
+                      ? "All products"
+                      : (products.find((p) => String(p.id) === filters.product_id)?.name ??
+                        "All products")}
                   </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All areas</SelectItem>
-                  {areas.map((a) => (
-                    <SelectItem key={a.id} value={String(a.id)}>
-                      {a.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </FilterSection>
-
-            {/* Pricing Tier */}
-            <FilterSection label="Pricing Tier">
-              <Select
-                value={filters.pricing_tier_id}
-                onValueChange={(v) => setFilter("pricing_tier_id", v ?? "all")}
-              >
-                <SelectTrigger className="w-full">
-                  <SelectValue>
-                    {filters.pricing_tier_id === "all"
-                      ? "All tiers"
-                      : filters.pricing_tier_id === "none"
-                        ? "No tier"
-                        : (() => {
-                            const t = tiers.find((t) => String(t.id) === filters.pricing_tier_id);
-                            return t ? `${t.name} — ${t.unit_price}tk` : "All tiers";
-                          })()}
-                  </SelectValue>
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All tiers</SelectItem>
-                  <SelectItem value="none">No tier</SelectItem>
-                  {tiers.map((t) => (
-                    <SelectItem key={t.id} value={String(t.id)}>
-                      {t.name} — {t.unit_price}tk
+                  <SelectItem value="all">All products</SelectItem>
+                  {products.map((p) => (
+                    <SelectItem key={p.id} value={String(p.id)}>
+                      {p.name}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -1332,9 +1195,17 @@ export default function CustomersPage() {
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-function FilterSection({ label, children }: { label: string; children: React.ReactNode }) {
+function FilterSection({
+  label,
+  children,
+  className,
+}: {
+  label: string;
+  children: React.ReactNode;
+  className?: string;
+}) {
   return (
-    <div className="space-y-2">
+    <div className={`space-y-2 ${className ?? ""}`}>
       <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{label}</p>
       {children}
     </div>

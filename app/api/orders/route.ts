@@ -20,6 +20,7 @@ export async function GET(request: Request) {
       ? await sql`
           SELECT o.*,
                  c.name  AS customer_name,
+                 c.phone AS customer_phone,
                  a.name  AS area_name,
                  p.name  AS product_name,
                  p.unit  AS product_unit,
@@ -28,7 +29,8 @@ export async function GET(request: Request) {
                    COALESCE((SELECT SUM(oa.quantity) FROM order_assets oa WHERE oa.order_id = o.id), 0)
                    - COALESCE((SELECT SUM(oar.quantity) FROM order_asset_returns oar WHERE oar.order_id = o.id), 0)
                  )::int AS unreturned_assets,
-                 (SELECT MAX(py.paid_at) FROM payments py WHERE py.order_id = o.id) AS last_payment_date
+                 (SELECT MAX(py.paid_at) FROM payments py WHERE py.order_id = o.id) AS last_payment_date,
+                 COALESCE((SELECT SUM(py.amount) FROM payments py WHERE py.order_id = o.id), 0)::numeric AS due_collection
           FROM orders o
           LEFT JOIN customers c ON c.id = o.customer_id
           LEFT JOIN areas a     ON a.id = o.area_id
@@ -40,6 +42,7 @@ export async function GET(request: Request) {
       : await sql`
           SELECT o.*,
                  c.name  AS customer_name,
+                 c.phone AS customer_phone,
                  a.name  AS area_name,
                  p.name  AS product_name,
                  p.unit  AS product_unit,
@@ -47,7 +50,8 @@ export async function GET(request: Request) {
                    COALESCE((SELECT SUM(oa.quantity) FROM order_assets oa WHERE oa.order_id = o.id), 0)
                    - COALESCE((SELECT SUM(oar.quantity) FROM order_asset_returns oar WHERE oar.order_id = o.id), 0)
                  )::int AS unreturned_assets,
-                 (SELECT MAX(py.paid_at) FROM payments py WHERE py.order_id = o.id) AS last_payment_date
+                 (SELECT MAX(py.paid_at) FROM payments py WHERE py.order_id = o.id) AS last_payment_date,
+                 COALESCE((SELECT SUM(py.amount) FROM payments py WHERE py.order_id = o.id), 0)::numeric AS due_collection
           FROM orders o
           LEFT JOIN customers c ON c.id = o.customer_id
           LEFT JOIN areas a     ON a.id = o.area_id
@@ -74,6 +78,9 @@ export async function POST(request: Request) {
   const total_amount = d.unit_price * d.quantity;
   const paid_amount = d.paid_amount ?? 0;
   const due_amount = total_amount - paid_amount;
+  const collection = paid_amount;
+  const total_cost = (d.unit_cost + d.unit_label_cost + d.unit_other_cost) * d.quantity;
+  const net_value = total_amount - total_cost;
 
   // Fetch customer to get area_id and check due limit
   const [customer] = await sql`SELECT * FROM customers WHERE id = ${d.customer_id}`;
@@ -109,12 +116,16 @@ export async function POST(request: Request) {
   const [order] = await sql`
     INSERT INTO orders (
       partner_id, customer_id, area_id, product_id,
-      quantity, unit_price, total_amount,
-      paid_amount, due_amount, status, note
+      quantity, unit, unit_price, total_amount,
+      paid_amount, due_amount, status, note,
+      unit_cost, unit_label_cost, unit_other_cost,
+      collection, total_cost, net_value, ordered_at
     ) VALUES (
       ${user.id}, ${d.customer_id}, ${customer.area_id}, ${d.product_id},
-      ${d.quantity}, ${d.unit_price}, ${total_amount},
-      ${paid_amount}, ${due_amount}, 'pending', ${d.note || null}
+      ${d.quantity}, ${d.unit || null}, ${d.unit_price}, ${total_amount},
+      ${paid_amount}, ${due_amount}, 'pending', ${d.note || null},
+      ${d.unit_cost}, ${d.unit_label_cost}, ${d.unit_other_cost},
+      ${collection}, ${total_cost}, ${net_value}, ${d.ordered_at}::TIMESTAMPTZ
     )
     RETURNING *
   `;

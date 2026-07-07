@@ -1,160 +1,65 @@
 import { sql } from "@/lib/db";
-import { requireUser, requireAdmin } from "@/lib/auth";
-import {
-  createPurchaseRequestSchema,
-  approvePurchaseRequestSchema,
-  rejectPurchaseRequestSchema,
-  markPurchasedSchema,
-} from "@/lib/schemas/purchase-request";
+import { requireAdmin } from "@/lib/auth";
+import { createPurchaseSchema } from "@/lib/schemas/purchase-request";
 
 async function getRequest(id: number) {
   const [req] = await sql`SELECT * FROM purchase_requests WHERE id = ${id}`;
   return req ?? null;
 }
 
-// PATCH /api/purchase-requests/[id]
-// body: { action: "approve" | "reject" | "mark-purchased", ...fields }
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const auth = await requireUser();
+  const auth = await requireAdmin();
   if ("error" in auth) return auth.error;
 
-  const { user } = auth;
   const { id } = await params;
   const pr = await getRequest(Number(id));
   if (!pr) return Response.json({ error: "Not found" }, { status: 404 });
 
-  const body = await request.json();
-  const { action, ...rest } = body as { action: string } & Record<string, unknown>;
-
-  if (action === "approve" || action === "reject") {
-    if (user.role !== "admin") {
-      return Response.json({ error: "Forbidden" }, { status: 403 });
-    }
-    if (pr.status !== "pending") {
-      return Response.json(
-        { error: "Only pending requests can be approved or rejected" },
-        { status: 400 }
-      );
-    }
-
-    if (action === "approve") {
-      const parsed = approvePurchaseRequestSchema.safeParse(rest);
-      if (!parsed.success) {
-        return Response.json({ error: parsed.error.flatten().fieldErrors }, { status: 400 });
-      }
-      const [updated] = await sql`
-        UPDATE purchase_requests SET
-          status      = 'approved',
-          admin_note  = ${parsed.data.admin_note || null},
-          approved_by = ${user.id},
-          approved_at = NOW()
-        WHERE id = ${id}
-        RETURNING *
-      `;
-      return Response.json(updated);
-    }
-
-    // reject
-    const parsed = rejectPurchaseRequestSchema.safeParse(rest);
-    if (!parsed.success) {
-      return Response.json({ error: parsed.error.flatten().fieldErrors }, { status: 400 });
-    }
-    const [updated] = await sql`
-      UPDATE purchase_requests SET
-        status     = 'rejected',
-        admin_note = ${parsed.data.admin_note || null}
-      WHERE id = ${id}
-      RETURNING *
-    `;
-    return Response.json(updated);
+  const parsed = createPurchaseSchema.safeParse(await request.json());
+  if (!parsed.success) {
+    return Response.json({ error: parsed.error.flatten().fieldErrors }, { status: 400 });
   }
 
-  if (action === "mark-purchased") {
-    if (user.role !== "admin") {
-      return Response.json({ error: "Forbidden" }, { status: 403 });
-    }
-    if (pr.status !== "approved") {
-      return Response.json(
-        { error: "Only approved requests can be marked as purchased" },
-        { status: 400 }
-      );
-    }
+  const d = parsed.data;
+  const unit_cost = d.actual_price + d.unit_transport_cost + d.unit_label_cost + d.unit_other_cost;
+  const actual_total = unit_cost * d.actual_qty;
 
-    const parsed = markPurchasedSchema.safeParse(rest);
-    if (!parsed.success) {
-      return Response.json({ error: parsed.error.flatten().fieldErrors }, { status: 400 });
-    }
+  // Remove old assets and re-insert
+  await sql`DELETE FROM purchase_request_assets WHERE purchase_request_id = ${id}`;
 
-    const d = parsed.data;
-    const actual_total = d.actual_price * d.actual_qty;
+  const [updated] = await sql`
+    UPDATE purchase_requests SET
+      supplier_id         = ${d.supplier_id},
+      product_id          = ${d.product_id},
+      requested_qty       = ${d.actual_qty},
+      estimated_price     = ${d.actual_price},
+      estimated_total     = ${actual_total},
+      actual_qty          = ${d.actual_qty},
+      actual_price        = ${d.actual_price},
+      actual_total        = ${actual_total},
+      unit                = ${d.unit || null},
+      unit_transport_cost = ${d.unit_transport_cost},
+      unit_label_cost     = ${d.unit_label_cost},
+      unit_other_cost     = ${d.unit_other_cost},
+      purchased_at        = ${d.purchased_at},
+      payment_method      = ${d.payment_method || null},
+      from_personal       = ${d.from_personal},
+      note                = ${d.note || null},
+      remarks             = ${d.remarks || null}
+    WHERE id = ${id}
+    RETURNING *
+  `;
 
-    if (d.initial_payment_amount && d.initial_payment_amount > actual_total) {
-      return Response.json(
-        { error: "Initial payment cannot exceed the total purchase amount" },
-        { status: 400 }
-      );
-    }
-
-    const [updated] = await sql`
-      UPDATE purchase_requests SET
-        status          = 'purchased',
-        actual_qty      = ${d.actual_qty},
-        actual_price    = ${d.actual_price},
-        actual_total    = ${actual_total},
-        purchased_at    = ${d.purchased_at},
-        admin_note      = ${d.admin_note || null},
-        completed_at    = NOW()
-      WHERE id = ${id}
-      RETURNING *
-    `;
-
-    if (d.initial_payment_amount && d.initial_payment_amount > 0) {
+  if (d.assets && d.assets.length > 0) {
+    for (const a of d.assets) {
       await sql`
-        INSERT INTO supplier_payments (purchase_request_id, amount, paid_at, created_by)
-        VALUES (${id}, ${d.initial_payment_amount}, ${d.purchased_at}, ${user.id})
+        INSERT INTO purchase_request_assets (purchase_request_id, asset_id, quantity)
+        VALUES (${id}, ${a.asset_id}, ${a.quantity})
       `;
     }
-
-    if (d.assets && d.assets.length > 0) {
-      for (const a of d.assets) {
-        await sql`
-          INSERT INTO purchase_request_assets (purchase_request_id, asset_id, quantity)
-          VALUES (${id}, ${a.asset_id}, ${a.quantity})
-        `;
-      }
-    }
-
-    return Response.json(updated);
   }
 
-  if (action === "edit") {
-    if (user.role !== "admin") {
-      return Response.json({ error: "Forbidden" }, { status: 403 });
-    }
-
-    const parsed = createPurchaseRequestSchema.safeParse(rest);
-    if (!parsed.success) {
-      return Response.json({ error: parsed.error.flatten().fieldErrors }, { status: 400 });
-    }
-
-    const d = parsed.data;
-    const estimated_total = d.estimated_price != null ? d.estimated_price * d.requested_qty : null;
-
-    const [updated] = await sql`
-      UPDATE purchase_requests SET
-        supplier_id     = ${d.supplier_id},
-        product_id      = ${d.product_id},
-        requested_qty   = ${d.requested_qty},
-        estimated_price = ${d.estimated_price ?? null},
-        estimated_total = ${estimated_total},
-        note            = ${d.note || null}
-      WHERE id = ${id}
-      RETURNING *
-    `;
-    return Response.json(updated);
-  }
-
-  return Response.json({ error: "Invalid action" }, { status: 400 });
+  return Response.json(updated);
 }
 
 export async function DELETE(_request: Request, { params }: { params: Promise<{ id: string }> }) {

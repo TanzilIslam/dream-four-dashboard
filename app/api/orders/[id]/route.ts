@@ -1,6 +1,11 @@
 import { sql } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
-import { deliverOrderSchema, payOrderSchema, cancelOrderSchema } from "@/lib/schemas/order";
+import {
+  deliverOrderSchema,
+  payOrderSchema,
+  cancelOrderSchema,
+  editOrderSchema,
+} from "@/lib/schemas/order";
 
 async function getOrder(id: number) {
   const [order] = await sql`SELECT * FROM orders WHERE id = ${id}`;
@@ -11,8 +16,29 @@ function canAccess(user: { id: number; role: string }, order: Record<string, unk
   return user.role === "admin" || order.partner_id === user.id;
 }
 
+const FULL_SELECT = sql`
+  SELECT o.*,
+         c.name  AS customer_name,
+         c.phone AS customer_phone,
+         a.name  AS area_name,
+         p.name  AS product_name,
+         p.unit  AS product_unit,
+         u.name  AS partner_name,
+         GREATEST(0,
+           COALESCE((SELECT SUM(oa.quantity) FROM order_assets oa WHERE oa.order_id = o.id), 0)
+           - COALESCE((SELECT SUM(oar.quantity) FROM order_asset_returns oar WHERE oar.order_id = o.id), 0)
+         )::int AS unreturned_assets,
+         (SELECT MAX(py.paid_at) FROM payments py WHERE py.order_id = o.id) AS last_payment_date,
+         COALESCE((SELECT SUM(py.amount) FROM payments py WHERE py.order_id = o.id), 0)::numeric AS due_collection
+  FROM orders o
+  LEFT JOIN customers c ON c.id = o.customer_id
+  LEFT JOIN areas a     ON a.id = o.area_id
+  LEFT JOIN products p  ON p.id = o.product_id
+  LEFT JOIN users u     ON u.id = o.partner_id
+`;
+
 // PATCH /api/orders/[id]
-// body: { action: "deliver" | "pay" | "cancel", ...fields }
+// body: { action: "deliver" | "pay" | "cancel" | "edit", ...fields }
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const auth = await requireUser();
   if ("error" in auth) return auth.error;
@@ -25,6 +51,58 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 
   const body = await request.json();
   const { action, ...rest } = body as { action: string } & Record<string, unknown>;
+
+  if (action === "edit") {
+    if (!["pending", "delivered"].includes(order.status)) {
+      return Response.json(
+        { error: "Only pending or delivered orders can be edited" },
+        { status: 400 }
+      );
+    }
+    const parsed = editOrderSchema.safeParse(rest);
+    if (!parsed.success) {
+      return Response.json({ error: parsed.error.flatten().fieldErrors }, { status: 400 });
+    }
+    const d = parsed.data;
+    const total_amount = d.unit_price * d.quantity;
+    const due_amount = Math.max(0, total_amount - Number(order.paid_amount));
+    const collection = Number(order.paid_amount);
+    const total_cost = (d.unit_cost + d.unit_label_cost + d.unit_other_cost) * d.quantity;
+    const net_value = total_amount - total_cost;
+
+    await sql`
+      UPDATE orders SET
+        product_id      = ${d.product_id},
+        quantity         = ${d.quantity},
+        unit             = ${d.unit || null},
+        unit_price       = ${d.unit_price},
+        total_amount     = ${total_amount},
+        due_amount       = ${due_amount},
+        unit_cost        = ${d.unit_cost},
+        unit_label_cost  = ${d.unit_label_cost},
+        unit_other_cost  = ${d.unit_other_cost},
+        ordered_at       = ${d.ordered_at}::TIMESTAMPTZ,
+        note             = ${d.note || null},
+        collection       = ${collection},
+        total_cost       = ${total_cost},
+        net_value        = ${net_value}
+      WHERE id = ${id}
+    `;
+
+    // Handle asset updates: delete old + insert new
+    await sql`DELETE FROM order_assets WHERE order_id = ${id}`;
+    if (d.assets && d.assets.length > 0) {
+      for (const a of d.assets) {
+        await sql`
+          INSERT INTO order_assets (order_id, asset_id, quantity)
+          VALUES (${id}, ${a.asset_id}, ${a.quantity})
+        `;
+      }
+    }
+
+    const [updated] = await sql`${FULL_SELECT} WHERE o.id = ${id}`;
+    return Response.json(updated);
+  }
 
   if (action === "deliver") {
     if (order.status !== "pending") {
@@ -87,25 +165,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       }
     }
 
-    const [updated] = await sql`
-      SELECT o.*,
-             c.name  AS customer_name,
-             a.name  AS area_name,
-             p.name  AS product_name,
-             p.unit  AS product_unit,
-             u.name  AS partner_name,
-             GREATEST(0,
-               COALESCE((SELECT SUM(oa.quantity) FROM order_assets oa WHERE oa.order_id = o.id), 0)
-               - COALESCE((SELECT SUM(oar.quantity) FROM order_asset_returns oar WHERE oar.order_id = o.id), 0)
-             )::int AS unreturned_assets,
-             (SELECT MAX(py.paid_at) FROM payments py WHERE py.order_id = o.id) AS last_payment_date
-      FROM orders o
-      LEFT JOIN customers c ON c.id = o.customer_id
-      LEFT JOIN areas a     ON a.id = o.area_id
-      LEFT JOIN products p  ON p.id = o.product_id
-      LEFT JOIN users u     ON u.id = o.partner_id
-      WHERE o.id = ${id}
-    `;
+    const [updated] = await sql`${FULL_SELECT} WHERE o.id = ${id}`;
 
     return Response.json(updated);
   }
