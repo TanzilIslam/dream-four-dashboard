@@ -395,6 +395,7 @@ export async function GET() {
   await sql`ALTER TABLE orders ADD COLUMN IF NOT EXISTS unit_cost      NUMERIC(12,2) DEFAULT 0`;
   await sql`ALTER TABLE orders ADD COLUMN IF NOT EXISTS unit_label_cost NUMERIC(12,2) DEFAULT 0`;
   await sql`ALTER TABLE orders ADD COLUMN IF NOT EXISTS unit_other_cost NUMERIC(12,2) DEFAULT 0`;
+  await sql`ALTER TABLE orders ADD COLUMN IF NOT EXISTS unit_transport_cost NUMERIC(12,2) DEFAULT 0`;
   await sql`ALTER TABLE orders ADD COLUMN IF NOT EXISTS collection     NUMERIC(12,2) DEFAULT 0`;
   await sql`ALTER TABLE orders ADD COLUMN IF NOT EXISTS total_cost     NUMERIC(12,2) DEFAULT 0`;
   await sql`ALTER TABLE orders ADD COLUMN IF NOT EXISTS net_value      NUMERIC(12,2) DEFAULT 0`;

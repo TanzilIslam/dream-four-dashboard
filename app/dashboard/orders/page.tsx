@@ -80,6 +80,7 @@ type Order = {
   last_payment_date: string | null;
   unit: string | null;
   unit_cost: string;
+  unit_transport_cost: string;
   unit_label_cost: string;
   unit_other_cost: string;
   collection: string;
@@ -228,6 +229,7 @@ export default function OrdersPage() {
       unit: "",
       unit_price: 0,
       unit_cost: 0,
+      unit_transport_cost: 0,
       unit_label_cost: 0,
       unit_other_cost: 0,
       paid_amount: 0,
@@ -278,6 +280,11 @@ export default function OrdersPage() {
     name: "unit_cost",
     defaultValue: 0,
   });
+  const watchUnitTransportCost = useWatch({
+    control: createForm.control,
+    name: "unit_transport_cost",
+    defaultValue: 0,
+  });
   const watchUnitLabelCost = useWatch({
     control: createForm.control,
     name: "unit_label_cost",
@@ -298,16 +305,23 @@ export default function OrdersPage() {
   const orderCollection = watchPaidAmount || 0;
   const orderDue = Math.max(0, orderSales - orderCollection);
   const orderTotalCost =
-    ((watchUnitCost || 0) + (watchUnitLabelCost || 0) + (watchUnitOtherCost || 0)) *
+    ((watchUnitCost || 0) +
+      (watchUnitTransportCost || 0) +
+      (watchUnitLabelCost || 0) +
+      (watchUnitOtherCost || 0)) *
     (watchQuantity || 0);
   const orderNetValue = orderSales - orderTotalCost;
   const selectedProductName = products.find((p) => p.id === productId)?.name;
 
   // Auto-calculate sales price (unit_price) = unit_cost + label_cost + other_cost
   useEffect(() => {
-    const salesPrice = (watchUnitCost || 0) + (watchUnitLabelCost || 0) + (watchUnitOtherCost || 0);
+    const salesPrice =
+      (watchUnitCost || 0) +
+      (watchUnitTransportCost || 0) +
+      (watchUnitLabelCost || 0) +
+      (watchUnitOtherCost || 0);
     createForm.setValue("unit_price", salesPrice);
-  }, [watchUnitCost, watchUnitLabelCost, watchUnitOtherCost, createForm]);
+  }, [watchUnitCost, watchUnitTransportCost, watchUnitLabelCost, watchUnitOtherCost, createForm]);
 
   // Auto-fill unit from product
   useEffect(() => {
@@ -540,6 +554,7 @@ export default function OrdersPage() {
       unit: "",
       unit_price: 0,
       unit_cost: 0,
+      unit_transport_cost: 0,
       unit_label_cost: 0,
       unit_other_cost: 0,
       paid_amount: 0,
@@ -560,8 +575,12 @@ export default function OrdersPage() {
       quantity: order.quantity,
       unit: order.unit || "",
       unit_price:
-        Number(order.unit_cost) + Number(order.unit_label_cost) + Number(order.unit_other_cost),
+        Number(order.unit_cost) +
+        Number(order.unit_transport_cost) +
+        Number(order.unit_label_cost) +
+        Number(order.unit_other_cost),
       unit_cost: Number(order.unit_cost),
+      unit_transport_cost: Number(order.unit_transport_cost),
       unit_label_cost: Number(order.unit_label_cost),
       unit_other_cost: Number(order.unit_other_cost),
       paid_amount: Number(order.paid_amount),
@@ -1393,6 +1412,18 @@ export default function OrdersPage() {
             </Field>
 
             <Field
+              label="Transport Cost per Unit (৳)"
+              error={createForm.formState.errors.unit_transport_cost?.message}
+            >
+              <Input
+                type="number"
+                step="0.01"
+                min={0}
+                {...createForm.register("unit_transport_cost", { valueAsNumber: true })}
+              />
+            </Field>
+
+            <Field
               label="Label Cost per Unit (৳)"
               error={createForm.formState.errors.unit_label_cost?.message}
             >
@@ -1937,6 +1968,10 @@ export default function OrdersPage() {
                 <div>
                   <p className="text-xs text-muted-foreground">Unit Cost</p>
                   <p>৳{Number(viewingOrder.unit_cost).toFixed(2)}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Transport Cost</p>
+                  <p>৳{Number(viewingOrder.unit_transport_cost).toFixed(2)}</p>
                 </div>
                 <div>
                   <p className="text-xs text-muted-foreground">Unit Price</p>

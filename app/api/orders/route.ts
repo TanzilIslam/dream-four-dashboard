@@ -79,7 +79,8 @@ export async function POST(request: Request) {
   const paid_amount = d.paid_amount ?? 0;
   const due_amount = total_amount - paid_amount;
   const collection = paid_amount;
-  const total_cost = (d.unit_cost + d.unit_label_cost + d.unit_other_cost) * d.quantity;
+  const total_cost =
+    (d.unit_cost + d.unit_transport_cost + d.unit_label_cost + d.unit_other_cost) * d.quantity;
   const net_value = total_amount - total_cost;
 
   // Fetch customer to get area_id and check due limit
@@ -118,13 +119,13 @@ export async function POST(request: Request) {
       partner_id, customer_id, area_id, product_id,
       quantity, unit, unit_price, total_amount,
       paid_amount, due_amount, status, note,
-      unit_cost, unit_label_cost, unit_other_cost,
+      unit_cost, unit_transport_cost, unit_label_cost, unit_other_cost,
       collection, total_cost, net_value, ordered_at
     ) VALUES (
       ${user.id}, ${d.customer_id}, ${customer.area_id}, ${d.product_id},
       ${d.quantity}, ${d.unit || null}, ${d.unit_price}, ${total_amount},
       ${paid_amount}, ${due_amount}, 'pending', ${d.note || null},
-      ${d.unit_cost}, ${d.unit_label_cost}, ${d.unit_other_cost},
+      ${d.unit_cost}, ${d.unit_transport_cost}, ${d.unit_label_cost}, ${d.unit_other_cost},
       ${collection}, ${total_cost}, ${net_value}, ${d.ordered_at}::TIMESTAMPTZ
     )
     RETURNING *

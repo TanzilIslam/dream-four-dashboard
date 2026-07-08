@@ -67,7 +67,8 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     const total_amount = d.unit_price * d.quantity;
     const due_amount = Math.max(0, total_amount - Number(order.paid_amount));
     const collection = Number(order.paid_amount);
-    const total_cost = (d.unit_cost + d.unit_label_cost + d.unit_other_cost) * d.quantity;
+    const total_cost =
+      (d.unit_cost + d.unit_transport_cost + d.unit_label_cost + d.unit_other_cost) * d.quantity;
     const net_value = total_amount - total_cost;
 
     await sql`
@@ -79,6 +80,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
         total_amount     = ${total_amount},
         due_amount       = ${due_amount},
         unit_cost        = ${d.unit_cost},
+        unit_transport_cost = ${d.unit_transport_cost},
         unit_label_cost  = ${d.unit_label_cost},
         unit_other_cost  = ${d.unit_other_cost},
         ordered_at       = ${d.ordered_at}::TIMESTAMPTZ,

@@ -102,7 +102,7 @@ export async function GET(request: Request) {
         `
       : [];
 
-  const [summary, customers, dailyTrend, products, expenseBreakdown, dues, supplies] =
+  const [summary, customers, dailyTrend, products, expenseBreakdown, dues, supplies, miniDueList] =
     await Promise.all([
       // Sheet 1: Summary KPIs
       sql`
@@ -164,6 +164,7 @@ export async function GET(request: Request) {
         p.name                                                    AS "Product",
         COALESCE(o.unit, p.unit)                                  AS "Unit",
         COALESCE(o.unit_cost, 0)::numeric                        AS "Unit Cost",
+        COALESCE(o.unit_transport_cost, 0)::numeric              AS "Transport Cost",
         COALESCE(o.unit_label_cost, 0)::numeric                  AS "Label Cost",
         COALESCE(o.unit_other_cost, 0)::numeric                  AS "Other Cost",
         o.quantity::int                                           AS "Qty",
@@ -246,6 +247,7 @@ export async function GET(request: Request) {
         p.name                                                    AS "Product",
         COALESCE(o.unit, p.unit)                                  AS "Unit",
         COALESCE(o.unit_cost, 0)::numeric                        AS "Unit Cost",
+        COALESCE(o.unit_transport_cost, 0)::numeric              AS "Transport Cost",
         COALESCE(o.unit_label_cost, 0)::numeric                  AS "Label Cost",
         COALESCE(o.unit_other_cost, 0)::numeric                  AS "Other Cost",
         o.quantity::int                                           AS "Qty",
@@ -295,6 +297,27 @@ export async function GET(request: Request) {
       LEFT JOIN suppliers s ON s.id = pr.supplier_id
       WHERE pr.status = 'purchased' ${purchaseProductFilter} ${purchaseDateFilter}
       ORDER BY pr.purchased_at DESC
+    `,
+
+      // Sheet 8: Mini Due List (per-customer summary)
+      sql`
+      SELECT
+        c.name                                                    AS "Customer",
+        COALESCE(c.phone, '')                                     AS "Phone",
+        COALESCE(SUM(o.total_amount), 0)::numeric                 AS "Total",
+        COALESCE(SUM(o.paid_amount), 0)::numeric                  AS "Paid",
+        COALESCE(SUM(o.due_amount), 0)::numeric                   AS "Due",
+        GREATEST(0,
+          COALESCE(SUM((SELECT SUM(oa.quantity) FROM order_assets oa WHERE oa.order_id = o.id)), 0)
+          - COALESCE(SUM((SELECT SUM(oar.quantity) FROM order_asset_returns oar WHERE oar.order_id = o.id)), 0)
+        )::int                                                    AS "Asset",
+        MAX(o.ordered_at)::date                                   AS "Last Order Date",
+        ''                                                        AS "Remarks"
+      FROM orders o
+      JOIN customers c ON c.id = o.customer_id
+      WHERE o.due_amount > 0 AND o.status != 'cancelled' ${productFilter} ${dateFilter}
+      GROUP BY c.id, c.name, c.phone
+      ORDER BY SUM(o.due_amount) DESC
     `,
     ]);
 
@@ -376,6 +399,11 @@ export async function GET(request: Request) {
     Date: fmt(r["Date"]),
   }));
 
+  const formattedMiniDueList = miniDueList.map((r: Record<string, unknown>) => ({
+    ...r,
+    "Last Order Date": fmt(r["Last Order Date"]),
+  }));
+
   return Response.json({
     summary: summaryRows,
     customers: formattedCustomers,
@@ -384,5 +412,6 @@ export async function GET(request: Request) {
     expenseBreakdown,
     dues: formattedDues,
     supplies: formattedSupplies,
+    miniDueList: formattedMiniDueList,
   });
 }

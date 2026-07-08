@@ -10,6 +10,7 @@ export const createOrderSchema = z
     unit_cost: z.number().min(0, "Cost must be non-negative").default(0),
     unit_label_cost: z.number().min(0, "Label cost must be non-negative").default(0),
     unit_other_cost: z.number().min(0, "Other cost must be non-negative").default(0),
+    unit_transport_cost: z.number().min(0, "Transport cost must be non-negative").default(0),
     paid_amount: z.number().min(0, "Paid amount must be non-negative").default(0),
     ordered_at: z.string().min(1, "Date is required"),
     note: z.string().optional().or(z.literal("")),
@@ -31,6 +32,7 @@ export const editOrderSchema = z.object({
   unit_cost: z.number().min(0, "Cost must be non-negative").default(0),
   unit_label_cost: z.number().min(0, "Label cost must be non-negative").default(0),
   unit_other_cost: z.number().min(0, "Other cost must be non-negative").default(0),
+  unit_transport_cost: z.number().min(0, "Transport cost must be non-negative").default(0),
   ordered_at: z.string().min(1, "Date is required"),
   note: z.string().optional().or(z.literal("")),
   assets: z
