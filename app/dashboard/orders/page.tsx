@@ -1008,6 +1008,7 @@ export default function OrdersPage() {
               <TableHead>Qty</TableHead>
               <TableHead>Sales</TableHead>
               <TableHead>Net Value</TableHead>
+              <TableHead>Due</TableHead>
               <TableHead>Collection</TableHead>
               <TableHead>Due Coll.</TableHead>
               <TableHead>Status</TableHead>
@@ -1046,6 +1047,13 @@ export default function OrdersPage() {
                   <TableCell>৳{Number(o.total_amount).toFixed(2)}</TableCell>
                   <TableCell className={Number(o.net_value) < 0 ? "text-destructive" : ""}>
                     ৳{Number(o.net_value).toFixed(2)}
+                  </TableCell>
+                  <TableCell>
+                    {Number(o.due_amount) > 0 ? (
+                      <span className="text-destructive">৳{Number(o.due_amount).toFixed(2)}</span>
+                    ) : (
+                      <span className="text-muted-foreground">—</span>
+                    )}
                   </TableCell>
                   <TableCell>
                     {Number(o.collection) > 0 ? (
