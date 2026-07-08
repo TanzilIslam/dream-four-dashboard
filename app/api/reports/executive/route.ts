@@ -300,12 +300,13 @@ export async function GET(request: Request) {
     `,
 
       // Sheet 8: Mini Due List (per-customer summary)
+      // Include ALL non-cancelled orders for customers who have outstanding dues
       sql`
       SELECT
         c.name                                                    AS "Customer",
         COALESCE(c.phone, '')                                     AS "Phone",
         COALESCE(SUM(o.total_amount), 0)::numeric                 AS "Total",
-        COALESCE(SUM(o.paid_amount), 0)::numeric                  AS "Paid",
+        (COALESCE(SUM(o.total_amount), 0) - COALESCE(SUM(o.due_amount), 0))::numeric AS "Paid",
         COALESCE(SUM(o.due_amount), 0)::numeric                   AS "Due",
         GREATEST(0,
           COALESCE(SUM((SELECT SUM(oa.quantity) FROM order_assets oa WHERE oa.order_id = o.id)), 0)
@@ -315,8 +316,13 @@ export async function GET(request: Request) {
         ''                                                        AS "Remarks"
       FROM orders o
       JOIN customers c ON c.id = o.customer_id
-      WHERE o.due_amount > 0 AND o.status != 'cancelled' ${productFilter} ${dateFilter}
+      WHERE o.status != 'cancelled' ${productFilter} ${dateFilter}
+        AND c.id IN (
+          SELECT o2.customer_id FROM orders o2
+          WHERE o2.due_amount > 0 AND o2.status != 'cancelled'
+        )
       GROUP BY c.id, c.name, c.phone
+      HAVING SUM(o.due_amount) > 0
       ORDER BY SUM(o.due_amount) DESC
     `,
     ]);
