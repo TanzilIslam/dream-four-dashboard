@@ -316,10 +316,10 @@ export async function GET(request: Request) {
         ''                                                        AS "Remarks"
       FROM orders o
       JOIN customers c ON c.id = o.customer_id
-      WHERE o.status != 'cancelled' ${productFilter} ${dateFilter}
+      WHERE o.status = 'delivered' ${productFilter} ${dateFilter}
         AND c.id IN (
           SELECT o2.customer_id FROM orders o2
-          WHERE o2.due_amount > 0 AND o2.status != 'cancelled'
+          WHERE o2.due_amount > 0 AND o2.status = 'delivered'
         )
       GROUP BY c.id, c.name, c.phone
       HAVING SUM(o.due_amount) > 0
