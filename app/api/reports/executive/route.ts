@@ -305,8 +305,6 @@ export async function GET(request: Request) {
       SELECT
         c.name                                                    AS "Customer",
         COALESCE(c.phone, '')                                     AS "Phone",
-        COALESCE(SUM(o.total_amount), 0)::numeric                 AS "Total",
-        (COALESCE(SUM(o.total_amount), 0) - COALESCE(SUM(o.due_amount), 0))::numeric AS "Paid",
         COALESCE(SUM(o.due_amount), 0)::numeric                   AS "Due",
         GREATEST(0,
           COALESCE(SUM((SELECT SUM(oa.quantity) FROM order_assets oa WHERE oa.order_id = o.id)), 0)
