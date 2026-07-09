@@ -1098,6 +1098,10 @@ export default function PurchasesPage() {
                     />
                   )}
                   <DetailRow
+                    label="Total Cost/Unit"
+                    value={`৳${(Number(detailsTarget.actual_price ?? 0) + Number(detailsTarget.unit_transport_cost ?? 0) + Number(detailsTarget.unit_label_cost ?? 0) + Number(detailsTarget.unit_other_cost ?? 0)).toFixed(2)}`}
+                  />
+                  <DetailRow
                     label="Total"
                     value={
                       detailsTarget.actual_total
