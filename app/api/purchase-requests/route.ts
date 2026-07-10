@@ -24,7 +24,7 @@ export async function GET() {
       GROUP BY purchase_request_id
     ) sp ON sp.purchase_request_id = pr.id
     WHERE pr.status = 'purchased'
-    ORDER BY pr.created_at DESC
+    ORDER BY pr.created_at ASC
   `;
 
   return Response.json(requests);

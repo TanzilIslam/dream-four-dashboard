@@ -257,9 +257,8 @@ export default function ExportPage() {
             "Date"
           );
         if (s.key === "supplies")
-          rows = addTotalsRow(rows, ["Qty", "Total", "Paid", "Due"], "Date");
-        if (s.key === "miniDueList")
-          rows = addTotalsRow(rows, ["Due", "Asset"], "Customer");
+          rows = addTotalsRow(rows, ["Qty", "Total", "S.Paid", "Due"], "Date");
+        if (s.key === "miniDueList") rows = addTotalsRow(rows, ["Due", "Asset"], "Customer");
         return { key: s.key, label: SHEET_LABELS[s.key], rows };
       })
       .filter((s) => s.rows.length > 0);

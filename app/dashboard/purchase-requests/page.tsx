@@ -98,7 +98,7 @@ export default function PurchasesPage() {
     | "paid_asc"
     | "due_desc"
     | "due_asc"
-  >("id_desc");
+  >("id_asc");
 
   const [createOpen, setCreateOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<Purchase | null>(null);
@@ -441,7 +441,7 @@ export default function PurchasesPage() {
     .sort((a, b) => {
       switch (sortBy) {
         case "id_asc":
-          return a.id - b.id;
+          return new Date(a.purchased_at ?? 0).getTime() - new Date(b.purchased_at ?? 0).getTime();
         case "qty_desc":
           return Number(b.actual_qty ?? 0) - Number(a.actual_qty ?? 0);
         case "qty_asc":
@@ -459,7 +459,7 @@ export default function PurchasesPage() {
         case "due_asc":
           return Number(a.due_amount ?? 0) - Number(b.due_amount ?? 0);
         default:
-          return b.id - a.id;
+          return new Date(b.purchased_at ?? 0).getTime() - new Date(a.purchased_at ?? 0).getTime();
       }
     });
 

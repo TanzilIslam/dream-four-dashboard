@@ -272,7 +272,7 @@ export async function GET(request: Request) {
         pr.purchased_at::date                                   AS "Date",
         CASE WHEN s.phone IS NOT NULL AND s.phone != '' THEN s.name || E'\n' || s.phone ELSE COALESCE(s.name, '—') END AS "Supplier",
         p.name                                                  AS "Product",
-        COALESCE(pr.unit, p.unit)                               AS "Unit",
+        REPLACE(COALESCE(pr.unit, p.unit), 'piece', 'pic')       AS "Unit",
         pr.actual_price::numeric                                AS "Unit Price",
         COALESCE(pr.unit_transport_cost, 0)::numeric            AS "Transport Cost",
         COALESCE(pr.unit_label_cost, 0)::numeric                AS "Label Cost",
@@ -284,19 +284,18 @@ export async function GET(request: Request) {
           SELECT SUM(sp.amount)
           FROM supplier_payments sp
           WHERE sp.purchase_request_id = pr.id
-        ), 0)::numeric                                          AS "Paid",
+        ), 0)::numeric                                          AS "S.Paid",
         (pr.actual_total - COALESCE((
           SELECT SUM(sp.amount)
           FROM supplier_payments sp
           WHERE sp.purchase_request_id = pr.id
         ), 0))::numeric                                         AS "Due",
-        pr.note                                                 AS "Note",
         pr.remarks                                              AS "Remarks"
       FROM purchase_requests pr
       JOIN products p ON p.id = pr.product_id
       LEFT JOIN suppliers s ON s.id = pr.supplier_id
       WHERE pr.status = 'purchased' ${purchaseProductFilter} ${purchaseDateFilter}
-      ORDER BY pr.purchased_at DESC
+      ORDER BY pr.purchased_at ASC
     `,
 
       // Sheet 8: Mini Due List (per-customer summary)
