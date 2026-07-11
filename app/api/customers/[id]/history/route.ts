@@ -77,11 +77,11 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
       };
     }
     const g = productMap[pid];
-    g.total_orders += 1;
-    g.total_qty += Number(o.quantity);
-    g.total_amount += Number(o.total_amount);
-    g.total_paid += Number(o.paid_amount);
-    if (o.status === "delivered" || o.status === "paid") {
+    if (o.status === "delivered") {
+      g.total_orders += 1;
+      g.total_qty += Number(o.quantity);
+      g.total_amount += Number(o.total_amount);
+      g.total_paid += Number(o.paid_amount);
       g.total_due += Number(o.due_amount);
     }
     g.orders.push(o);
