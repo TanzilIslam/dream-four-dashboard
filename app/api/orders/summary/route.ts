@@ -20,7 +20,7 @@ export async function GET(request: Request) {
       COALESCE(SUM(o.paid_amount),  0) AS paid,
       COALESCE(SUM(o.due_amount),   0) AS due
     FROM orders o
-    WHERE o.status NOT IN ('cancelled')
+    WHERE o.status IN ('delivered', 'paid')  -- FULFILLED: see lib/order-status.ts
     ${productFilter}
     ${partnerFilter}
   `;

@@ -96,7 +96,7 @@ export async function GET(request: Request) {
                  COALESCE(SUM(o.quantity), 0)::int   AS qty
           FROM orders o
           JOIN products p ON p.id = o.product_id
-          WHERE o.status != 'cancelled' ${dateFilter}
+          WHERE o.status IN ('delivered', 'paid') ${dateFilter}
           GROUP BY p.id, p.name
           ORDER BY p.name
         `
@@ -115,7 +115,7 @@ export async function GET(request: Request) {
           COALESCE(SUM(o.due_amount), 0)    AS outstanding_due,
           COUNT(DISTINCT o.customer_id)::int AS active_customers
         FROM orders o
-        WHERE o.status != 'cancelled' ${productFilter} ${dateFilter}
+        WHERE o.status IN ('delivered', 'paid') ${productFilter} ${dateFilter}  -- FULFILLED: see lib/order-status.ts
       ),
       purchase_stats AS (
         SELECT COALESCE(SUM(pr.actual_total), 0) AS total_purchase_cost
@@ -179,7 +179,7 @@ export async function GET(request: Request) {
       JOIN customers c ON c.id = o.customer_id
       JOIN products p  ON p.id = o.product_id
       LEFT JOIN areas a ON a.id = c.area_id
-      WHERE o.status != 'cancelled' ${productFilter} ${dateFilter}
+      WHERE o.status IN ('delivered', 'paid') ${productFilter} ${dateFilter}  -- FULFILLED: see lib/order-status.ts
       ORDER BY o.ordered_at ASC
     `,
 
@@ -192,7 +192,7 @@ export async function GET(request: Request) {
         COALESCE(SUM(o.total_amount), 0)::numeric AS "Revenue (৳)",
         COALESCE(SUM(o.paid_amount), 0)::numeric  AS "Collected (৳)"
       FROM orders o
-      WHERE o.status != 'cancelled' ${productFilter} ${dateFilter}
+      WHERE o.status IN ('delivered', 'paid') ${productFilter} ${dateFilter}  -- FULFILLED: see lib/order-status.ts
       GROUP BY o.ordered_at::date
       ORDER BY o.ordered_at::date
     `,
@@ -201,20 +201,20 @@ export async function GET(request: Request) {
       sql`
       SELECT
         p.name                                                AS "Product",
-        COALESCE(SUM(o.quantity) FILTER (WHERE o.status != 'cancelled'), 0)::int        AS "Qty Sold",
-        COALESCE(SUM(o.total_amount) FILTER (WHERE o.status != 'cancelled'), 0)::numeric AS "Revenue (৳)",
+        COALESCE(SUM(o.quantity) FILTER (WHERE o.status IN ('delivered', 'paid')), 0)::int        AS "Qty Sold",
+        COALESCE(SUM(o.total_amount) FILTER (WHERE o.status IN ('delivered', 'paid')), 0)::numeric AS "Revenue (৳)",
         COALESCE((SELECT SUM(pr.actual_total) FROM purchase_requests pr WHERE pr.product_id = p.id AND pr.status = 'purchased'), 0)::numeric AS "Purchase Cost (৳)",
         (
-          COALESCE(SUM(o.total_amount) FILTER (WHERE o.status != 'cancelled'), 0)
+          COALESCE(SUM(o.total_amount) FILTER (WHERE o.status IN ('delivered', 'paid')), 0)
           - COALESCE((SELECT SUM(pr.actual_total) FROM purchase_requests pr WHERE pr.product_id = p.id AND pr.status = 'purchased'), 0)
         )::numeric AS "Gross Profit (৳)",
         CASE
-          WHEN COALESCE(SUM(o.total_amount) FILTER (WHERE o.status != 'cancelled'), 0) = 0 THEN '0%'
+          WHEN COALESCE(SUM(o.total_amount) FILTER (WHERE o.status IN ('delivered', 'paid')), 0) = 0 THEN '0%'
           ELSE ROUND(
             100 * (
-              COALESCE(SUM(o.total_amount) FILTER (WHERE o.status != 'cancelled'), 0)
+              COALESCE(SUM(o.total_amount) FILTER (WHERE o.status IN ('delivered', 'paid')), 0)
               - COALESCE((SELECT SUM(pr.actual_total) FROM purchase_requests pr WHERE pr.product_id = p.id AND pr.status = 'purchased'), 0)
-            ) / COALESCE(SUM(o.total_amount) FILTER (WHERE o.status != 'cancelled'), 1)
+            ) / COALESCE(SUM(o.total_amount) FILTER (WHERE o.status IN ('delivered', 'paid')), 1)
           )::text || '%'
         END AS "Margin %"
       FROM products p
@@ -262,7 +262,7 @@ export async function GET(request: Request) {
       JOIN customers c ON c.id = o.customer_id
       JOIN products p  ON p.id = o.product_id
       LEFT JOIN areas a ON a.id = c.area_id
-      WHERE o.due_amount > 0 AND o.status != 'cancelled' ${productFilter} ${dateFilter}
+      WHERE o.due_amount > 0 AND o.status = 'delivered' ${productFilter} ${dateFilter}  -- HAS_DUE: see lib/order-status.ts
       ORDER BY o.ordered_at ASC
     `,
 
@@ -313,10 +313,10 @@ export async function GET(request: Request) {
         ''                                                        AS "Remarks"
       FROM orders o
       JOIN customers c ON c.id = o.customer_id
-      WHERE o.status = 'delivered' ${productFilter} ${dateFilter}
+      WHERE o.status IN ('delivered', 'paid') ${productFilter} ${dateFilter}  -- FULFILLED: see lib/order-status.ts
         AND c.id IN (
           SELECT o2.customer_id FROM orders o2
-          WHERE o2.due_amount > 0 AND o2.status = 'delivered'
+          WHERE o2.due_amount > 0 AND o2.status IN ('delivered', 'paid')
         )
       GROUP BY c.id, c.name, c.phone
       HAVING SUM(o.due_amount) > 0

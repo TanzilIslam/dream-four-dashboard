@@ -96,14 +96,14 @@ export async function GET(request: Request) {
         COUNT(DISTINCT o.customer_id)  AS debtor_count,
         COALESCE(SUM(o.due_amount), 0) AS total_due
       FROM orders o
-      WHERE o.due_amount > 0 AND o.status NOT IN ('cancelled','paid')
+      WHERE o.due_amount > 0 AND o.status = 'delivered'  -- HAS_DUE: see lib/order-status.ts
     `;
 
     const topDebtors = await sql`
       SELECT c.name, SUM(o.due_amount) AS total_due
       FROM orders o
       JOIN customers c ON c.id = o.customer_id
-      WHERE o.due_amount > 0 AND o.status NOT IN ('cancelled','paid')
+      WHERE o.due_amount > 0 AND o.status = 'delivered'  -- HAS_DUE: see lib/order-status.ts
       GROUP BY c.id, c.name
       ORDER BY total_due DESC
       LIMIT 5

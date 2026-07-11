@@ -151,9 +151,12 @@ export default function CalendarPage() {
   const purchasePaid = dayData?.purchases.reduce((s, r) => s + Number(r.paid), 0) ?? 0;
   const purchaseDue = dayData?.purchases.reduce((s, r) => s + Number(r.due), 0) ?? 0;
 
-  const orderTotal = dayData?.orders.reduce((s, r) => s + Number(r.total_amount), 0) ?? 0;
-  const orderPaid = dayData?.orders.reduce((s, r) => s + Number(r.paid_amount), 0) ?? 0;
-  const orderDue = dayData?.orders.reduce((s, r) => s + Number(r.due_amount), 0) ?? 0;
+  // FULFILLED only: see lib/order-status.ts
+  const fulfilledOrders =
+    dayData?.orders.filter((r) => r.status === "delivered" || r.status === "paid") ?? [];
+  const orderTotal = fulfilledOrders.reduce((s, r) => s + Number(r.total_amount), 0);
+  const orderPaid = fulfilledOrders.reduce((s, r) => s + Number(r.paid_amount), 0);
+  const orderDue = fulfilledOrders.reduce((s, r) => s + Number(r.due_amount), 0);
 
   const collectionTotal = dayData?.collections.reduce((s, r) => s + Number(r.amount), 0) ?? 0;
 

@@ -27,7 +27,7 @@ export async function GET(request: Request) {
       COALESCE(SUM(o.due_amount), 0) AS outstanding_due
     FROM customers c
     LEFT JOIN areas a ON a.id = c.area_id
-    LEFT JOIN orders o ON o.customer_id = c.id AND o.status NOT IN ('cancelled', 'paid')
+    LEFT JOIN orders o ON o.customer_id = c.id AND o.status = 'delivered'  -- HAS_DUE: see lib/order-status.ts
     WHERE c.partner_id = ${targetId}
       AND c.is_active = true
       AND c.is_paused = false
@@ -61,7 +61,7 @@ export async function GET(request: Request) {
       AND o.due_amount > 0
       AND o.promised_payment_date IS NOT NULL
       AND o.promised_payment_date <= ${today}
-      AND o.status NOT IN ('cancelled', 'paid')
+      AND o.status = 'delivered'  -- HAS_DUE: see lib/order-status.ts
     ORDER BY o.promised_payment_date ASC
   `;
 
