@@ -77,7 +77,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
       };
     }
     const g = productMap[pid];
-    if (o.status === "delivered") {
+    if (o.status === "delivered" || o.status === "paid") {
       g.total_orders += 1;
       g.total_qty += Number(o.quantity);
       g.total_amount += Number(o.total_amount);
