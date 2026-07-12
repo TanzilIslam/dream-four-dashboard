@@ -120,7 +120,7 @@ function ExpenseCategoriesInner() {
         </Button>
       </div>
 
-      <div className="rounded-lg border border-border overflow-hidden">
+      <div className="rounded-lg border border-border overflow-x-auto">
         <Table>
           <TableHeader>
             <TableRow>
@@ -175,7 +175,7 @@ function ExpenseCategoriesInner() {
       </div>
 
       <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
-        <SheetContent className="w-full sm:max-w-md">
+        <SheetContent className="!w-full sm:max-w-md">
           <SheetHeader>
             <SheetTitle>{mode === "create" ? "Add Category" : "Edit Category"}</SheetTitle>
           </SheetHeader>

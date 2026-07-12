@@ -156,7 +156,7 @@ export default function UsersPage() {
         </Button>
       </div>
 
-      <div className="rounded-lg border border-border overflow-hidden">
+      <div className="rounded-lg border border-border overflow-x-auto">
         <Table>
           <TableHeader>
             <TableRow>
@@ -233,7 +233,7 @@ export default function UsersPage() {
 
       {/* Right Sheet */}
       <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
-        <SheetContent className="w-full sm:max-w-md">
+        <SheetContent className="!w-full sm:max-w-md">
           <SheetHeader>
             <SheetTitle>{mode === "create" ? "Add User" : "Edit User"}</SheetTitle>
           </SheetHeader>

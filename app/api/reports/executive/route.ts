@@ -102,10 +102,19 @@ export async function GET(request: Request) {
         `
       : [];
 
-  const [summary, customers, dailyTrend, products, expenseBreakdown, dues, supplies, miniDueList] =
-    await Promise.all([
-      // Sheet 1: Summary KPIs
-      sql`
+  const [
+    summary,
+    customers,
+    dailyTrend,
+    products,
+    expenseBreakdown,
+    dues,
+    supplies,
+    miniDueList,
+    assetOverview,
+  ] = await Promise.all([
+    // Sheet 1: Summary KPIs
+    sql`
       WITH order_stats AS (
         SELECT
           COUNT(*)::int                    AS total_orders,
@@ -156,8 +165,8 @@ export async function GET(request: Request) {
       FROM order_stats os, purchase_stats ps, expense_stats es, loan_stats ls, customer_stats cs, supplier_stats ss
     `,
 
-      // Sheet 2: Customer Performance
-      sql`
+    // Sheet 2: Customer Performance
+    sql`
       SELECT
         o.ordered_at::date                                        AS "Date",
         CASE WHEN c.phone IS NOT NULL AND c.phone != '' THEN c.name || E'\n' || c.phone ELSE c.name END AS "Customer",
@@ -183,8 +192,8 @@ export async function GET(request: Request) {
       ORDER BY o.ordered_at ASC
     `,
 
-      // Sheet 3: Daily Sales Trend
-      sql`
+    // Sheet 3: Daily Sales Trend
+    sql`
       SELECT
         o.ordered_at::date                        AS "Date",
         COUNT(o.id)::int                          AS "Orders",
@@ -194,11 +203,11 @@ export async function GET(request: Request) {
       FROM orders o
       WHERE o.status IN ('delivered', 'paid') ${productFilter} ${dateFilter}  -- FULFILLED: see lib/order-status.ts
       GROUP BY o.ordered_at::date
-      ORDER BY o.ordered_at::date
+      ORDER BY o.ordered_at::date ASC
     `,
 
-      // Sheet 4: Product Performance
-      sql`
+    // Sheet 4: Product Performance
+    sql`
       SELECT
         p.name                                                AS "Product",
         COALESCE(SUM(o.quantity) FILTER (WHERE o.status IN ('delivered', 'paid')), 0)::int        AS "Qty Sold",
@@ -224,8 +233,8 @@ export async function GET(request: Request) {
       ORDER BY SUM(o.total_amount) DESC NULLS LAST
     `,
 
-      // Sheet 5: Expense Breakdown
-      sql`
+    // Sheet 5: Expense Breakdown
+    sql`
       SELECT
         COALESCE(ec.name, 'Uncategorized')                      AS "Category",
         COALESCE(p.name, 'Common (No Product)')                 AS "Product",
@@ -239,8 +248,8 @@ export async function GET(request: Request) {
       ORDER BY SUM(e.amount) DESC
     `,
 
-      // Sheet 6: Outstanding Dues (one row per order with due > 0)
-      sql`
+    // Sheet 6: All Sales (one row per fulfilled order)
+    sql`
       SELECT
         o.ordered_at::date                                        AS "Date",
         CASE WHEN c.phone IS NOT NULL AND c.phone != '' THEN c.name || E'\n' || c.phone ELSE c.name END AS "Customer",
@@ -262,12 +271,12 @@ export async function GET(request: Request) {
       JOIN customers c ON c.id = o.customer_id
       JOIN products p  ON p.id = o.product_id
       LEFT JOIN areas a ON a.id = c.area_id
-      WHERE o.due_amount > 0 AND o.status = 'delivered' ${productFilter} ${dateFilter}  -- HAS_DUE: see lib/order-status.ts
+      WHERE o.status IN ('delivered', 'paid') ${productFilter} ${dateFilter}  -- FULFILLED: see lib/order-status.ts
       ORDER BY o.ordered_at ASC
     `,
 
-      // Sheet 7: Purchases
-      sql`
+    // Sheet 7: Purchases
+    sql`
       SELECT
         pr.purchased_at::date                                   AS "Date",
         CASE WHEN s.phone IS NOT NULL AND s.phone != '' THEN s.name || E'\n' || s.phone ELSE COALESCE(s.name, '—') END AS "Supplier",
@@ -298,9 +307,9 @@ export async function GET(request: Request) {
       ORDER BY pr.purchased_at ASC
     `,
 
-      // Sheet 8: Mini Due List (per-customer summary)
-      // Include ALL non-cancelled orders for customers who have outstanding dues
-      sql`
+    // Sheet 8: Mini Due List (per-customer summary)
+    // Include ALL non-cancelled orders for customers who have outstanding dues
+    sql`
       SELECT
         c.name                                                    AS "Customer",
         COALESCE(c.phone, '')                                     AS "Phone",
@@ -322,7 +331,33 @@ export async function GET(request: Request) {
       HAVING SUM(o.due_amount) > 0
       ORDER BY SUM(o.due_amount) DESC
     `,
-    ]);
+
+    // Sheet 9: Asset Overview — unreturned assets per customer + supplier return summary
+    sql`
+      SELECT
+        c.name                           AS "Customer",
+        COALESCE(c.phone, '')            AS "Phone",
+        pa.name                          AS "Asset",
+        p.name                           AS "Product",
+        SUM(oa.quantity)::int            AS "Sent",
+        COALESCE(SUM(oar.returned), 0)::int AS "Returned",
+        (SUM(oa.quantity) - COALESCE(SUM(oar.returned), 0))::int AS "Unreturned"
+      FROM order_assets oa
+      JOIN orders o ON o.id = oa.order_id
+      JOIN customers c ON c.id = o.customer_id
+      JOIN product_assets pa ON pa.id = oa.asset_id
+      JOIN products p ON p.id = pa.product_id
+      LEFT JOIN LATERAL (
+        SELECT SUM(oar2.quantity) AS returned
+        FROM order_asset_returns oar2
+        WHERE oar2.order_id = oa.order_id AND oar2.asset_id = oa.asset_id
+      ) oar ON true
+      WHERE o.status IN ('delivered', 'paid')
+      GROUP BY c.id, c.name, c.phone, pa.id, pa.name, p.name
+      HAVING SUM(oa.quantity) - COALESCE(SUM(oar.returned), 0) > 0
+      ORDER BY c.name, pa.name
+    `,
+  ]);
 
   const fmt = (d: unknown) =>
     d
@@ -416,5 +451,6 @@ export async function GET(request: Request) {
     dues: formattedDues,
     supplies: formattedSupplies,
     miniDueList: formattedMiniDueList,
+    assetOverview,
   });
 }

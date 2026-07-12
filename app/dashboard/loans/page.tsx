@@ -191,7 +191,7 @@ export default function LoansPage() {
       </div>
 
       {/* Table */}
-      <div className="rounded-lg border border-border overflow-hidden">
+      <div className="rounded-lg border border-border overflow-x-auto">
         <Table>
           <TableHeader>
             <TableRow>
@@ -293,7 +293,7 @@ export default function LoansPage() {
 
       {/* Create Sheet */}
       <Sheet open={createOpen} onOpenChange={setCreateOpen}>
-        <SheetContent className="w-full sm:max-w-md overflow-y-auto">
+        <SheetContent className="!w-full sm:max-w-md overflow-y-auto">
           <SheetHeader>
             <SheetTitle>Give Loan</SheetTitle>
           </SheetHeader>
@@ -354,7 +354,7 @@ export default function LoansPage() {
 
       {/* Return Sheet */}
       <Sheet open={returnTarget !== null} onOpenChange={(open) => !open && setReturnTarget(null)}>
-        <SheetContent className="w-full sm:max-w-sm overflow-y-auto">
+        <SheetContent className="!w-full sm:max-w-sm overflow-y-auto">
           <SheetHeader>
             <SheetTitle>Mark as Returned</SheetTitle>
           </SheetHeader>

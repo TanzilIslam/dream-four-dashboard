@@ -71,9 +71,10 @@ const REPORT_SHEETS = [
   { key: "dailyTrend", label: "Daily Sales Trend" },
   { key: "products", label: "Product Performance" },
   { key: "expenseBreakdown", label: "Expense Breakdown" },
-  { key: "dues", label: "Outstanding Dues" },
+  { key: "dues", label: "All Sales" },
   { key: "supplies", label: "Purchases" },
   { key: "miniDueList", label: "Mini Due List" },
+  { key: "assetOverview", label: "Asset Overview" },
 ] as const;
 
 type SheetKey = (typeof REPORT_SHEETS)[number]["key"];
@@ -84,9 +85,10 @@ const SHEET_LABELS: Record<SheetKey, string> = {
   dailyTrend: "Daily Sales Trend",
   products: "Product Performance",
   expenseBreakdown: "Expense Breakdown",
-  dues: "Outstanding Dues",
+  dues: "All Sales",
   supplies: "Purchases",
   miniDueList: "Mini Due List",
+  assetOverview: "Asset Overview",
 };
 
 const DB_TABLES = [
@@ -259,6 +261,8 @@ export default function ExportPage() {
         if (s.key === "supplies")
           rows = addTotalsRow(rows, ["Qty", "Total", "S.Paid", "Due"], "Date");
         if (s.key === "miniDueList") rows = addTotalsRow(rows, ["Due", "Asset"], "Customer");
+        if (s.key === "assetOverview")
+          rows = addTotalsRow(rows, ["Sent", "Returned", "Unreturned"], "Customer");
         return { key: s.key, label: SHEET_LABELS[s.key], rows };
       })
       .filter((s) => s.rows.length > 0);

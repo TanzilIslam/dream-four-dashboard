@@ -8,9 +8,11 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   const { id } = await params;
 
   const assets = await sql`
-    SELECT asset_id, quantity
-    FROM purchase_request_assets
-    WHERE purchase_request_id = ${id}
+    SELECT pra.asset_id, pra.quantity, pa.name AS asset_name
+    FROM purchase_request_assets pra
+    JOIN product_assets pa ON pa.id = pra.asset_id
+    WHERE pra.purchase_request_id = ${id}
+    ORDER BY pa.name ASC
   `;
 
   return Response.json(assets);

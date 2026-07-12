@@ -855,13 +855,13 @@ export default function OrdersPage() {
             )}
           </p>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <div className="relative">
+        <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+          <div className="relative w-full sm:w-auto">
             <Input
               type="date"
               value={paidDateFilter}
               onChange={(e) => setPaidDateFilter(e.target.value)}
-              className="h-8 text-sm w-38 pr-7"
+              className="h-8 text-sm w-full sm:w-38 pr-7"
               title="Filter by paid date"
             />
             {paidDateFilter && (
@@ -874,7 +874,7 @@ export default function OrdersPage() {
             )}
           </div>
           <Select value={orderSort} onValueChange={(v) => setOrderSort(v as typeof orderSort)}>
-            <SelectTrigger className="h-8 text-sm w-44">
+            <SelectTrigger className="h-8 text-sm w-full sm:w-44">
               <SelectValue>
                 {
                   {
@@ -962,8 +962,17 @@ export default function OrdersPage() {
         </OrderFilterSection>
         <OrderFilterSection label="Status" className="md:col-span-3">
           <Select value={filters.status} onValueChange={(v) => setFilter("status", v ?? "all")}>
-            <SelectTrigger className="w-full">
-              <SelectValue />
+            <SelectTrigger className="w-full overflow-hidden">
+              <SelectValue className="truncate">
+                {{
+                  all: "All Active",
+                  due: "Due",
+                  pending: "Pending",
+                  delivered: "Delivered",
+                  paid: "Paid",
+                  cancelled: "Cancelled",
+                }[filters.status] ?? filters.status}
+              </SelectValue>
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Active</SelectItem>
@@ -1190,7 +1199,7 @@ export default function OrdersPage() {
 
       {/* Filter sheet (mobile only) */}
       <Sheet open={filterOpen && isMobile} onOpenChange={(open) => !open && setFilterOpen(false)}>
-        <SheetContent className="w-full sm:max-w-sm overflow-y-auto">
+        <SheetContent className="!w-full sm:max-w-sm overflow-y-auto">
           <SheetHeader>
             <SheetTitle>Filters</SheetTitle>
           </SheetHeader>
@@ -1198,8 +1207,17 @@ export default function OrdersPage() {
             {/* Status */}
             <OrderFilterSection label="Status">
               <Select value={filters.status} onValueChange={(v) => setFilter("status", v ?? "all")}>
-                <SelectTrigger className="w-full">
-                  <SelectValue />
+                <SelectTrigger className="w-full overflow-hidden">
+                  <SelectValue className="truncate">
+                    {{
+                      all: "All Active",
+                      due: "Due",
+                      pending: "Pending",
+                      delivered: "Delivered",
+                      paid: "Paid",
+                      cancelled: "Cancelled",
+                    }[filters.status] ?? filters.status}
+                  </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="due">Due</SelectItem>
@@ -1312,7 +1330,7 @@ export default function OrdersPage() {
 
       {/* Create / Edit order sheet */}
       <Sheet open={formOpen} onOpenChange={setFormOpen}>
-        <SheetContent className="w-full sm:max-w-md overflow-y-auto">
+        <SheetContent className="!w-full sm:max-w-md overflow-y-auto">
           <SheetHeader>
             <SheetTitle>{formMode === "edit" ? "Edit Order" : "New Order"}</SheetTitle>
           </SheetHeader>
@@ -1558,7 +1576,7 @@ export default function OrdersPage() {
         open={paymentSheetTarget !== null}
         onOpenChange={(open) => !open && setPaymentSheetTarget(null)}
       >
-        <SheetContent className="w-full sm:max-w-md overflow-y-auto">
+        <SheetContent className="!w-full sm:max-w-md overflow-y-auto">
           <SheetHeader>
             <SheetTitle>Payments — {paymentSheetTarget?.customer_name ?? "Order"}</SheetTitle>
           </SheetHeader>
@@ -1774,7 +1792,7 @@ export default function OrdersPage() {
 
       {/* Cancel order sheet */}
       <Sheet open={cancelTarget !== null} onOpenChange={(open) => !open && setCancelTarget(null)}>
-        <SheetContent className="w-full sm:max-w-md">
+        <SheetContent className="!w-full sm:max-w-md">
           <SheetHeader>
             <SheetTitle>Cancel Order</SheetTitle>
           </SheetHeader>
@@ -1813,7 +1831,7 @@ export default function OrdersPage() {
         open={returnAssetTarget !== null}
         onOpenChange={(open) => !open && setReturnAssetTarget(null)}
       >
-        <SheetContent className="w-full sm:max-w-md overflow-y-auto">
+        <SheetContent className="!w-full sm:max-w-md overflow-y-auto">
           <SheetHeader>
             <SheetTitle>Return Assets — Order #{returnAssetTarget?.id}</SheetTitle>
           </SheetHeader>
@@ -1925,14 +1943,14 @@ export default function OrdersPage() {
 
       {/* Order Detail Sheet */}
       <Sheet open={viewingOrder !== null} onOpenChange={(open) => !open && setViewingOrder(null)}>
-        <SheetContent className="w-full sm:!max-w-lg overflow-y-auto">
+        <SheetContent className="!w-full sm:!max-w-lg overflow-y-auto">
           <SheetHeader>
             <SheetTitle>Order #{viewingOrder?.id}</SheetTitle>
           </SheetHeader>
           {viewingOrder && (
             <div className="mt-4 px-4 pb-8 space-y-6">
               {/* Order info */}
-              <div className="rounded-lg border border-border p-4 grid grid-cols-2 gap-x-6 gap-y-3 text-sm">
+              <div className="rounded-lg border border-border p-4 grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3 text-sm">
                 <div>
                   <p className="text-xs text-muted-foreground">Customer</p>
                   <p className="font-medium">{viewingOrder.customer_name ?? "—"}</p>
@@ -2073,7 +2091,7 @@ export default function OrdersPage() {
                     No payments recorded.
                   </p>
                 ) : (
-                  <div className="rounded-lg border border-border overflow-hidden">
+                  <div className="rounded-lg border border-border overflow-x-auto">
                     <Table>
                       <TableHeader>
                         <TableRow>

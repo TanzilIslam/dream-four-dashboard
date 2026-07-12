@@ -503,7 +503,7 @@ export default function CustomersPage() {
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <Select value={orderSort} onValueChange={(v) => setOrderSort(v as typeof orderSort)}>
-            <SelectTrigger className="h-8 text-sm w-48">
+            <SelectTrigger className="h-8 text-sm w-full sm:w-48">
               <SelectValue>
                 {
                   {
@@ -575,7 +575,7 @@ export default function CustomersPage() {
         />
       </div>
 
-      <div className="rounded-lg border border-border overflow-hidden">
+      <div className="rounded-lg border border-border overflow-x-auto">
         <Table>
           <TableHeader>
             <TableRow>
@@ -699,7 +699,7 @@ export default function CustomersPage() {
 
       {/* ── Filter Sheet (mobile only) ────────────────────────────── */}
       <Sheet open={filterOpen && isMobile} onOpenChange={(open) => !open && setFilterOpen(false)}>
-        <SheetContent className="w-full sm:max-w-sm overflow-y-auto">
+        <SheetContent className="!w-full sm:max-w-sm overflow-y-auto">
           <SheetHeader>
             <SheetTitle>Filters</SheetTitle>
           </SheetHeader>
@@ -770,7 +770,7 @@ export default function CustomersPage() {
 
       {/* ── Create / Edit Sheet ───────────────────────────────────── */}
       <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
-        <SheetContent className="w-full sm:max-w-md overflow-y-auto">
+        <SheetContent className="!w-full sm:max-w-md overflow-y-auto">
           <SheetHeader>
             <SheetTitle>{mode === "create" ? "Add Customer" : "Edit Customer"}</SheetTitle>
           </SheetHeader>
@@ -951,7 +951,7 @@ export default function CustomersPage() {
         open={viewingCustomer !== null}
         onOpenChange={(open) => !open && setViewingCustomer(null)}
       >
-        <SheetContent className="w-full sm:!max-w-2xl overflow-y-auto">
+        <SheetContent className="!w-full sm:!max-w-2xl overflow-y-auto">
           <SheetHeader>
             <SheetTitle>{viewingCustomer?.name}</SheetTitle>
           </SheetHeader>
@@ -969,9 +969,9 @@ export default function CustomersPage() {
                     {customerHistory.map((product) => (
                       <div key={product.product_id} className="space-y-2">
                         {/* Product header */}
-                        <div className="flex items-center justify-between">
+                        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1">
                           <p className="text-sm font-semibold">{product.product_name}</p>
-                          <div className="flex gap-3 text-xs text-muted-foreground">
+                          <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">
                             <span>{product.total_orders} orders</span>
                             <span>
                               {product.total_qty} {product.product_unit}
@@ -988,7 +988,7 @@ export default function CustomersPage() {
                         </div>
 
                         {/* Orders table */}
-                        <div className="rounded-md border border-border overflow-hidden text-xs">
+                        <div className="rounded-md border border-border overflow-x-auto text-xs">
                           <table className="w-full">
                             <thead>
                               <tr className="bg-muted/50 text-muted-foreground">
@@ -1081,7 +1081,7 @@ export default function CustomersPage() {
 
               {/* Customer details — below history */}
               <div className="border-t border-border pt-4 space-y-6">
-                <div className="grid grid-cols-3 gap-x-4 gap-y-5">
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-5">
                   <DetailCell label="Status">
                     <Badge variant={viewingCustomer.is_active ? "default" : "secondary"}>
                       {viewingCustomer.is_active ? "Active" : "Inactive"}
@@ -1131,7 +1131,7 @@ export default function CustomersPage() {
                   </div>
                 )}
 
-                <div className="grid grid-cols-3 gap-x-4 gap-y-5">
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-5">
                   <DetailCell label="Orders">{viewingCustomer.total_orders}</DetailCell>
                   <DetailCell label="Total Qty">{viewingCustomer.total_quantity}</DetailCell>
                   <DetailCell label="Total Assets">
@@ -1165,7 +1165,7 @@ export default function CustomersPage() {
                 </div>
 
                 {viewingCustomer.tier_name && (
-                  <div className="grid grid-cols-3 gap-x-4 gap-y-5">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-5">
                     <DetailCell label="Tier">{viewingCustomer.tier_name}</DetailCell>
                     <DetailCell label="Unit Price">৳{viewingCustomer.tier_unit_price}</DetailCell>
                     <DetailCell label="Min Qty">

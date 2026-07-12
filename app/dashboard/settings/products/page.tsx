@@ -206,7 +206,7 @@ function ProductsInner() {
         </div>
       </div>
 
-      <div className="rounded-lg border border-border overflow-hidden">
+      <div className="rounded-lg border border-border overflow-x-auto">
         <Table>
           <TableHeader>
             <TableRow>
@@ -282,7 +282,7 @@ function ProductsInner() {
       </div>
 
       <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
-        <SheetContent className="w-full sm:max-w-md overflow-y-auto">
+        <SheetContent className="!w-full sm:max-w-md overflow-y-auto">
           <SheetHeader>
             <SheetTitle>{mode === "create" ? "Add Product" : "Edit Product"}</SheetTitle>
           </SheetHeader>
@@ -343,7 +343,7 @@ function ProductsInner() {
 
       {/* Asset management sheet */}
       <Sheet open={assetTarget !== null} onOpenChange={(open) => !open && setAssetTarget(null)}>
-        <SheetContent className="w-full sm:max-w-md overflow-y-auto">
+        <SheetContent className="!w-full sm:max-w-md overflow-y-auto">
           <SheetHeader>
             <SheetTitle>Assets — {assetTarget?.name}</SheetTitle>
           </SheetHeader>

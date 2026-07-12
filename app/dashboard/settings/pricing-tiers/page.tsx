@@ -168,7 +168,7 @@ function PricingTiersInner() {
       <div className="flex items-center gap-2">
         <Label className="text-sm text-muted-foreground">Product</Label>
         <Select value={filterProduct} onValueChange={(v) => setFilterProduct(v ?? "all")}>
-          <SelectTrigger className="w-56">
+          <SelectTrigger className="w-full sm:w-56">
             <SelectValue placeholder="All products">{filterProductName}</SelectValue>
           </SelectTrigger>
           <SelectContent>
@@ -188,7 +188,7 @@ function PricingTiersInner() {
         </p>
       )}
 
-      <div className="rounded-lg border border-border overflow-hidden">
+      <div className="rounded-lg border border-border overflow-x-auto">
         <Table>
           <TableHeader>
             <TableRow>
@@ -247,7 +247,7 @@ function PricingTiersInner() {
       </div>
 
       <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
-        <SheetContent className="w-full sm:max-w-md overflow-y-auto">
+        <SheetContent className="!w-full sm:max-w-md overflow-y-auto">
           <SheetHeader>
             <SheetTitle>{mode === "create" ? "Add Pricing Tier" : "Edit Pricing Tier"}</SheetTitle>
           </SheetHeader>

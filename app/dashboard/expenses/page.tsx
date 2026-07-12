@@ -224,22 +224,22 @@ export default function ExpensesPage() {
       </div>
 
       {/* Filters + sort */}
-      <div className="flex items-center gap-2 flex-wrap">
+      <div className="flex items-center gap-2 flex-wrap w-full">
         <Input
           type="date"
-          className="h-8 w-36 text-sm"
+          className="h-8 w-full sm:w-36 text-sm"
           value={from}
           onChange={(e) => setFrom(e.target.value)}
         />
         <Input
           type="date"
-          className="h-8 w-36 text-sm"
+          className="h-8 w-full sm:w-36 text-sm"
           value={to}
           onChange={(e) => setTo(e.target.value)}
         />
 
         <Select value={categoryFilter} onValueChange={(v) => setCategoryFilter(v ?? "all")}>
-          <SelectTrigger className="h-8 text-sm w-36">
+          <SelectTrigger className="h-8 text-sm w-full sm:w-36">
             <SelectValue>
               {categoryFilter === "all"
                 ? "All categories"
@@ -258,7 +258,7 @@ export default function ExpensesPage() {
         </Select>
 
         <Select value={productFilter} onValueChange={(v) => setProductFilter(v ?? "all")}>
-          <SelectTrigger className="h-8 text-sm w-32">
+          <SelectTrigger className="h-8 text-sm w-full sm:w-32">
             <SelectValue>
               {productFilter === "all"
                 ? "All products"
@@ -279,7 +279,7 @@ export default function ExpensesPage() {
         </Select>
 
         <Select value={areaFilter} onValueChange={(v) => setAreaFilter(v ?? "all")}>
-          <SelectTrigger className="h-8 text-sm w-32">
+          <SelectTrigger className="h-8 text-sm w-full sm:w-32">
             <SelectValue>
               {areaFilter === "all"
                 ? "All areas"
@@ -298,7 +298,7 @@ export default function ExpensesPage() {
 
         {uniqueMethods.length > 0 && (
           <Select value={methodFilter} onValueChange={(v) => setMethodFilter(v ?? "all")}>
-            <SelectTrigger className="h-8 text-sm w-32">
+            <SelectTrigger className="h-8 text-sm w-full sm:w-32">
               <SelectValue>{methodFilter === "all" ? "All methods" : methodFilter}</SelectValue>
             </SelectTrigger>
             <SelectContent>
@@ -313,7 +313,7 @@ export default function ExpensesPage() {
         )}
 
         <Select value={sortBy} onValueChange={(v) => setSortBy(v as typeof sortBy)}>
-          <SelectTrigger className="h-8 text-sm w-40">
+          <SelectTrigger className="h-8 text-sm w-full sm:w-40">
             <SelectValue>
               {
                 {
@@ -338,7 +338,7 @@ export default function ExpensesPage() {
         )}
       </div>
 
-      <div className="rounded-lg border border-border overflow-hidden">
+      <div className="rounded-lg border border-border overflow-x-auto">
         <Table>
           <TableHeader>
             <TableRow>
@@ -409,7 +409,7 @@ export default function ExpensesPage() {
       </div>
 
       <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
-        <SheetContent className="w-full sm:max-w-md overflow-y-auto">
+        <SheetContent className="!w-full sm:max-w-md overflow-y-auto">
           <SheetHeader>
             <SheetTitle>{editingId !== null ? "Edit Expense" : "Log Expense"}</SheetTitle>
           </SheetHeader>

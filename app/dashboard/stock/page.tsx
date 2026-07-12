@@ -444,7 +444,7 @@ export default function StockPage() {
               </Button>
             )}
           </div>
-          <div className="rounded-xl border overflow-hidden">
+          <div className="rounded-xl border overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -492,7 +492,7 @@ export default function StockPage() {
       {isAdmin && supplierAssetReturns.length > 0 && (
         <div className="space-y-3">
           <h2 className="font-semibold">Asset Returns to Suppliers</h2>
-          <div className="rounded-xl border overflow-hidden">
+          <div className="rounded-xl border overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -539,7 +539,7 @@ export default function StockPage() {
       {isAdmin && adjustments.length > 0 && (
         <div className="space-y-3">
           <h2 className="font-semibold">Adjustment History</h2>
-          <div className="rounded-xl border overflow-hidden">
+          <div className="rounded-xl border overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -594,7 +594,7 @@ export default function StockPage() {
 
       {/* Purchase history sheet */}
       <Sheet open={historyTarget !== null} onOpenChange={(open) => !open && setHistoryTarget(null)}>
-        <SheetContent className="w-full sm:!max-w-4xl overflow-y-auto">
+        <SheetContent className="!w-full sm:!max-w-4xl overflow-y-auto">
           <SheetHeader>
             <SheetTitle>
               Purchase History — {historyTarget?.name}
@@ -704,7 +704,7 @@ export default function StockPage() {
 
       {/* Return assets to supplier sheet (admin only) */}
       <Sheet open={sarOpen} onOpenChange={setSarOpen}>
-        <SheetContent className="w-full sm:max-w-md overflow-y-auto">
+        <SheetContent className="!w-full sm:max-w-md overflow-y-auto">
           <SheetHeader>
             <SheetTitle>Return Assets to Supplier</SheetTitle>
           </SheetHeader>
@@ -797,9 +797,9 @@ export default function StockPage() {
 
       {/* Log Adjustment Sheet */}
       <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
-        <SheetContent className="w-full sm:max-w-md overflow-y-auto">
+        <SheetContent className="!w-full sm:max-w-md overflow-y-auto">
           <SheetHeader>
-            <SheetTitle>Log Stock Adjustmentss</SheetTitle>
+            <SheetTitle>Log Stock Adjustments</SheetTitle>
           </SheetHeader>
 
           <form onSubmit={form.handleSubmit(onSubmit)} className="mt-6 space-y-5 px-4 pb-8">

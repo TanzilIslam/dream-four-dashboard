@@ -75,6 +75,7 @@ type SupplierPayment = {
   created_by_name: string | null;
 };
 
+type PurchaseAsset = { asset_id: number; quantity: number; asset_name: string };
 type Supplier = { id: number; name: string };
 type Product = { id: number; name: string; unit: string };
 type ProductAsset = { id: number; name: string };
@@ -112,6 +113,7 @@ export default function PurchasesPage() {
   // Payment states
   const [paymentTarget, setPaymentTarget] = useState<Purchase | null>(null);
   const [detailsTarget, setDetailsTarget] = useState<Purchase | null>(null);
+  const [detailAssets, setDetailAssets] = useState<PurchaseAsset[]>([]);
   const [detailPayments, setDetailPayments] = useState<SupplierPayment[]>([]);
   const [detailPaymentsLoading, setDetailPaymentsLoading] = useState(false);
   const [detailPaymentSummary, setDetailPaymentSummary] = useState<{
@@ -247,7 +249,7 @@ export default function PurchasesPage() {
       });
   }, [watchProductId, editTarget]);
 
-  // Fetch payment details
+  // Fetch payment details and assets
   useEffect(() => {
     if (!detailsTarget?.id) return;
     // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -264,6 +266,10 @@ export default function PurchasesPage() {
         setDetailPaymentsLoading(false);
       })
       .catch(() => setDetailPaymentsLoading(false));
+    fetch(`/api/purchase-requests/${detailsTarget.id}/assets`)
+      .then((res) => (res.ok ? res.json() : []))
+      .then((data) => setDetailAssets(data))
+      .catch(() => setDetailAssets([]));
   }, [detailsTarget?.id]);
 
   async function refreshPurchases() {
@@ -523,9 +529,9 @@ export default function PurchasesPage() {
       )}
 
       {/* Filters */}
-      <div className="flex items-center gap-2 flex-wrap">
+      <div className="flex items-center gap-2 flex-wrap w-full sm:w-auto">
         <Select value={supplierFilter} onValueChange={(v) => setSupplierFilter(v ?? "all")}>
-          <SelectTrigger className="h-8 text-sm w-36">
+          <SelectTrigger className="h-8 text-sm w-full sm:w-36">
             <SelectValue>
               {supplierFilter === "all"
                 ? "All suppliers"
@@ -543,7 +549,7 @@ export default function PurchasesPage() {
         </Select>
 
         <Select value={dueFilter} onValueChange={(v) => setDueFilter(v ?? "all")}>
-          <SelectTrigger className="h-8 text-sm w-32">
+          <SelectTrigger className="h-8 text-sm w-full sm:w-32">
             <SelectValue>{{ all: "All due", yes: "Has due", no: "No due" }[dueFilter]}</SelectValue>
           </SelectTrigger>
           <SelectContent>
@@ -554,7 +560,7 @@ export default function PurchasesPage() {
         </Select>
 
         <Select value={sortBy} onValueChange={(v) => setSortBy(v as typeof sortBy)}>
-          <SelectTrigger className="h-8 text-sm w-44">
+          <SelectTrigger className="h-8 text-sm w-full sm:w-44">
             <SelectValue>
               {
                 {
@@ -588,7 +594,7 @@ export default function PurchasesPage() {
       </div>
 
       {/* Table */}
-      <div className="rounded-lg border border-border overflow-hidden">
+      <div className="rounded-lg border border-border overflow-x-auto">
         <Table>
           <TableHeader>
             <TableRow>
@@ -695,6 +701,7 @@ export default function PurchasesPage() {
                         size="icon"
                         onClick={() => {
                           setDetailPayments([]);
+                          setDetailAssets([]);
                           setDetailPaymentSummary(null);
                           setDetailPaymentsLoading(true);
                           setDetailsTarget(r);
@@ -723,7 +730,7 @@ export default function PurchasesPage() {
           }
         }}
       >
-        <SheetContent className="w-full sm:max-w-md overflow-y-auto">
+        <SheetContent className="!w-full sm:max-w-md overflow-y-auto">
           <SheetHeader>
             <SheetTitle>{editTarget ? "Edit Purchase" : "New Purchase"}</SheetTitle>
           </SheetHeader>
@@ -944,7 +951,7 @@ export default function PurchasesPage() {
           if (!open) setPaymentTarget(null);
         }}
       >
-        <SheetContent className="w-full sm:max-w-md overflow-y-auto">
+        <SheetContent className="!w-full sm:max-w-md overflow-y-auto">
           <SheetHeader>
             <SheetTitle>Add Payment</SheetTitle>
           </SheetHeader>
@@ -1053,7 +1060,7 @@ export default function PurchasesPage() {
 
       {/* Purchase details sidebar */}
       <Sheet open={detailsTarget !== null} onOpenChange={(open) => !open && setDetailsTarget(null)}>
-        <SheetContent className="w-full sm:max-w-md overflow-y-auto">
+        <SheetContent className="!w-full sm:max-w-md overflow-y-auto">
           <SheetHeader>
             <SheetTitle>Purchase Details</SheetTitle>
           </SheetHeader>
@@ -1123,6 +1130,30 @@ export default function PurchasesPage() {
                   )}
                 </dl>
               </section>
+
+              {detailAssets.length > 0 && (
+                <>
+                  <div className="border-t border-border" />
+                  <section className="space-y-3">
+                    <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                      Assets Received
+                    </h3>
+                    <div className="space-y-2">
+                      {detailAssets.map((a) => (
+                        <div
+                          key={a.asset_id}
+                          className="flex items-center justify-between rounded-md border border-border px-3 py-2"
+                        >
+                          <span className="text-sm font-medium">{a.asset_name}</span>
+                          <span className="text-sm tabular-nums text-muted-foreground">
+                            ×{a.quantity}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </section>
+                </>
+              )}
 
               <div className="border-t border-border" />
 

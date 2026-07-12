@@ -161,15 +161,17 @@ export default function CalendarPage() {
   const collectionTotal = dayData?.collections.reduce((s, r) => s + Number(r.amount), 0) ?? 0;
 
   return (
-    <div className="p-6 space-y-4">
+    <div className="p-4 sm:p-6 space-y-4">
       {/* Header */}
       <div className="flex items-baseline gap-3">
         <h1 className="text-xl font-semibold">Calendar</h1>
-        <span className="text-sm text-muted-foreground">Click any date to view details</span>
+        <span className="text-sm text-muted-foreground hidden sm:inline">
+          Click any date to view details
+        </span>
       </div>
 
       {/* Calendar */}
-      <div className="rounded-xl border border-border bg-card shadow-sm w-fit overflow-hidden">
+      <div className="rounded-xl border border-border bg-card shadow-sm w-full sm:w-fit overflow-hidden">
         <Calendar
           mode="single"
           selected={selected}
@@ -188,12 +190,12 @@ export default function CalendarPage() {
             month_grid: "table-fixed border-collapse",
             weekdays: "border-b border-border",
             weekday:
-              "py-1.5 w-8 text-[11px] font-medium text-muted-foreground text-center uppercase tracking-wide",
+              "py-1.5 w-[14.28%] sm:w-8 text-[11px] font-medium text-muted-foreground text-center uppercase tracking-wide",
             weeks: "",
             week: "border-b border-border last:border-0",
-            day: "border-r border-border last:border-0 align-top p-0 w-8",
+            day: "border-r border-border last:border-0 align-top p-0 w-[14.28%] sm:w-8",
             day_button:
-              "w-8 h-8 p-0 flex items-center justify-center font-normal text-sm hover:bg-accent hover:text-accent-foreground transition-colors cursor-pointer",
+              "w-full sm:w-8 h-10 sm:h-8 p-0 flex items-center justify-center font-normal text-sm hover:bg-accent hover:text-accent-foreground transition-colors cursor-pointer",
             selected: "bg-primary text-primary-foreground font-semibold rounded-none",
             today: "bg-primary/20 text-primary font-semibold",
             outside: "text-muted-foreground/40 bg-muted/20",
@@ -205,7 +207,7 @@ export default function CalendarPage() {
 
       {/* Day detail sidebar */}
       <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
-        <SheetContent className="w-full sm:!max-w-2xl md:!max-w-4xl overflow-y-auto flex flex-col">
+        <SheetContent className="!w-full sm:!max-w-2xl md:!max-w-4xl overflow-y-auto flex flex-col">
           <SheetHeader className="shrink-0">
             <SheetTitle>
               {selected?.toLocaleDateString("en-GB", {
@@ -220,7 +222,7 @@ export default function CalendarPage() {
           {/* Product filter */}
           <div className="px-4 pt-3 shrink-0">
             <Select value={productFilter} onValueChange={(v) => setProductFilter(v ?? "all")}>
-              <SelectTrigger className="h-8 text-sm w-48">
+              <SelectTrigger className="h-8 text-sm w-full sm:w-48">
                 <SelectValue>
                   {productFilter === "all"
                     ? "All Products"
@@ -241,7 +243,7 @@ export default function CalendarPage() {
 
           {/* Tabs */}
           <div className="px-4 pt-3 shrink-0">
-            <div className="flex border-b border-border">
+            <div className="grid grid-cols-4 sm:flex border-b border-border">
               {(["stock", "purchases", "orders", "collection"] as const).map((tab) => {
                 const count =
                   tab === "purchases"
@@ -255,7 +257,7 @@ export default function CalendarPage() {
                   <button
                     key={tab}
                     onClick={() => setActiveTab(tab)}
-                    className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors capitalize ${
+                    className={`px-2 sm:px-4 py-2 text-xs sm:text-sm font-medium border-b-2 transition-colors capitalize text-center ${
                       activeTab === tab
                         ? "border-primary text-primary"
                         : "border-transparent text-muted-foreground hover:text-foreground"
@@ -263,7 +265,7 @@ export default function CalendarPage() {
                   >
                     {tab}
                     {dayData && count != null && count > 0 && (
-                      <span className="ml-1.5 text-xs bg-muted rounded-full px-1.5 py-0.5">
+                      <span className="ml-1 sm:ml-1.5 text-[10px] sm:text-xs bg-muted rounded-full px-1 sm:px-1.5 py-0.5">
                         {count}
                       </span>
                     )}
@@ -302,7 +304,7 @@ export default function CalendarPage() {
                               {s.product_name}{" "}
                               <span className="font-normal text-muted-foreground">({s.unit})</span>
                             </p>
-                            <div className="grid grid-cols-3 gap-2">
+                            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                               <SummaryCard
                                 label="Opening"
                                 value={Number(s.opening_stock).toLocaleString()}
@@ -343,7 +345,7 @@ export default function CalendarPage() {
                 {activeTab === "purchases" && (
                   <div className="space-y-4">
                     {/* Summary */}
-                    <div className="grid grid-cols-3 gap-2">
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                       <SummaryCard label="Total Purchased" value={`৳${fmt(purchaseTotal)}`} />
                       <SummaryCard label="Total Paid" value={`৳${fmt(purchasePaid)}`} />
                       <SummaryCard label="Total Due" value={`৳${fmt(purchaseDue)}`} />
@@ -354,7 +356,7 @@ export default function CalendarPage() {
                         No purchases on this date.
                       </p>
                     ) : (
-                      <div className="rounded-lg border border-border overflow-hidden">
+                      <div className="rounded-lg border border-border overflow-x-auto">
                         <Table>
                           <TableHeader>
                             <TableRow>
@@ -406,7 +408,7 @@ export default function CalendarPage() {
                 {activeTab === "orders" && (
                   <div className="space-y-4">
                     {/* Summary */}
-                    <div className="grid grid-cols-3 gap-2">
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                       <SummaryCard label="Orders" value={String(dayData.orders.length)} />
                       <SummaryCard label="Total Amount" value={`৳${fmt(orderTotal)}`} />
                       <SummaryCard label="Collected" value={`৳${fmt(orderPaid)}`} />
