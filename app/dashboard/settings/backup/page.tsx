@@ -94,12 +94,28 @@ const SHEET_LABELS: Record<SheetKey, string> = {
 const DB_TABLES = [
   { key: "customers", label: "Customers" },
   { key: "orders", label: "Orders" },
+  { key: "payments", label: "Payments" },
   { key: "purchase_requests", label: "Purchase Requests" },
+  { key: "supplier_payments", label: "Supplier Payments" },
   { key: "expenses", label: "Expenses" },
-  { key: "stock", label: "Stock" },
+  { key: "returns", label: "Returns" },
+  { key: "stock", label: "Stock (Summary)" },
+  { key: "stock_adjustments", label: "Stock Adjustments" },
   { key: "areas", label: "Areas" },
   { key: "suppliers", label: "Suppliers" },
   { key: "products", label: "Products" },
+  { key: "product_assets", label: "Product Assets" },
+  { key: "order_assets", label: "Order Assets" },
+  { key: "order_asset_returns", label: "Order Asset Returns" },
+  { key: "purchase_request_assets", label: "Purchase Request Assets" },
+  { key: "supplier_asset_returns", label: "Supplier Asset Returns" },
+  { key: "expense_categories", label: "Expense Categories" },
+  { key: "pricing_tiers", label: "Pricing Tiers" },
+  { key: "partner_loans", label: "Partner Loans" },
+  { key: "loan_repayments", label: "Loan Repayments" },
+  { key: "cash_remittances", label: "Cash Remittances" },
+  { key: "users", label: "Users" },
+  { key: "user_areas", label: "User Areas" },
 ];
 
 type SheetData = { key: SheetKey; label: string; rows: Record<string, unknown>[] };
@@ -240,7 +256,7 @@ export default function ExportPage() {
         if (s.key === "customers")
           rows = addTotalsRow(
             rows,
-            ["Qty", "Total Cost", "Sales", "Net Value", "Due", "Due Collection", "Collection"],
+            ["Qty", "Total Cost", "Sales", "Net Value", "Paid", "Due"],
             "Date"
           );
         if (s.key === "dailyTrend")
@@ -255,7 +271,7 @@ export default function ExportPage() {
         if (s.key === "dues")
           rows = addTotalsRow(
             rows,
-            ["Qty", "Total Cost", "Sales", "Net Value", "Due", "Due Collection", "Collection"],
+            ["Qty", "Total Cost", "Sales", "Net Value", "Paid", "Due"],
             "Date"
           );
         if (s.key === "supplies")

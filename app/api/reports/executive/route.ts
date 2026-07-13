@@ -147,6 +147,28 @@ export async function GET(request: Request) {
       ),
       supplier_stats AS (
         SELECT COUNT(*)::int AS total_suppliers FROM suppliers WHERE is_active = true
+      ),
+      supplier_payment_stats AS (
+        SELECT COALESCE(SUM(sp.amount), 0) AS total_supplier_paid
+        FROM supplier_payments sp
+        JOIN purchase_requests pr ON pr.id = sp.purchase_request_id
+        WHERE pr.status = 'purchased' ${purchaseProductFilter} ${purchaseDateFilter}
+      ),
+      stock_stats AS (
+        SELECT COALESCE(SUM(
+          COALESCE(purchased.qty, 0)
+          - COALESCE(reserved.qty, 0)
+          - COALESCE(delivered.qty, 0)
+          + COALESCE(returned.qty, 0)
+          + COALESCE(adjusted.qty, 0)
+        ), 0)::int AS total_stock
+        FROM products p
+        LEFT JOIN (SELECT product_id, SUM(actual_qty) AS qty FROM purchase_requests WHERE status = 'purchased' GROUP BY product_id) purchased ON purchased.product_id = p.id
+        LEFT JOIN (SELECT product_id, SUM(quantity) AS qty FROM orders WHERE status = 'pending' GROUP BY product_id) reserved ON reserved.product_id = p.id
+        LEFT JOIN (SELECT product_id, SUM(quantity) AS qty FROM orders WHERE status IN ('delivered', 'paid') GROUP BY product_id) delivered ON delivered.product_id = p.id
+        LEFT JOIN (SELECT product_id, SUM(quantity) AS qty FROM returns GROUP BY product_id) returned ON returned.product_id = p.id
+        LEFT JOIN (SELECT product_id, SUM(quantity) AS qty FROM stock_adjustments GROUP BY product_id) adjusted ON adjusted.product_id = p.id
+        WHERE 1=1 ${productId && productId !== "all" ? sql`AND p.id = ${Number(productId)}` : sql``}
       )
       SELECT
         os.total_orders,
@@ -156,13 +178,15 @@ export async function GET(request: Request) {
         os.outstanding_due::numeric,
         os.active_customers,
         ps.total_purchase_cost::numeric,
+        sps.total_supplier_paid::numeric,
         es.total_expenses::numeric,
         ls.total_loans_issued::numeric,
         ls.outstanding_loans::numeric,
         cs.total_customers,
         ss.total_suppliers,
+        stk.total_stock,
         (os.gross_revenue - ps.total_purchase_cost - es.total_expenses)::numeric AS net_position
-      FROM order_stats os, purchase_stats ps, expense_stats es, loan_stats ls, customer_stats cs, supplier_stats ss
+      FROM order_stats os, purchase_stats ps, expense_stats es, loan_stats ls, customer_stats cs, supplier_stats ss, supplier_payment_stats sps, stock_stats stk
     `,
 
     // Sheet 2: Customer Performance
@@ -178,11 +202,10 @@ export async function GET(request: Request) {
         COALESCE(o.unit_other_cost, 0)::numeric                  AS "Other Cost",
         o.quantity::int                                           AS "Qty",
         COALESCE(o.total_cost, 0)::numeric                       AS "Total Cost",
-        o.total_amount::numeric                                   AS "Sales",
         COALESCE(o.net_value, 0)::numeric                        AS "Net Value",
+        o.total_amount::numeric                                   AS "Sales",
+        o.paid_amount::numeric                                    AS "Paid",
         o.due_amount::numeric                                     AS "Due",
-        COALESCE((SELECT SUM(py.amount) FROM payments py WHERE py.order_id = o.id), 0)::numeric AS "Due Collection",
-        COALESCE(o.collection, 0)::numeric                       AS "Collection",
         COALESCE(o.note, '')                                     AS "Remarks"
       FROM orders o
       JOIN customers c ON c.id = o.customer_id
@@ -261,11 +284,10 @@ export async function GET(request: Request) {
         COALESCE(o.unit_other_cost, 0)::numeric                  AS "Other Cost",
         o.quantity::int                                           AS "Qty",
         COALESCE(o.total_cost, 0)::numeric                       AS "Total Cost",
-        o.total_amount::numeric                                   AS "Sales",
         COALESCE(o.net_value, 0)::numeric                        AS "Net Value",
+        o.total_amount::numeric                                   AS "Sales",
+        o.paid_amount::numeric                                    AS "Paid",
         o.due_amount::numeric                                     AS "Due",
-        COALESCE((SELECT SUM(py.amount) FROM payments py WHERE py.order_id = o.id), 0)::numeric AS "Due Collection",
-        COALESCE(o.collection, 0)::numeric                       AS "Collection",
         COALESCE(o.note, '')                                     AS "Remarks"
       FROM orders o
       JOIN customers c ON c.id = o.customer_id
@@ -389,30 +411,99 @@ export async function GET(request: Request) {
     return `${parts} | Total: ${total}`;
   };
 
+  // Purchase totals from supplies query
+  const purchaseQty = supplies.reduce(
+    (s: number, r: Record<string, unknown>) => s + Number(r["Qty"] ?? 0),
+    0
+  );
+  const purchaseTotal = supplies.reduce(
+    (s: number, r: Record<string, unknown>) => s + Number(r["Total"] ?? 0),
+    0
+  );
+  const purchasePaid = supplies.reduce(
+    (s: number, r: Record<string, unknown>) => s + Number(r["S.Paid"] ?? 0),
+    0
+  );
+  const purchaseDue = supplies.reduce(
+    (s: number, r: Record<string, unknown>) => s + Number(r["Due"] ?? 0),
+    0
+  );
+
+  // Sales totals from dues (All Sales) query
+  const salesQty = dues.reduce(
+    (s: number, r: Record<string, unknown>) => s + Number(r["Qty"] ?? 0),
+    0
+  );
+  const salesTotalCost = dues.reduce(
+    (s: number, r: Record<string, unknown>) => s + Number(r["Total Cost"] ?? 0),
+    0
+  );
+  const salesNetValue = dues.reduce(
+    (s: number, r: Record<string, unknown>) => s + Number(r["Net Value"] ?? 0),
+    0
+  );
+  const salesAmount = dues.reduce(
+    (s: number, r: Record<string, unknown>) => s + Number(r["Sales"] ?? 0),
+    0
+  );
+  const salesPaid = dues.reduce(
+    (s: number, r: Record<string, unknown>) => s + Number(r["Paid"] ?? 0),
+    0
+  );
+  const salesDue = dues.reduce(
+    (s: number, r: Record<string, unknown>) => s + Number(r["Due"] ?? 0),
+    0
+  );
+
+  const totalExpenses = Number(s?.total_expenses ?? 0);
+  const totalStock = Number(s?.total_stock ?? 0);
+  const avgPrice = salesQty > 0 ? salesAmount / salesQty : 0;
+  const stockValue = totalStock * avgPrice;
+  const actualCash = salesPaid - purchasePaid - totalExpenses;
+  const cashInHand = salesDue + stockValue + actualCash;
+
   const summaryRows = s
     ? [
         { Metric: "Product", Value: productLabel },
         { Metric: "Period", Value: periodValue },
-        { Metric: "Total Orders", Value: formatBreakdown("orders", s.total_orders as number) },
-        { Metric: "Total Qty Sold", Value: formatBreakdown("qty", s.total_qty as number) },
-        { Metric: "Total Customers", Value: s.total_customers },
-        { Metric: "Total Suppliers", Value: s.total_suppliers },
-        // { Metric: "Gross Revenue (৳)", Value: Number(s.gross_revenue).toFixed(2) },
-        // { Metric: "Total Collected (৳)", Value: Number(s.total_collected).toFixed(2) },
-        // { Metric: "Outstanding Due (৳)", Value: Number(s.outstanding_due).toFixed(2) },
-        // { Metric: "Active Customers", Value: s.active_customers },
-        // { Metric: "Purchase Cost (৳)", Value: Number(s.total_purchase_cost).toFixed(2) },
-        // { Metric: "Gross Profit (৳)", Value: Number(s.gross_profit).toFixed(2) },
-        // { Metric: "Total Expenses (৳)", Value: Number(s.total_expenses).toFixed(2) },
-        // { Metric: "Net Position (৳)", Value: Number(s.net_position).toFixed(2) },
-        { Metric: "Total Purchased (৳)", Value: Number(s.total_purchase_cost).toFixed(2) },
-        { Metric: "Total Sell (৳)", Value: Number(s.gross_revenue).toFixed(2) },
-        { Metric: "Total Due (৳)", Value: Number(s.outstanding_due).toFixed(2) },
-        { Metric: "Total Expenses (৳)", Value: Number(s.total_expenses).toFixed(2) },
-        { Metric: "Total Loans Issued (৳)", Value: Number(s.total_loans_issued).toFixed(2) },
+        { Metric: "", Value: "" },
+        { Metric: "--- PURCHASES ---", Value: "" },
+        { Metric: "Qty", Value: purchaseQty },
+        { Metric: "Total", Value: purchaseTotal.toFixed(2) },
+        { Metric: "Paid", Value: purchasePaid.toFixed(2) },
+        { Metric: "Due", Value: purchaseDue.toFixed(2) },
+        { Metric: "", Value: "" },
+        { Metric: "--- STOCK ---", Value: "" },
+        { Metric: "Current Stock Qty", Value: totalStock },
+        { Metric: "Avg Selling Price", Value: avgPrice.toFixed(2) },
+        { Metric: "Stock Value", Value: stockValue.toFixed(2) },
+        { Metric: "", Value: "" },
+        { Metric: "--- ALL SALES ---", Value: "" },
+        { Metric: "Qty", Value: salesQty },
+        { Metric: "Total Cost", Value: salesTotalCost.toFixed(2) },
+        { Metric: "Net Value", Value: salesNetValue.toFixed(2) },
+        { Metric: "Sales", Value: salesAmount.toFixed(2) },
+        { Metric: "Paid", Value: salesPaid.toFixed(2) },
+        { Metric: "Due", Value: salesDue.toFixed(2) },
+        { Metric: "", Value: "" },
+        { Metric: "--- EXPENSES ---", Value: "" },
+        { Metric: "Total Expenses", Value: totalExpenses.toFixed(2) },
+        { Metric: "", Value: "" },
+        { Metric: "--- TOTAL SPENT ---", Value: "" },
+        { Metric: "Supplier Paid", Value: purchasePaid.toFixed(2) },
+        { Metric: "Expenses", Value: totalExpenses.toFixed(2) },
+        { Metric: "= Total Spent", Value: (purchasePaid + totalExpenses).toFixed(2) },
+        { Metric: "", Value: "" },
+        { Metric: "--- TOTAL IN HAND ---", Value: "" },
+        { Metric: "Collected", Value: salesPaid.toFixed(2) },
+        { Metric: "+ Due from Customers", Value: salesDue.toFixed(2) },
+        { Metric: "+ Stock Value", Value: stockValue.toFixed(2) },
+        { Metric: "= Total In Hand", Value: (salesPaid + salesDue + stockValue).toFixed(2) },
+        { Metric: "", Value: "" },
+        { Metric: "--- PROFIT / LOSS ---", Value: "" },
         {
-          Metric: "Total Net Profit (৳)",
-          Value: `Sell - Purchased - Expenses = ${Number(s.net_position).toFixed(2)}`,
+          Metric: "Total In Hand - Total Spent",
+          Value: `${(salesPaid + salesDue + stockValue).toFixed(2)} - ${(purchasePaid + totalExpenses).toFixed(2)} = ${(salesPaid + salesDue + stockValue - purchasePaid - totalExpenses).toFixed(2)}`,
         },
       ]
     : [];
