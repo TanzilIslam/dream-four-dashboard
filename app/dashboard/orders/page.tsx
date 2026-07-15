@@ -844,8 +844,8 @@ export default function OrdersPage() {
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-y-2">
         <div>
-          <h1 className="text-xl font-semibold">Orders</h1>
-          <p className="text-sm text-muted-foreground">
+          <h1 className="text-xl font-semibold hidden sm:block">Orders</h1>
+          {/* <p className="text-sm text-muted-foreground">
             Track deliveries and payments.
             {!loading && (
               <span className="ml-1 font-medium text-foreground">
@@ -853,10 +853,10 @@ export default function OrdersPage() {
                 {filteredOrders.length !== orders.length ? ` of ${orders.length}` : ""} total
               </span>
             )}
-          </p>
+          </p> */}
         </div>
         <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
-          <div className="relative w-full sm:w-auto">
+          {/* <div className="relative w-full sm:w-auto">
             <Input
               type="date"
               value={paidDateFilter}
@@ -905,8 +905,8 @@ export default function OrdersPage() {
               <SelectItem value="due_desc">Due: high to low</SelectItem>
               <SelectItem value="due_asc">Due: low to high</SelectItem>
             </SelectContent>
-          </Select>
-          <Button
+          </Select> */}
+          {/* <Button
             variant="outline"
             size="sm"
             onClick={() => setFilterOpen((v) => !v)}
@@ -919,16 +919,16 @@ export default function OrdersPage() {
                 {activeFilterCount}
               </span>
             )}
-          </Button>
+          </Button> */}
           <Button size="sm" onClick={openCreate}>
             <PlusIcon className="size-4" />
-            New Order
+            <span className="hidden sm:inline">New Order</span>
           </Button>
         </div>
       </div>
 
       {/* Stock summary — filtered by selected product */}
-      {!loading && stock.length > 0 && (
+      {/* {!loading && stock.length > 0 && (
         <div className="flex flex-wrap gap-2">
           {stock
             .filter((s) => filters.product_id === "all" || String(s.id) === filters.product_id)
@@ -949,18 +949,18 @@ export default function OrdersPage() {
               );
             })}
         </div>
-      )}
+      )} */}
 
-      {/* Desktop inline filter bar */}
-      <div className="hidden md:grid md:grid-cols-12 items-start gap-4">
-        <OrderFilterSection label="Customer" className="md:col-span-6">
+      {/* Inline filter bar */}
+      <div className="grid grid-cols-12 items-start gap-4">
+        <OrderFilterSection label="Customer" className="col-span-12 sm:col-span-6">
           <Input
             placeholder="Search customer…"
             value={filters.customer_search}
             onChange={(e) => setFilter("customer_search", e.target.value)}
           />
         </OrderFilterSection>
-        <OrderFilterSection label="Status" className="md:col-span-3">
+        <OrderFilterSection label="Status" className="col-span-6 sm:col-span-3">
           <Select value={filters.status} onValueChange={(v) => setFilter("status", v ?? "all")}>
             <SelectTrigger className="w-full overflow-hidden">
               <SelectValue className="truncate">
@@ -984,7 +984,7 @@ export default function OrdersPage() {
             </SelectContent>
           </Select>
         </OrderFilterSection>
-        <OrderFilterSection label="Product" className="md:col-span-3">
+        <OrderFilterSection label="Product" className="col-span-6 sm:col-span-3">
           <Select
             value={filters.product_id}
             onValueChange={(v) => setFilter("product_id", v ?? "all")}
@@ -1008,7 +1008,7 @@ export default function OrdersPage() {
           </Select>
         </OrderFilterSection>
       </div>
-      {!loading && orders.length > 0 && (
+      {/* {!loading && orders.length > 0 && (
         <div className="flex items-center gap-4 flex-wrap text-sm px-1">
           <span className="text-muted-foreground">
             Total:{" "}
@@ -1022,7 +1022,7 @@ export default function OrdersPage() {
             Due: <span className="font-medium text-amber-600">৳{orderSummary.due.toFixed(2)}</span>
           </span>
         </div>
-      )}
+      )} */}
 
       <div className="rounded-lg border border-border overflow-x-auto">
         <Table>
