@@ -313,15 +313,23 @@ export default function OrdersPage() {
   const orderNetValue = orderSales - orderTotalCost;
   const selectedProductName = products.find((p) => p.id === productId)?.name;
 
-  // Auto-calculate sales price (unit_price) = unit_cost + label_cost + other_cost
+  // Auto-calculate sales price (unit_price) = unit_cost + label_cost + other_cost (only for new orders)
   useEffect(() => {
+    if (formMode === "edit") return;
     const salesPrice =
       (watchUnitCost || 0) +
       (watchUnitTransportCost || 0) +
       (watchUnitLabelCost || 0) +
       (watchUnitOtherCost || 0);
     createForm.setValue("unit_price", salesPrice);
-  }, [watchUnitCost, watchUnitTransportCost, watchUnitLabelCost, watchUnitOtherCost, createForm]);
+  }, [
+    watchUnitCost,
+    watchUnitTransportCost,
+    watchUnitLabelCost,
+    watchUnitOtherCost,
+    createForm,
+    formMode,
+  ]);
 
   // Auto-fill unit from product
   useEffect(() => {
@@ -574,11 +582,7 @@ export default function OrdersPage() {
       product_id: order.product_id,
       quantity: order.quantity,
       unit: order.unit || "",
-      unit_price:
-        Number(order.unit_cost) +
-        Number(order.unit_transport_cost) +
-        Number(order.unit_label_cost) +
-        Number(order.unit_other_cost),
+      unit_price: Number(order.unit_price),
       unit_cost: Number(order.unit_cost),
       unit_transport_cost: Number(order.unit_transport_cost),
       unit_label_cost: Number(order.unit_label_cost),
@@ -840,6 +844,95 @@ export default function OrdersPage() {
     setCancelling(false);
   }
 
+  // Shared action buttons used in both table and card views
+  function OrderActions({ o, fullWidth }: { o: Order; fullWidth?: boolean }) {
+    return (
+      <div
+        className={
+          fullWidth
+            ? "flex items-center justify-around border-t border-border pt-2 -mx-1"
+            : "flex items-center gap-1"
+        }
+      >
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={() => setViewingOrder(o)}
+          className="size-7 text-muted-foreground hover:text-foreground"
+          title="View order details"
+        >
+          <Eye className="size-3.5" />
+        </Button>
+        {(o.status === "pending" || o.status === "delivered") && (
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => openEdit(o)}
+            className="size-7 text-muted-foreground hover:text-foreground"
+            title="Edit order"
+          >
+            <Pencil className="size-3.5" />
+          </Button>
+        )}
+        {o.status === "pending" && (
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setDeliverTarget(o)}
+            className="size-7 text-blue-600 hover:bg-blue-50 hover:text-blue-700"
+            title="Mark delivered"
+          >
+            <Truck className="size-3.5" />
+          </Button>
+        )}
+        {(o.status === "pending" || o.status === "delivered" || Number(o.paid_amount) > 0) && (
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => {
+              payForm.reset({
+                paid_amount: Number(o.due_amount),
+                payment_method: "",
+                paid_at: new Date().toISOString().slice(0, 10),
+                note: "",
+              });
+              setPaymentSheetTarget(o);
+            }}
+            className="size-7 text-green-600 hover:bg-green-50 hover:text-green-700"
+            title="Payments"
+          >
+            <BanknoteIcon className="size-3.5" />
+          </Button>
+        )}
+        {o.unreturned_assets > 0 && (
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => openReturnAssetSheet(o)}
+            className="size-7 text-amber-600 hover:bg-amber-50 hover:text-amber-700"
+            title={`Return assets (${o.unreturned_assets} unreturned)`}
+          >
+            <Undo2 className="size-3.5" />
+          </Button>
+        )}
+        {o.status !== "paid" && o.status !== "cancelled" && (
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => {
+              cancelForm.reset({ cancellation_reason: "" });
+              setCancelTarget(o);
+            }}
+            className="size-7 text-destructive hover:bg-destructive/10 hover:text-destructive"
+            title="Cancel order"
+          >
+            <XCircle className="size-3.5" />
+          </Button>
+        )}
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-y-2">
@@ -1024,178 +1117,173 @@ export default function OrdersPage() {
         </div>
       )} */}
 
-      <div className="rounded-lg border border-border overflow-x-auto">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Customer</TableHead>
-              <TableHead>Product</TableHead>
-              <TableHead>Order Date</TableHead>
-              <TableHead>Unit Cost</TableHead>
-              <TableHead>Total Cost</TableHead>
-              <TableHead>Qty</TableHead>
-              <TableHead>Sales</TableHead>
-              <TableHead>Net Value</TableHead>
-              <TableHead>Due</TableHead>
-              <TableHead>Collection</TableHead>
-              <TableHead>Due Coll.</TableHead>
-              <TableHead>Status</TableHead>
-              {hasUnreturnedAssets && <TableHead>Assets</TableHead>}
-              <TableHead className="w-28" />
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {loading ? (
-              <TableRow>
-                <TableCell colSpan={18} className="text-center text-muted-foreground py-10">
-                  Loading…
-                </TableCell>
-              </TableRow>
-            ) : filteredOrders.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={18} className="text-center text-muted-foreground py-10">
-                  {activeFilterCount > 0 ? "No orders match your filters" : "No orders"}
-                </TableCell>
-              </TableRow>
-            ) : (
-              filteredOrders.map((o) => (
-                <TableRow key={o.id}>
-                  <TableCell className="font-medium">{o.customer_name ?? "—"}</TableCell>
-                  <TableCell className="text-sm">{o.product_name ?? "—"}</TableCell>
-                  <TableCell className="text-muted-foreground text-xs whitespace-nowrap">
+      {/* ── Desktop: Table | Mobile: Cards ── */}
+      {loading ? (
+        <div className="text-center text-muted-foreground py-10">Loading…</div>
+      ) : filteredOrders.length === 0 ? (
+        <div className="text-center text-muted-foreground py-10">
+          {activeFilterCount > 0 ? "No orders match your filters" : "No orders"}
+        </div>
+      ) : (
+        <>
+          {/* Desktop table */}
+          <div className="hidden md:block rounded-lg border border-border overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Customer</TableHead>
+                  <TableHead>Product</TableHead>
+                  <TableHead>Dates</TableHead>
+                  <TableHead>Details</TableHead>
+                  <TableHead>Status</TableHead>
+                  {hasUnreturnedAssets && <TableHead>Assets</TableHead>}
+                  <TableHead className="w-28" />
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredOrders.map((o) => (
+                  <TableRow key={o.id}>
+                    <TableCell className="font-medium">{o.customer_name ?? "—"}</TableCell>
+                    <TableCell className="text-sm">{o.product_name ?? "—"}</TableCell>
+                    <TableCell className="text-muted-foreground text-xs whitespace-nowrap">
+                      <div>
+                        {new Date(o.ordered_at).toLocaleDateString("en-GB", {
+                          day: "numeric",
+                          month: "short",
+                          year: "numeric",
+                        })}
+                      </div>
+                      {o.delivered_at && (
+                        <div className="text-green-600">
+                          {new Date(o.delivered_at).toLocaleDateString("en-GB", {
+                            day: "numeric",
+                            month: "short",
+                            year: "numeric",
+                          })}
+                        </div>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-sm space-y-0.5">
+                      <div>
+                        <span className="text-muted-foreground">Qty:</span> {o.quantity}
+                      </div>
+                      <div>
+                        <span className="text-muted-foreground">Rate:</span> ৳
+                        {Number(o.unit_price).toFixed(2)}
+                      </div>
+                      <div>
+                        <span className="text-muted-foreground">Sales:</span> ৳
+                        {Number(o.total_amount).toFixed(2)}
+                      </div>
+                      <div>
+                        <span className="text-muted-foreground">Due:</span>{" "}
+                        {Number(o.due_amount) > 0 ? (
+                          <span className="text-destructive">
+                            ৳{Number(o.due_amount).toFixed(2)}
+                          </span>
+                        ) : (
+                          <span className="text-muted-foreground">—</span>
+                        )}
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant={STATUS_VARIANT[o.status] ?? "secondary"}>{o.status}</Badge>
+                    </TableCell>
+                    {hasUnreturnedAssets && (
+                      <TableCell>
+                        {o.unreturned_assets > 0 ? (
+                          <span className="font-medium text-amber-600">{o.unreturned_assets}</span>
+                        ) : (
+                          <span className="text-muted-foreground">—</span>
+                        )}
+                      </TableCell>
+                    )}
+                    <TableCell>
+                      <OrderActions o={o} />
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+
+          {/* Mobile cards */}
+          <div className="md:hidden space-y-3">
+            {filteredOrders.map((o) => (
+              <div key={o.id} className="rounded-lg border border-border bg-card p-4 space-y-3">
+                {/* Top row: customer · product · status */}
+                <div className="grid grid-cols-3 items-center gap-2">
+                  <span className="font-medium truncate">{o.customer_name ?? "—"}</span>
+                  <span className="text-sm text-muted-foreground truncate text-center">
+                    {o.product_name ?? "—"}
+                  </span>
+                  <span className="text-right">
+                    <Badge variant={STATUS_VARIANT[o.status] ?? "secondary"}>{o.status}</Badge>
+                  </span>
+                </div>
+
+                {/* Details row */}
+                <div className="flex items-center justify-around text-sm text-center">
+                  <div>
+                    <p className="text-xs text-muted-foreground">Qty</p>
+                    <p className="font-medium">{o.quantity}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">Rate</p>
+                    <p className="font-medium">৳{Number(o.unit_price).toFixed(2)}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">Sales</p>
+                    <p className="font-medium">৳{Number(o.total_amount).toFixed(2)}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">Due</p>
+                    <p
+                      className={
+                        Number(o.due_amount) > 0
+                          ? "font-medium text-destructive"
+                          : "text-muted-foreground"
+                      }
+                    >
+                      {Number(o.due_amount) > 0 ? `৳${Number(o.due_amount).toFixed(2)}` : "—"}
+                    </p>
+                  </div>
+                  {hasUnreturnedAssets && o.unreturned_assets > 0 && (
+                    <div>
+                      <p className="text-xs text-muted-foreground">Assets</p>
+                      <p className="font-medium text-amber-600">{o.unreturned_assets}</p>
+                    </div>
+                  )}
+                </div>
+
+                {/* Dates */}
+                <div className="text-xs text-muted-foreground">
+                  <span>
                     {new Date(o.ordered_at).toLocaleDateString("en-GB", {
                       day: "numeric",
                       month: "short",
                       year: "numeric",
                     })}
-                  </TableCell>
-                  <TableCell>৳{Number(o.unit_cost).toFixed(2)}</TableCell>
-                  <TableCell>৳{Number(o.total_cost).toFixed(2)}</TableCell>
-                  <TableCell>{o.quantity}</TableCell>
-                  <TableCell>৳{Number(o.total_amount).toFixed(2)}</TableCell>
-                  <TableCell className={Number(o.net_value) < 0 ? "text-destructive" : ""}>
-                    ৳{Number(o.net_value).toFixed(2)}
-                  </TableCell>
-                  <TableCell>
-                    {Number(o.due_amount) > 0 ? (
-                      <span className="text-destructive">৳{Number(o.due_amount).toFixed(2)}</span>
-                    ) : (
-                      <span className="text-muted-foreground">—</span>
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    {Number(o.collection) > 0 ? (
-                      <span className="text-green-600">৳{Number(o.collection).toFixed(2)}</span>
-                    ) : (
-                      <span className="text-muted-foreground">—</span>
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    {Number(o.due_collection) > 0 ? (
-                      <span className="text-green-600">৳{Number(o.due_collection).toFixed(2)}</span>
-                    ) : (
-                      <span className="text-muted-foreground">—</span>
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant={STATUS_VARIANT[o.status] ?? "secondary"}>{o.status}</Badge>
-                  </TableCell>
-                  {hasUnreturnedAssets && (
-                    <TableCell>
-                      {o.unreturned_assets > 0 ? (
-                        <span className="font-medium text-amber-600">{o.unreturned_assets}</span>
-                      ) : (
-                        <span className="text-muted-foreground">—</span>
-                      )}
-                    </TableCell>
+                  </span>
+                  {o.delivered_at && (
+                    <span className="text-green-600 ml-2">
+                      →{" "}
+                      {new Date(o.delivered_at).toLocaleDateString("en-GB", {
+                        day: "numeric",
+                        month: "short",
+                        year: "numeric",
+                      })}
+                    </span>
                   )}
-                  <TableCell>
-                    <div className="flex items-center gap-1">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => setViewingOrder(o)}
-                        className="size-7 text-muted-foreground hover:text-foreground"
-                        title="View order details"
-                      >
-                        <Eye className="size-3.5" />
-                      </Button>
-                      {(o.status === "pending" || o.status === "delivered") && (
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => openEdit(o)}
-                          className="size-7 text-muted-foreground hover:text-foreground"
-                          title="Edit order"
-                        >
-                          <Pencil className="size-3.5" />
-                        </Button>
-                      )}
-                      {o.status === "pending" && (
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => setDeliverTarget(o)}
-                          className="size-7 text-blue-600 hover:bg-blue-50 hover:text-blue-700"
-                          title="Mark delivered"
-                        >
-                          <Truck className="size-3.5" />
-                        </Button>
-                      )}
-                      {(o.status === "pending" ||
-                        o.status === "delivered" ||
-                        Number(o.paid_amount) > 0) && (
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => {
-                            payForm.reset({
-                              paid_amount: Number(o.due_amount),
-                              payment_method: "",
-                              paid_at: new Date().toISOString().slice(0, 10),
-                              note: "",
-                            });
-                            setPaymentSheetTarget(o);
-                          }}
-                          className="size-7 text-green-600 hover:bg-green-50 hover:text-green-700"
-                          title="Payments"
-                        >
-                          <BanknoteIcon className="size-3.5" />
-                        </Button>
-                      )}
-                      {o.unreturned_assets > 0 && (
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => openReturnAssetSheet(o)}
-                          className="size-7 text-amber-600 hover:bg-amber-50 hover:text-amber-700"
-                          title={`Return assets (${o.unreturned_assets} unreturned)`}
-                        >
-                          <Undo2 className="size-3.5" />
-                        </Button>
-                      )}
-                      {o.status !== "paid" && o.status !== "cancelled" && (
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => {
-                            cancelForm.reset({ cancellation_reason: "" });
-                            setCancelTarget(o);
-                          }}
-                          className="size-7 text-destructive hover:bg-destructive/10 hover:text-destructive"
-                          title="Cancel order"
-                        >
-                          <XCircle className="size-3.5" />
-                        </Button>
-                      )}
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
-      </div>
+                </div>
+
+                {/* Actions */}
+                <OrderActions o={o} fullWidth />
+              </div>
+            ))}
+          </div>
+        </>
+      )}
 
       {/* Filter sheet (mobile only) */}
       <Sheet open={filterOpen && isMobile} onOpenChange={(open) => !open && setFilterOpen(false)}>

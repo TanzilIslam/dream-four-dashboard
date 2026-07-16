@@ -329,10 +329,11 @@ export async function GET(request: Request) {
       ORDER BY pr.purchased_at ASC
     `,
 
-    // Sheet 8: Mini Due List (per-customer summary)
+    // Sheet 8: Mini Due List (per-customer summary, grouped by area)
     // Include ALL non-cancelled orders for customers who have outstanding dues
     sql`
       SELECT
+        COALESCE(a.name, 'No Area')                               AS "Area",
         c.name                                                    AS "Customer",
         COALESCE(c.phone, '')                                     AS "Phone",
         COALESCE(SUM(o.due_amount), 0)::numeric                   AS "Due",
@@ -344,14 +345,15 @@ export async function GET(request: Request) {
         ''                                                        AS "Remarks"
       FROM orders o
       JOIN customers c ON c.id = o.customer_id
+      LEFT JOIN areas a ON a.id = c.area_id
       WHERE o.status IN ('delivered', 'paid') ${productFilter} ${dateFilter}  -- FULFILLED: see lib/order-status.ts
         AND c.id IN (
           SELECT o2.customer_id FROM orders o2
           WHERE o2.due_amount > 0 AND o2.status IN ('delivered', 'paid')
         )
-      GROUP BY c.id, c.name, c.phone
+      GROUP BY a.name, c.id, c.name, c.phone
       HAVING SUM(o.due_amount) > 0
-      ORDER BY SUM(o.due_amount) DESC
+      ORDER BY a.name NULLS LAST, SUM(o.due_amount) DESC
     `,
 
     // Sheet 9: Asset Overview — unreturned assets per customer + supplier return summary
