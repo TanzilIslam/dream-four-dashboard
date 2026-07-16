@@ -235,12 +235,13 @@ export default function ExportPage() {
     labelCol: string
   ): Record<string, unknown>[] {
     if (rows.length === 0) return rows;
+    const dataRows = rows.filter((r) => !Object.values(r).some((v) => typeof v === "string" && v.startsWith("Subtotal —")));
     const total: Record<string, unknown> = {};
     const keys = Object.keys(rows[0]);
     for (const key of keys) {
       if (key === labelCol) total[key] = "TOTAL";
       else if (sumCols.includes(key)) {
-        const sum = rows.reduce((acc, r) => acc + (Number(r[key]) || 0), 0);
+        const sum = dataRows.reduce((acc, r) => acc + (Number(r[key]) || 0), 0);
         total[key] = Math.round(sum * 100) / 100;
       } else {
         total[key] = "";
