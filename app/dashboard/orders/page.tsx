@@ -1155,13 +1155,9 @@ export default function OrdersPage() {
                     <TableCell className="font-medium">{o.customer_name ?? "—"}</TableCell>
                     <TableCell className="text-sm">{o.product_name ?? "—"}</TableCell>
                     <TableCell className="text-muted-foreground text-xs whitespace-nowrap">
-                      <div>
-                        {formatDate(o.ordered_at)}
-                      </div>
+                      <div>{formatDate(o.ordered_at)}</div>
                       {o.delivered_at && (
-                        <div className="text-green-600">
-                          {formatDate(o.delivered_at)}
-                        </div>
+                        <div className="text-green-600">{formatDate(o.delivered_at)}</div>
                       )}
                     </TableCell>
                     <TableCell className="text-sm space-y-0.5">
@@ -1259,13 +1255,9 @@ export default function OrdersPage() {
 
                 {/* Dates */}
                 <div className="text-xs text-muted-foreground">
-                  <span>
-                    {formatDate(o.ordered_at)}
-                  </span>
+                  <span>{formatDate(o.ordered_at)}</span>
                   {o.delivered_at && (
-                    <span className="text-green-600 ml-2">
-                      → {formatDate(o.delivered_at)}
-                    </span>
+                    <span className="text-green-600 ml-2">→ {formatDate(o.delivered_at)}</span>
                   )}
                 </div>
 
@@ -1773,8 +1765,7 @@ export default function OrdersPage() {
                           <div className="mb-3 space-y-1">
                             {orderAssetsReturned.map((r) => (
                               <p key={r.id} className="text-xs text-muted-foreground">
-                                {r.asset_name}: {r.quantity} returned on{" "}
-                                {formatDate(r.returned_at)}
+                                {r.asset_name}: {r.quantity} returned on {formatDate(r.returned_at)}
                               </p>
                             ))}
                           </div>
@@ -1923,9 +1914,7 @@ export default function OrdersPage() {
                     {returnAssetTarget.customer_name}
                   </span>
                 </p>
-                <p>
-                  {formatDate(returnAssetTarget.ordered_at)}
-                </p>
+                <p>{formatDate(returnAssetTarget.ordered_at)}</p>
               </div>
 
               {/* Already returned */}
@@ -2033,9 +2022,7 @@ export default function OrdersPage() {
                 </div>
                 <div>
                   <p className="text-xs text-muted-foreground">Order Date</p>
-                  <p>
-                    {formatDate(viewingOrder.ordered_at)}
-                  </p>
+                  <p>{formatDate(viewingOrder.ordered_at)}</p>
                 </div>
                 <div>
                   <p className="text-xs text-muted-foreground">Status</p>
@@ -2124,9 +2111,7 @@ export default function OrdersPage() {
                 {viewingOrder.delivered_at && (
                   <div>
                     <p className="text-xs text-muted-foreground">Delivered</p>
-                    <p>
-                      {formatDate(viewingOrder.delivered_at)}
-                    </p>
+                    <p>{formatDate(viewingOrder.delivered_at)}</p>
                   </div>
                 )}
                 {viewingOrder.note && (

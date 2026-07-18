@@ -229,7 +229,9 @@ export default function ExportPage() {
     labelCol: string
   ): Record<string, unknown>[] {
     if (rows.length === 0) return rows;
-    const dataRows = rows.filter((r) => !Object.values(r).some((v) => typeof v === "string" && v.startsWith("Subtotal —")));
+    const dataRows = rows.filter(
+      (r) => !Object.values(r).some((v) => typeof v === "string" && v.startsWith("Subtotal —"))
+    );
     const total: Record<string, unknown> = {};
     const keys = Object.keys(rows[0]);
     for (const key of keys) {

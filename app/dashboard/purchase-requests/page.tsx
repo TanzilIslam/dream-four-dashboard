@@ -1047,9 +1047,9 @@ export default function PurchasesPage() {
         open={deletePaymentTarget !== null}
         onOpenChange={(open) => !open && setDeletePaymentTarget(null)}
         title="Delete Payment"
-        description={`Delete payment of ৳${Number(deletePaymentTarget?.amount ?? 0).toFixed(2)} on ${
-          formatDate(deletePaymentTarget?.paid_at)
-        }?`}
+        description={`Delete payment of ৳${Number(deletePaymentTarget?.amount ?? 0).toFixed(2)} on ${formatDate(
+          deletePaymentTarget?.paid_at
+        )}?`}
         confirmLabel="Delete"
         loading={deletingPayment}
         onConfirm={handleDeletePayment}
@@ -1113,12 +1113,7 @@ export default function PurchasesPage() {
                         : "—"
                     }
                   />
-                  <DetailRow
-                    label="Purchase Date"
-                    value={
-                      formatDate(detailsTarget.purchased_at)
-                    }
-                  />
+                  <DetailRow label="Purchase Date" value={formatDate(detailsTarget.purchased_at)} />
                   {detailsTarget.note && <DetailRow label="Note" value={detailsTarget.note} />}
                   {detailsTarget.remarks && (
                     <DetailRow label="Remarks" value={detailsTarget.remarks} />

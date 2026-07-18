@@ -379,9 +379,7 @@ export default function ExpensesPage() {
                   <TableCell className="text-muted-foreground max-w-[160px] truncate">
                     {e.description ?? "—"}
                   </TableCell>
-                  <TableCell className="text-muted-foreground">
-                    {formatDate(e.date)}
-                  </TableCell>
+                  <TableCell className="text-muted-foreground">{formatDate(e.date)}</TableCell>
                   <TableCell>
                     <div className="flex items-center gap-1 justify-end">
                       <Button

@@ -166,8 +166,27 @@ export default function CustomersPage() {
   const [customerHistory, setCustomerHistory] = useState<CustomerHistoryProduct[] | null>(null);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [paymentCustomer, setPaymentCustomer] = useState<Customer | null>(null);
-  const [paymentList, setPaymentList] = useState<{ id: number; amount: string; paid_at: string; payment_method: string | null; product_name: string }[]>([]);
-  const [deliveredOrders, setDeliveredOrders] = useState<{ id: number; delivered_at: string | null; quantity: number; unit_price: string; total_amount: string; paid_amount: string; due_amount: string; product_name: string }[]>([]);
+  const [paymentList, setPaymentList] = useState<
+    {
+      id: number;
+      amount: string;
+      paid_at: string;
+      payment_method: string | null;
+      product_name: string;
+    }[]
+  >([]);
+  const [deliveredOrders, setDeliveredOrders] = useState<
+    {
+      id: number;
+      delivered_at: string | null;
+      quantity: number;
+      unit_price: string;
+      total_amount: string;
+      paid_amount: string;
+      due_amount: string;
+      product_name: string;
+    }[]
+  >([]);
   const [paymentListLoading, setPaymentListLoading] = useState(false);
   const [customerSheetTab, setCustomerSheetTab] = useState<string>("payments");
   const [nameSortDir, setNameSortDir] = useState<"asc" | "desc">("asc");
@@ -412,7 +431,9 @@ export default function CustomersPage() {
 
   useEffect(() => {
     if (!paymentCustomer) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setPaymentListLoading(true);
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setCustomerSheetTab("payments");
     fetch(`/api/customers/${paymentCustomer.id}/payments`)
       .then((r) => r.json())
@@ -428,7 +449,15 @@ export default function CustomersPage() {
     try {
       const { utils, writeFile } = await import("xlsx");
 
-      type LedgerEntry = { date: Date; type: "delivery" | "payment"; details: string; qty: number | null; rate: number | null; purchase: number; paid: number };
+      type LedgerEntry = {
+        date: Date;
+        type: "delivery" | "payment";
+        details: string;
+        qty: number | null;
+        rate: number | null;
+        purchase: number;
+        paid: number;
+      };
 
       const entries: LedgerEntry[] = [];
 
@@ -462,7 +491,13 @@ export default function CustomersPage() {
 
       // Header rows
       aoa.push(["Dream Four — Customer Ledger"]);
-      aoa.push([`Customer: ${paymentCustomer.name}`, null, `Phone: ${paymentCustomer.phone ?? "—"}`, null, `Area: ${paymentCustomer.area_name ?? "—"}`]);
+      aoa.push([
+        `Customer: ${paymentCustomer.name}`,
+        null,
+        `Phone: ${paymentCustomer.phone ?? "—"}`,
+        null,
+        `Area: ${paymentCustomer.area_name ?? "—"}`,
+      ]);
       aoa.push([`Generated: ${formatDate(new Date())}`]);
       aoa.push([]); // separator
 
@@ -490,7 +525,15 @@ export default function CustomersPage() {
       }
 
       // Total row
-      aoa.push([null, "TOTAL", null, null, Math.round(totalPurchase * 100) / 100, Math.round(totalPaid * 100) / 100, Math.round(balance * 100) / 100]);
+      aoa.push([
+        null,
+        "TOTAL",
+        null,
+        null,
+        Math.round(totalPurchase * 100) / 100,
+        Math.round(totalPaid * 100) / 100,
+        Math.round(balance * 100) / 100,
+      ]);
 
       const ws = utils.aoa_to_sheet(aoa);
 
@@ -501,8 +544,8 @@ export default function CustomersPage() {
       ws["!cols"] = [
         { wch: 14 }, // Date
         { wch: 22 }, // Details
-        { wch: 6 },  // Qty
-        { wch: 8 },  // Rate
+        { wch: 6 }, // Qty
+        { wch: 8 }, // Rate
         { wch: 14 }, // Purchase
         { wch: 14 }, // Paid
         { wch: 14 }, // Balance
@@ -751,20 +794,24 @@ export default function CustomersPage() {
                   {/* <TableCell className="text-right tabular-nums">{c.total_orders}</TableCell> */}
                   {/* <TableCell className="text-right tabular-nums">{c.total_quantity}</TableCell> */}
                   <TableCell className="text-sm space-y-0.5 tabular-nums">
-                    <div><span className="text-muted-foreground">Sold:</span> ৳{(Number(c.total_paid) + Number(c.total_due)).toFixed(0)} ({c.total_quantity} unit)</div>
-                    <div><span className="text-muted-foreground">Paid:</span> <span className="text-green-600">৳{Number(c.total_paid).toFixed(0)}</span></div>
+                    <div>
+                      <span className="text-muted-foreground">Sold:</span> ৳
+                      {(Number(c.total_paid) + Number(c.total_due)).toFixed(0)} ({c.total_quantity}{" "}
+                      unit)
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">Paid:</span>{" "}
+                      <span className="text-green-600">৳{Number(c.total_paid).toFixed(0)}</span>
+                    </div>
                     {Number(c.total_due) > 0 && (
-                      <div><span className="text-muted-foreground">Due:</span> <span className="text-destructive">৳{Number(c.total_due).toFixed(0)}</span></div>
+                      <div>
+                        <span className="text-muted-foreground">Due:</span>{" "}
+                        <span className="text-destructive">৳{Number(c.total_due).toFixed(0)}</span>
+                      </div>
                     )}
                   </TableCell>
                   <TableCell className="text-right tabular-nums text-muted-foreground text-xs">
-                    {c.last_order_date
-                      ? new Date(c.last_order_date).toLocaleDateString("en-GB", {
-                          day: "numeric",
-                          month: "short",
-                          year: "numeric",
-                        })
-                      : "—"}
+                    {formatDate(c.last_order_date)}
                   </TableCell>
                   <TableCell className="text-right tabular-nums">
                     {c.total_assets_sent > 0 ? c.total_assets_sent : "—"}
@@ -1130,11 +1177,7 @@ export default function CustomersPage() {
                                 <>
                                   <tr key={order.id} className="hover:bg-muted/30">
                                     <td className="px-3 py-2 whitespace-nowrap">
-                                      {new Date(order.ordered_at).toLocaleDateString("en-GB", {
-                                        day: "numeric",
-                                        month: "short",
-                                        year: "numeric",
-                                      })}
+                                      {formatDate(order.ordered_at)}
                                     </td>
                                     <td className="px-3 py-2">
                                       <span
@@ -1173,11 +1216,7 @@ export default function CustomersPage() {
                                         className="bg-muted/20 text-muted-foreground"
                                       >
                                         <td className="pl-6 pr-3 py-1.5 whitespace-nowrap">
-                                          ↳{" "}
-                                          {new Date(pay.paid_at).toLocaleDateString("en-GB", {
-                                            day: "numeric",
-                                            month: "short",
-                                          })}
+                                          ↳ {formatDate(pay.paid_at)}
                                         </td>
                                         <td className="px-3 py-1.5 capitalize text-[10px]">
                                           {pay.payment_method ?? "—"}
@@ -1225,13 +1264,7 @@ export default function CustomersPage() {
                   <DetailCell label="Phone">{viewingCustomer.phone ?? "—"}</DetailCell>
                   <DetailCell label="WhatsApp">{viewingCustomer.whatsapp ?? "—"}</DetailCell>
                   <DetailCell label="Last Order">
-                    {viewingCustomer.last_order_date
-                      ? new Date(viewingCustomer.last_order_date).toLocaleDateString("en-GB", {
-                          day: "numeric",
-                          month: "short",
-                          year: "numeric",
-                        })
-                      : "—"}
+                    {formatDate(viewingCustomer.last_order_date)}
                   </DetailCell>
                   <DetailCell label="Delivery" className="capitalize">
                     {viewingCustomer.delivery_frequency}
@@ -1330,21 +1363,33 @@ export default function CustomersPage() {
             ) : (
               <Tabs value={customerSheetTab} onValueChange={setCustomerSheetTab}>
                 <div className="flex items-center gap-2">
-                <TabsList className="flex-1">
-                  <TabsTrigger value="payments" className="flex-1">Payments</TabsTrigger>
-                  <TabsTrigger value="orders" className="flex-1">Orders</TabsTrigger>
-                </TabsList>
-                {(deliveredOrders.length > 0 || paymentList.length > 0) && (
-                  <Button variant="outline" size="icon" onClick={exportLedger} title="Download Ledger" className="shrink-0">
-                    <Download className="h-4 w-4" />
-                  </Button>
-                )}
+                  <TabsList className="flex-1">
+                    <TabsTrigger value="payments" className="flex-1">
+                      Payments
+                    </TabsTrigger>
+                    <TabsTrigger value="orders" className="flex-1">
+                      Orders
+                    </TabsTrigger>
+                  </TabsList>
+                  {(deliveredOrders.length > 0 || paymentList.length > 0) && (
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      onClick={exportLedger}
+                      title="Download Ledger"
+                      className="shrink-0"
+                    >
+                      <Download className="h-4 w-4" />
+                    </Button>
+                  )}
                 </div>
 
                 {/* Payments Tab */}
                 <TabsContent value="payments" className="mt-4">
                   {paymentList.length === 0 ? (
-                    <p className="text-sm text-muted-foreground text-center py-6">No payments recorded.</p>
+                    <p className="text-sm text-muted-foreground text-center py-6">
+                      No payments recorded.
+                    </p>
                   ) : (
                     <>
                       <div className="rounded-md border border-border overflow-x-auto text-sm">
@@ -1361,14 +1406,14 @@ export default function CustomersPage() {
                             {paymentList.map((p) => (
                               <TableRow key={p.id}>
                                 <TableCell className="whitespace-nowrap text-muted-foreground">
-                                  {new Date(p.paid_at).toLocaleDateString("en-GB", {
-                                    day: "numeric",
-                                    month: "short",
-                                    year: "numeric",
-                                  })}
+                                  {formatDate(p.paid_at)}
                                 </TableCell>
-                                <TableCell className="text-muted-foreground">{p.product_name}</TableCell>
-                                <TableCell className="text-muted-foreground">{p.payment_method ?? "—"}</TableCell>
+                                <TableCell className="text-muted-foreground">
+                                  {p.product_name}
+                                </TableCell>
+                                <TableCell className="text-muted-foreground">
+                                  {p.payment_method ?? "—"}
+                                </TableCell>
                                 <TableCell className="text-right font-medium text-green-600 tabular-nums">
                                   ৳{Number(p.amount).toFixed(2)}
                                 </TableCell>
@@ -1390,7 +1435,9 @@ export default function CustomersPage() {
                 {/* Orders Tab */}
                 <TabsContent value="orders" className="mt-4">
                   {deliveredOrders.length === 0 ? (
-                    <p className="text-sm text-muted-foreground text-center py-6">No delivered orders.</p>
+                    <p className="text-sm text-muted-foreground text-center py-6">
+                      No delivered orders.
+                    </p>
                   ) : (
                     <>
                       <div className="rounded-md border border-border overflow-x-auto text-sm">
@@ -1408,15 +1455,17 @@ export default function CustomersPage() {
                             {deliveredOrders.map((o) => (
                               <TableRow key={o.id}>
                                 <TableCell className="whitespace-nowrap text-muted-foreground">
-                                  {new Date(o.delivered_at).toLocaleDateString("en-GB", {
-                                    day: "numeric",
-                                    month: "short",
-                                    year: "numeric",
-                                  })}
+                                  {formatDate(o.delivered_at)}
                                 </TableCell>
-                                <TableCell className="text-muted-foreground">{o.product_name}</TableCell>
-                                <TableCell className="text-right tabular-nums">{o.quantity}</TableCell>
-                                <TableCell className="text-right tabular-nums">৳{Number(o.unit_price).toFixed(2)}</TableCell>
+                                <TableCell className="text-muted-foreground">
+                                  {o.product_name}
+                                </TableCell>
+                                <TableCell className="text-right tabular-nums">
+                                  {o.quantity}
+                                </TableCell>
+                                <TableCell className="text-right tabular-nums">
+                                  ৳{Number(o.unit_price).toFixed(2)}
+                                </TableCell>
                                 <TableCell className="text-right font-medium tabular-nums">
                                   ৳{Number(o.total_amount).toFixed(2)}
                                 </TableCell>
@@ -1426,21 +1475,35 @@ export default function CustomersPage() {
                         </Table>
                       </div>
                       {(() => {
-                        const totalPurchase = deliveredOrders.reduce((sum, o) => sum + Number(o.total_amount), 0);
-                        const totalPaid = deliveredOrders.reduce((sum, o) => sum + Number(o.paid_amount), 0);
-                        const totalDue = deliveredOrders.reduce((sum, o) => sum + Number(o.due_amount), 0);
+                        const totalPurchase = deliveredOrders.reduce(
+                          (sum, o) => sum + Number(o.total_amount),
+                          0
+                        );
+                        const totalPaid = deliveredOrders.reduce(
+                          (sum, o) => sum + Number(o.paid_amount),
+                          0
+                        );
+                        const totalDue = deliveredOrders.reduce(
+                          (sum, o) => sum + Number(o.due_amount),
+                          0
+                        );
                         return (
                           <>
                             <div className="mt-3 flex justify-between items-center px-3 py-2 rounded-md bg-muted/50 text-sm font-semibold">
                               <span>Total</span>
                               <div className="flex gap-4 tabular-nums">
-                                <span>{deliveredOrders.reduce((sum, o) => sum + Number(o.quantity), 0)} qty</span>
+                                <span>
+                                  {deliveredOrders.reduce((sum, o) => sum + Number(o.quantity), 0)}{" "}
+                                  qty
+                                </span>
                                 <span>৳{totalPurchase.toFixed(2)}</span>
                               </div>
                             </div>
                             <div className="mt-2 flex justify-between items-center px-3 py-2 rounded-md bg-muted/50 text-sm font-semibold">
                               <span>Due</span>
-                              <span className={`tabular-nums ${totalDue > 0 ? "text-destructive" : "text-muted-foreground"}`}>
+                              <span
+                                className={`tabular-nums ${totalDue > 0 ? "text-destructive" : "text-muted-foreground"}`}
+                              >
                                 {totalDue > 0 ? `৳${totalDue.toFixed(2)}` : "—"}
                               </span>
                             </div>
