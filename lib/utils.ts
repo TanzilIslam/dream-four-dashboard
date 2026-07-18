@@ -17,6 +17,14 @@ export function extractError(error: unknown, fallback = "An error occurred"): st
   return fallback;
 }
 
+/** Format a date as "18 Jul 2026" (en-GB short). */
+export function formatDate(value: string | Date | null | undefined): string {
+  if (!value) return "—";
+  const d = typeof value === "string" ? new Date(value) : value;
+  if (Number.isNaN(d.getTime())) return "—";
+  return d.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+}
+
 /** Format a BDT amount with the ৳ symbol. Accepts numbers or numeric strings. */
 export function formatTaka(value: number | string | null | undefined): string {
   if (value === null || value === undefined || value === "") return "৳0";

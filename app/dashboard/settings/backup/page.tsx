@@ -67,9 +67,6 @@ type SampleKey = (typeof SAMPLE_TEMPLATES)[number]["key"];
 
 const REPORT_SHEETS = [
   { key: "summary", label: "Summary KPIs" },
-  { key: "customers", label: "Customer Performance" },
-  { key: "dailyTrend", label: "Daily Sales Trend" },
-  { key: "products", label: "Product Performance" },
   { key: "expenseBreakdown", label: "Expense Breakdown" },
   { key: "dues", label: "All Sales" },
   { key: "supplies", label: "Purchases" },
@@ -81,9 +78,6 @@ type SheetKey = (typeof REPORT_SHEETS)[number]["key"];
 
 const SHEET_LABELS: Record<SheetKey, string> = {
   summary: "Summary",
-  customers: "Customer Performance",
-  dailyTrend: "Daily Sales Trend",
-  products: "Product Performance",
   expenseBreakdown: "Expense Breakdown",
   dues: "All Sales",
   supplies: "Purchases",
@@ -286,20 +280,6 @@ export default function ExportPage() {
     return REPORT_SHEETS.filter((s) => selectedSheets.has(s.key))
       .map((s) => {
         let rows = data[s.key] ?? [];
-        if (s.key === "customers")
-          rows = addTotalsRow(
-            rows,
-            ["Qty", "Total Cost", "Sales", "Net Value", "Paid", "Due"],
-            "Date"
-          );
-        if (s.key === "dailyTrend")
-          rows = addTotalsRow(rows, ["Orders", "Qty", "Revenue (৳)", "Collected (৳)"], "Date");
-        if (s.key === "products")
-          rows = addTotalsRow(
-            rows,
-            ["Qty Sold", "Revenue (৳)", "Purchase Cost (৳)", "Gross Profit (৳)"],
-            "Product"
-          );
         if (s.key === "expenseBreakdown") rows = addTotalsRow(rows, ["Amount (৳)"], "Category");
         if (s.key === "dues")
           rows = addTotalsRow(

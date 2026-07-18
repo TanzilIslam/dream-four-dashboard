@@ -5,6 +5,7 @@ import { useForm } from "react-hook-form";
 import { useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
+import { formatDate } from "@/lib/utils";
 import {
   PlusIcon,
   Truck,
@@ -574,6 +575,22 @@ export default function OrdersPage() {
     setFormOpen(true);
   }
 
+  function openViewOrder(order: Order) {
+    setPaymentSheetTarget(null);
+    setViewingOrder(order);
+  }
+
+  function openPaymentSheet(order: Order) {
+    payForm.reset({
+      paid_amount: Number(order.due_amount),
+      payment_method: "",
+      paid_at: new Date().toISOString().slice(0, 10),
+      note: "",
+    });
+    setViewingOrder(null);
+    setPaymentSheetTarget(order);
+  }
+
   function openEdit(order: Order) {
     setFormMode("edit");
     setEditingId(order.id);
@@ -857,7 +874,7 @@ export default function OrdersPage() {
         <Button
           variant="ghost"
           size="icon"
-          onClick={() => setViewingOrder(o)}
+          onClick={() => openViewOrder(o)}
           className="size-7 text-muted-foreground hover:text-foreground"
           title="View order details"
         >
@@ -889,15 +906,7 @@ export default function OrdersPage() {
           <Button
             variant="ghost"
             size="icon"
-            onClick={() => {
-              payForm.reset({
-                paid_amount: Number(o.due_amount),
-                payment_method: "",
-                paid_at: new Date().toISOString().slice(0, 10),
-                note: "",
-              });
-              setPaymentSheetTarget(o);
-            }}
+            onClick={() => openPaymentSheet(o)}
             className="size-7 text-green-600 hover:bg-green-50 hover:text-green-700"
             title="Payments"
           >
@@ -1147,19 +1156,11 @@ export default function OrdersPage() {
                     <TableCell className="text-sm">{o.product_name ?? "—"}</TableCell>
                     <TableCell className="text-muted-foreground text-xs whitespace-nowrap">
                       <div>
-                        {new Date(o.ordered_at).toLocaleDateString("en-GB", {
-                          day: "numeric",
-                          month: "short",
-                          year: "numeric",
-                        })}
+                        {formatDate(o.ordered_at)}
                       </div>
                       {o.delivered_at && (
                         <div className="text-green-600">
-                          {new Date(o.delivered_at).toLocaleDateString("en-GB", {
-                            day: "numeric",
-                            month: "short",
-                            year: "numeric",
-                          })}
+                          {formatDate(o.delivered_at)}
                         </div>
                       )}
                     </TableCell>
@@ -1259,20 +1260,11 @@ export default function OrdersPage() {
                 {/* Dates */}
                 <div className="text-xs text-muted-foreground">
                   <span>
-                    {new Date(o.ordered_at).toLocaleDateString("en-GB", {
-                      day: "numeric",
-                      month: "short",
-                      year: "numeric",
-                    })}
+                    {formatDate(o.ordered_at)}
                   </span>
                   {o.delivered_at && (
                     <span className="text-green-600 ml-2">
-                      →{" "}
-                      {new Date(o.delivered_at).toLocaleDateString("en-GB", {
-                        day: "numeric",
-                        month: "short",
-                        year: "numeric",
-                      })}
+                      → {formatDate(o.delivered_at)}
                     </span>
                   )}
                 </div>
@@ -1718,7 +1710,7 @@ export default function OrdersPage() {
                     <div className="space-y-0.5 min-w-0">
                       <p className="font-medium tabular-nums">৳{Number(p.amount).toFixed(2)}</p>
                       <p className="text-xs text-muted-foreground">
-                        {new Date(p.paid_at).toLocaleDateString()}
+                        {formatDate(p.paid_at)}
                         {p.payment_method ? ` · ${p.payment_method}` : ""}
                       </p>
                       {p.note && <p className="text-xs text-muted-foreground">{p.note}</p>}
@@ -1782,7 +1774,7 @@ export default function OrdersPage() {
                             {orderAssetsReturned.map((r) => (
                               <p key={r.id} className="text-xs text-muted-foreground">
                                 {r.asset_name}: {r.quantity} returned on{" "}
-                                {new Date(r.returned_at).toLocaleDateString()}
+                                {formatDate(r.returned_at)}
                               </p>
                             ))}
                           </div>
@@ -1932,11 +1924,7 @@ export default function OrdersPage() {
                   </span>
                 </p>
                 <p>
-                  {new Date(returnAssetTarget.ordered_at).toLocaleDateString("en-GB", {
-                    day: "numeric",
-                    month: "short",
-                    year: "numeric",
-                  })}
+                  {formatDate(returnAssetTarget.ordered_at)}
                 </p>
               </div>
 
@@ -1950,11 +1938,7 @@ export default function OrdersPage() {
                     <p key={r.id} className="text-xs text-muted-foreground">
                       {r.asset_name}:{" "}
                       <span className="font-medium text-foreground">{r.quantity}</span> on{" "}
-                      {new Date(r.returned_at).toLocaleDateString("en-GB", {
-                        day: "numeric",
-                        month: "short",
-                        year: "numeric",
-                      })}
+                      {formatDate(r.returned_at)}
                     </p>
                   ))}
                 </div>
@@ -2050,11 +2034,7 @@ export default function OrdersPage() {
                 <div>
                   <p className="text-xs text-muted-foreground">Order Date</p>
                   <p>
-                    {new Date(viewingOrder.ordered_at).toLocaleDateString("en-GB", {
-                      day: "numeric",
-                      month: "short",
-                      year: "numeric",
-                    })}
+                    {formatDate(viewingOrder.ordered_at)}
                   </p>
                 </div>
                 <div>
@@ -2145,11 +2125,7 @@ export default function OrdersPage() {
                   <div>
                     <p className="text-xs text-muted-foreground">Delivered</p>
                     <p>
-                      {new Date(viewingOrder.delivered_at).toLocaleDateString("en-GB", {
-                        day: "numeric",
-                        month: "short",
-                        year: "numeric",
-                      })}
+                      {formatDate(viewingOrder.delivered_at)}
                     </p>
                   </div>
                 )}
@@ -2167,48 +2143,7 @@ export default function OrdersPage() {
                 )}
               </div>
 
-              {/* Payment history */}
-              <div>
-                <h3 className="text-sm font-semibold mb-2">Payment History</h3>
-                {viewOrderLoading ? (
-                  <div className="flex justify-center py-6">
-                    <Loader2 className="size-4 animate-spin text-muted-foreground" />
-                  </div>
-                ) : viewOrderPayments.length === 0 ? (
-                  <p className="text-sm text-muted-foreground text-center py-6">
-                    No payments recorded.
-                  </p>
-                ) : (
-                  <div className="rounded-lg border border-border overflow-x-auto">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Order Date</TableHead>
-                          <TableHead>Method</TableHead>
-                          <TableHead className="text-right">Amount</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {viewOrderPayments.map((p) => (
-                          <TableRow key={p.id}>
-                            <TableCell className="text-muted-foreground text-xs whitespace-nowrap">
-                              {new Date(p.paid_at).toLocaleDateString("en-GB", {
-                                day: "numeric",
-                                month: "short",
-                                year: "numeric",
-                              })}
-                            </TableCell>
-                            <TableCell className="text-sm">{p.payment_method ?? "—"}</TableCell>
-                            <TableCell className="text-right font-medium text-green-600">
-                              ৳{Number(p.amount).toFixed(2)}
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </div>
-                )}
-              </div>
+              {/* Payment history — hidden, use money icon instead */}
             </div>
           )}
         </SheetContent>

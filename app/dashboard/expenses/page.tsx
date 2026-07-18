@@ -5,6 +5,7 @@ import { useForm } from "react-hook-form";
 import { useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
+import { formatDate } from "@/lib/utils";
 import { PlusIcon, Pencil, Trash2 } from "lucide-react";
 
 import { createExpenseSchema, type CreateExpenseInput } from "@/lib/schemas/expense";
@@ -379,7 +380,7 @@ export default function ExpensesPage() {
                     {e.description ?? "—"}
                   </TableCell>
                   <TableCell className="text-muted-foreground">
-                    {new Date(e.date).toLocaleDateString()}
+                    {formatDate(e.date)}
                   </TableCell>
                   <TableCell>
                     <div className="flex items-center gap-1 justify-end">

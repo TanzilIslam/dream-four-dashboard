@@ -13,6 +13,8 @@ import {
   SlidersHorizontal,
   X,
   Eye,
+  BanknoteIcon,
+  Download,
 } from "lucide-react";
 
 import {
@@ -44,6 +46,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { formatDate } from "@/lib/utils";
 
 type Customer = {
   id: number;
@@ -161,6 +165,11 @@ export default function CustomersPage() {
   const [viewingCustomer, setViewingCustomer] = useState<Customer | null>(null);
   const [customerHistory, setCustomerHistory] = useState<CustomerHistoryProduct[] | null>(null);
   const [historyLoading, setHistoryLoading] = useState(false);
+  const [paymentCustomer, setPaymentCustomer] = useState<Customer | null>(null);
+  const [paymentList, setPaymentList] = useState<{ id: number; amount: string; paid_at: string; payment_method: string | null; product_name: string }[]>([]);
+  const [deliveredOrders, setDeliveredOrders] = useState<{ id: number; delivered_at: string | null; quantity: number; unit_price: string; total_amount: string; paid_amount: string; due_amount: string; product_name: string }[]>([]);
+  const [paymentListLoading, setPaymentListLoading] = useState(false);
+  const [customerSheetTab, setCustomerSheetTab] = useState<string>("payments");
   const [nameSortDir, setNameSortDir] = useState<"asc" | "desc">("asc");
   const [orderSort, setOrderSort] = useState<
     | "none"
@@ -401,6 +410,113 @@ export default function CustomersPage() {
       .finally(() => setHistoryLoading(false));
   }, [viewingCustomer]);
 
+  useEffect(() => {
+    if (!paymentCustomer) return;
+    setPaymentListLoading(true);
+    setCustomerSheetTab("payments");
+    fetch(`/api/customers/${paymentCustomer.id}/payments`)
+      .then((r) => r.json())
+      .then((data) => {
+        setPaymentList(data.payments ?? []);
+        setDeliveredOrders(data.orders ?? []);
+      })
+      .finally(() => setPaymentListLoading(false));
+  }, [paymentCustomer]);
+
+  async function exportLedger() {
+    if (!paymentCustomer) return;
+    try {
+      const { utils, writeFile } = await import("xlsx");
+
+      type LedgerEntry = { date: Date; type: "delivery" | "payment"; details: string; qty: number | null; rate: number | null; purchase: number; paid: number };
+
+      const entries: LedgerEntry[] = [];
+
+      for (const o of deliveredOrders) {
+        entries.push({
+          date: new Date(o.delivered_at ?? o.id),
+          type: "delivery",
+          details: o.product_name,
+          qty: o.quantity,
+          rate: Number(o.unit_price),
+          purchase: Number(o.total_amount),
+          paid: 0,
+        });
+      }
+
+      for (const p of paymentList) {
+        entries.push({
+          date: new Date(p.paid_at),
+          type: "payment",
+          details: `Payment (${p.payment_method ?? "Cash"})`,
+          qty: null,
+          rate: null,
+          purchase: 0,
+          paid: Number(p.amount),
+        });
+      }
+
+      entries.sort((a, b) => a.date.getTime() - b.date.getTime());
+
+      const aoa: (string | number | null)[][] = [];
+
+      // Header rows
+      aoa.push(["Dream Four — Customer Ledger"]);
+      aoa.push([`Customer: ${paymentCustomer.name}`, null, `Phone: ${paymentCustomer.phone ?? "—"}`, null, `Area: ${paymentCustomer.area_name ?? "—"}`]);
+      aoa.push([`Generated: ${formatDate(new Date())}`]);
+      aoa.push([]); // separator
+
+      // Column headers
+      aoa.push(["Date", "Details", "Qty", "Rate", "Purchase (৳)", "Paid (৳)", "Balance (৳)"]);
+
+      // Data rows with running balance
+      let balance = 0;
+      let totalPurchase = 0;
+      let totalPaid = 0;
+
+      for (const e of entries) {
+        balance += e.purchase - e.paid;
+        totalPurchase += e.purchase;
+        totalPaid += e.paid;
+        aoa.push([
+          formatDate(e.date),
+          e.details,
+          e.qty,
+          e.rate,
+          e.purchase || null,
+          e.paid || null,
+          Math.round(balance * 100) / 100,
+        ]);
+      }
+
+      // Total row
+      aoa.push([null, "TOTAL", null, null, Math.round(totalPurchase * 100) / 100, Math.round(totalPaid * 100) / 100, Math.round(balance * 100) / 100]);
+
+      const ws = utils.aoa_to_sheet(aoa);
+
+      // Merge header row across all columns
+      ws["!merges"] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: 6 } }];
+
+      // Column widths
+      ws["!cols"] = [
+        { wch: 14 }, // Date
+        { wch: 22 }, // Details
+        { wch: 6 },  // Qty
+        { wch: 8 },  // Rate
+        { wch: 14 }, // Purchase
+        { wch: 14 }, // Paid
+        { wch: 14 }, // Balance
+      ];
+
+      const wb = utils.book_new();
+      utils.book_append_sheet(wb, ws, "Ledger");
+      writeFile(wb, `${paymentCustomer.name}_Ledger.xlsx`);
+      toast.success("Ledger downloaded");
+    } catch {
+      toast.error("Failed to export ledger");
+    }
+  }
+
   async function refreshCustomers() {
     const res = await fetch(`/api/customers?status=${statusParam}`);
     setCustomers(await res.json());
@@ -597,8 +713,7 @@ export default function CustomersPage() {
               <TableHead>Phone</TableHead>
               {/* <TableHead className="text-right">Orders</TableHead> */}
               {/* <TableHead className="text-right">Qty</TableHead> */}
-              <TableHead className="text-right">Total Paid</TableHead>
-              <TableHead className="text-right">Total Due</TableHead>
+              <TableHead>Summary</TableHead>
               <TableHead className="text-right">Last Order</TableHead>
               <TableHead className="text-right">Total Assets</TableHead>
               <TableHead className="text-right">Assets to Return</TableHead>
@@ -635,11 +750,12 @@ export default function CustomersPage() {
                   <TableCell>{c.phone ?? "—"}</TableCell>
                   {/* <TableCell className="text-right tabular-nums">{c.total_orders}</TableCell> */}
                   {/* <TableCell className="text-right tabular-nums">{c.total_quantity}</TableCell> */}
-                  <TableCell className="text-right tabular-nums text-green-600">
-                    {Number(c.total_paid) > 0 ? `৳${Number(c.total_paid).toFixed(0)}` : "—"}
-                  </TableCell>
-                  <TableCell className="text-right tabular-nums text-amber-600">
-                    {Number(c.total_due) > 0 ? `৳${Number(c.total_due).toFixed(0)}` : "—"}
+                  <TableCell className="text-sm space-y-0.5 tabular-nums">
+                    <div><span className="text-muted-foreground">Sold:</span> ৳{(Number(c.total_paid) + Number(c.total_due)).toFixed(0)} ({c.total_quantity} unit)</div>
+                    <div><span className="text-muted-foreground">Paid:</span> <span className="text-green-600">৳{Number(c.total_paid).toFixed(0)}</span></div>
+                    {Number(c.total_due) > 0 && (
+                      <div><span className="text-muted-foreground">Due:</span> <span className="text-destructive">৳{Number(c.total_due).toFixed(0)}</span></div>
+                    )}
                   </TableCell>
                   <TableCell className="text-right tabular-nums text-muted-foreground text-xs">
                     {c.last_order_date
@@ -669,6 +785,15 @@ export default function CustomersPage() {
                         className="size-7 hover:bg-muted"
                       >
                         <Eye className="size-3.5" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => setPaymentCustomer(c)}
+                        className="size-7 text-green-600 hover:bg-green-50 hover:text-green-700"
+                        title="Payment history"
+                      >
+                        <BanknoteIcon className="size-3.5" />
                       </Button>
                       <Button
                         variant="ghost"
@@ -1187,6 +1312,150 @@ export default function CustomersPage() {
               </div>
             </div>
           )}
+        </SheetContent>
+      </Sheet>
+
+      {/* ── Customer Orders & Payments Sheet ─────────────────────── */}
+      <Sheet
+        open={paymentCustomer !== null}
+        onOpenChange={(open) => !open && setPaymentCustomer(null)}
+      >
+        <SheetContent className="!w-full sm:max-w-xl overflow-y-auto">
+          <SheetHeader>
+            <SheetTitle>{paymentCustomer?.name ?? ""}</SheetTitle>
+          </SheetHeader>
+          <div className="mt-4 px-4 pb-8">
+            {paymentListLoading ? (
+              <p className="text-sm text-muted-foreground text-center py-6">Loading…</p>
+            ) : (
+              <Tabs value={customerSheetTab} onValueChange={setCustomerSheetTab}>
+                <div className="flex items-center gap-2">
+                <TabsList className="flex-1">
+                  <TabsTrigger value="payments" className="flex-1">Payments</TabsTrigger>
+                  <TabsTrigger value="orders" className="flex-1">Orders</TabsTrigger>
+                </TabsList>
+                {(deliveredOrders.length > 0 || paymentList.length > 0) && (
+                  <Button variant="outline" size="icon" onClick={exportLedger} title="Download Ledger" className="shrink-0">
+                    <Download className="h-4 w-4" />
+                  </Button>
+                )}
+                </div>
+
+                {/* Payments Tab */}
+                <TabsContent value="payments" className="mt-4">
+                  {paymentList.length === 0 ? (
+                    <p className="text-sm text-muted-foreground text-center py-6">No payments recorded.</p>
+                  ) : (
+                    <>
+                      <div className="rounded-md border border-border overflow-x-auto text-sm">
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead>Date</TableHead>
+                              <TableHead>Product</TableHead>
+                              <TableHead>Method</TableHead>
+                              <TableHead className="text-right">Amount</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {paymentList.map((p) => (
+                              <TableRow key={p.id}>
+                                <TableCell className="whitespace-nowrap text-muted-foreground">
+                                  {new Date(p.paid_at).toLocaleDateString("en-GB", {
+                                    day: "numeric",
+                                    month: "short",
+                                    year: "numeric",
+                                  })}
+                                </TableCell>
+                                <TableCell className="text-muted-foreground">{p.product_name}</TableCell>
+                                <TableCell className="text-muted-foreground">{p.payment_method ?? "—"}</TableCell>
+                                <TableCell className="text-right font-medium text-green-600 tabular-nums">
+                                  ৳{Number(p.amount).toFixed(2)}
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </div>
+                      <div className="mt-3 flex justify-between items-center px-3 py-2 rounded-md bg-muted/50 text-sm font-semibold">
+                        <span>Total</span>
+                        <span className="text-green-600 tabular-nums">
+                          ৳{paymentList.reduce((sum, p) => sum + Number(p.amount), 0).toFixed(2)}
+                        </span>
+                      </div>
+                    </>
+                  )}
+                </TabsContent>
+
+                {/* Orders Tab */}
+                <TabsContent value="orders" className="mt-4">
+                  {deliveredOrders.length === 0 ? (
+                    <p className="text-sm text-muted-foreground text-center py-6">No delivered orders.</p>
+                  ) : (
+                    <>
+                      <div className="rounded-md border border-border overflow-x-auto text-sm">
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead>Date</TableHead>
+                              <TableHead>Product</TableHead>
+                              <TableHead className="text-right">Qty</TableHead>
+                              <TableHead className="text-right">Rate</TableHead>
+                              <TableHead className="text-right">Total</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {deliveredOrders.map((o) => (
+                              <TableRow key={o.id}>
+                                <TableCell className="whitespace-nowrap text-muted-foreground">
+                                  {new Date(o.delivered_at).toLocaleDateString("en-GB", {
+                                    day: "numeric",
+                                    month: "short",
+                                    year: "numeric",
+                                  })}
+                                </TableCell>
+                                <TableCell className="text-muted-foreground">{o.product_name}</TableCell>
+                                <TableCell className="text-right tabular-nums">{o.quantity}</TableCell>
+                                <TableCell className="text-right tabular-nums">৳{Number(o.unit_price).toFixed(2)}</TableCell>
+                                <TableCell className="text-right font-medium tabular-nums">
+                                  ৳{Number(o.total_amount).toFixed(2)}
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </div>
+                      {(() => {
+                        const totalPurchase = deliveredOrders.reduce((sum, o) => sum + Number(o.total_amount), 0);
+                        const totalPaid = deliveredOrders.reduce((sum, o) => sum + Number(o.paid_amount), 0);
+                        const totalDue = deliveredOrders.reduce((sum, o) => sum + Number(o.due_amount), 0);
+                        return (
+                          <>
+                            <div className="mt-3 flex justify-between items-center px-3 py-2 rounded-md bg-muted/50 text-sm font-semibold">
+                              <span>Total</span>
+                              <div className="flex gap-4 tabular-nums">
+                                <span>{deliveredOrders.reduce((sum, o) => sum + Number(o.quantity), 0)} qty</span>
+                                <span>৳{totalPurchase.toFixed(2)}</span>
+                              </div>
+                            </div>
+                            <div className="mt-2 flex justify-between items-center px-3 py-2 rounded-md bg-muted/50 text-sm font-semibold">
+                              <span>Due</span>
+                              <span className={`tabular-nums ${totalDue > 0 ? "text-destructive" : "text-muted-foreground"}`}>
+                                {totalDue > 0 ? `৳${totalDue.toFixed(2)}` : "—"}
+                              </span>
+                            </div>
+                            <p className="mt-1 text-[11px] text-muted-foreground px-3">
+                              ৳{totalPurchase.toFixed(2)} purchase − ৳{totalPaid.toFixed(2)} paid
+                            </p>
+                          </>
+                        );
+                      })()}
+                    </>
+                  )}
+                </TabsContent>
+              </Tabs>
+            )}
+          </div>
         </SheetContent>
       </Sheet>
 

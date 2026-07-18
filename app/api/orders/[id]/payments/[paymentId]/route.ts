@@ -44,6 +44,7 @@ export async function DELETE(
     UPDATE orders SET
       paid_amount = ${newPaid},
       due_amount  = ${newDue},
+      collection  = ${newPaid},
       status      = ${newStatus}
     WHERE id = ${id}
   `;

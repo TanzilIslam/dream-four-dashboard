@@ -144,6 +144,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       UPDATE orders SET
         paid_amount           = ${newPaid},
         due_amount            = ${newDue},
+        collection            = ${newPaid},
         payment_method        = ${d.payment_method || null},
         status                = ${newStatus},
         note                  = ${d.note || order.note}

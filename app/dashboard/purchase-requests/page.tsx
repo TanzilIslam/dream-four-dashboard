@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
+import { formatDate } from "@/lib/utils";
 import { PlusIcon, Pencil, Trash2, Eye, Banknote } from "lucide-react";
 
 import {
@@ -652,9 +653,7 @@ export default function PurchasesPage() {
                     {r.note ?? "—"}
                   </TableCell>
                   <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
-                    {r.purchased_at
-                      ? new Date(r.purchased_at).toLocaleDateString()
-                      : new Date(r.created_at).toLocaleDateString()}
+                    {formatDate(r.purchased_at ?? r.created_at)}
                   </TableCell>
                   <TableCell>
                     <div className="flex items-center gap-1">
@@ -1049,9 +1048,7 @@ export default function PurchasesPage() {
         onOpenChange={(open) => !open && setDeletePaymentTarget(null)}
         title="Delete Payment"
         description={`Delete payment of ৳${Number(deletePaymentTarget?.amount ?? 0).toFixed(2)} on ${
-          deletePaymentTarget?.paid_at
-            ? new Date(deletePaymentTarget.paid_at).toLocaleDateString()
-            : "—"
+          formatDate(deletePaymentTarget?.paid_at)
         }?`}
         confirmLabel="Delete"
         loading={deletingPayment}
@@ -1119,9 +1116,7 @@ export default function PurchasesPage() {
                   <DetailRow
                     label="Purchase Date"
                     value={
-                      detailsTarget.purchased_at
-                        ? new Date(detailsTarget.purchased_at).toLocaleDateString()
-                        : "—"
+                      formatDate(detailsTarget.purchased_at)
                     }
                   />
                   {detailsTarget.note && <DetailRow label="Note" value={detailsTarget.note} />}
@@ -1172,7 +1167,7 @@ export default function PurchasesPage() {
                         <div className="text-sm">
                           <p className="font-medium">৳{Number(p.amount).toFixed(2)}</p>
                           <p className="text-xs text-muted-foreground">
-                            {new Date(p.paid_at).toLocaleDateString()}
+                            {formatDate(p.paid_at)}
                             {p.payment_method && ` · ${p.payment_method}`}
                             {p.from_personal && " · Personal"}
                           </p>

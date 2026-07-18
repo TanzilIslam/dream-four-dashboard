@@ -189,72 +189,10 @@ export async function GET(request: Request) {
       FROM order_stats os, purchase_stats ps, expense_stats es, loan_stats ls, customer_stats cs, supplier_stats ss, supplier_payment_stats sps, stock_stats stk
     `,
 
-    // Sheet 2: Customer Performance
-    sql`
-      SELECT
-        o.ordered_at::date                                        AS "Date",
-        CASE WHEN c.phone IS NOT NULL AND c.phone != '' THEN c.name || E'\n' || c.phone ELSE c.name END AS "Customer",
-        p.name                                                    AS "Product",
-        COALESCE(o.unit, p.unit)                                  AS "Unit",
-        COALESCE(o.unit_cost, 0)::numeric                        AS "Unit Cost",
-        COALESCE(o.unit_transport_cost, 0)::numeric              AS "Transport Cost",
-        COALESCE(o.unit_label_cost, 0)::numeric                  AS "Label Cost",
-        COALESCE(o.unit_other_cost, 0)::numeric                  AS "Other Cost",
-        o.quantity::int                                           AS "Qty",
-        COALESCE(o.total_cost, 0)::numeric                       AS "Total Cost",
-        COALESCE(o.net_value, 0)::numeric                        AS "Net Value",
-        o.total_amount::numeric                                   AS "Sales",
-        o.paid_amount::numeric                                    AS "Paid",
-        o.due_amount::numeric                                     AS "Due",
-        COALESCE(o.note, '')                                     AS "Remarks"
-      FROM orders o
-      JOIN customers c ON c.id = o.customer_id
-      JOIN products p  ON p.id = o.product_id
-      LEFT JOIN areas a ON a.id = c.area_id
-      WHERE o.status IN ('delivered', 'paid') ${productFilter} ${dateFilter}  -- FULFILLED: see lib/order-status.ts
-      ORDER BY o.ordered_at ASC
-    `,
-
-    // Sheet 3: Daily Sales Trend
-    sql`
-      SELECT
-        o.ordered_at::date                        AS "Date",
-        COUNT(o.id)::int                          AS "Orders",
-        COALESCE(SUM(o.quantity), 0)::int         AS "Qty",
-        COALESCE(SUM(o.total_amount), 0)::numeric AS "Revenue (৳)",
-        COALESCE(SUM(o.paid_amount), 0)::numeric  AS "Collected (৳)"
-      FROM orders o
-      WHERE o.status IN ('delivered', 'paid') ${productFilter} ${dateFilter}  -- FULFILLED: see lib/order-status.ts
-      GROUP BY o.ordered_at::date
-      ORDER BY o.ordered_at::date ASC
-    `,
-
-    // Sheet 4: Product Performance
-    sql`
-      SELECT
-        p.name                                                AS "Product",
-        COALESCE(SUM(o.quantity) FILTER (WHERE o.status IN ('delivered', 'paid')), 0)::int        AS "Qty Sold",
-        COALESCE(SUM(o.total_amount) FILTER (WHERE o.status IN ('delivered', 'paid')), 0)::numeric AS "Revenue (৳)",
-        COALESCE((SELECT SUM(pr.actual_total) FROM purchase_requests pr WHERE pr.product_id = p.id AND pr.status = 'purchased'), 0)::numeric AS "Purchase Cost (৳)",
-        (
-          COALESCE(SUM(o.total_amount) FILTER (WHERE o.status IN ('delivered', 'paid')), 0)
-          - COALESCE((SELECT SUM(pr.actual_total) FROM purchase_requests pr WHERE pr.product_id = p.id AND pr.status = 'purchased'), 0)
-        )::numeric AS "Gross Profit (৳)",
-        CASE
-          WHEN COALESCE(SUM(o.total_amount) FILTER (WHERE o.status IN ('delivered', 'paid')), 0) = 0 THEN '0%'
-          ELSE ROUND(
-            100 * (
-              COALESCE(SUM(o.total_amount) FILTER (WHERE o.status IN ('delivered', 'paid')), 0)
-              - COALESCE((SELECT SUM(pr.actual_total) FROM purchase_requests pr WHERE pr.product_id = p.id AND pr.status = 'purchased'), 0)
-            ) / COALESCE(SUM(o.total_amount) FILTER (WHERE o.status IN ('delivered', 'paid')), 1)
-          )::text || '%'
-        END AS "Margin %"
-      FROM products p
-      LEFT JOIN orders o ON o.product_id = p.id ${dateFilter}
-      ${productId && productId !== "all" ? sql`WHERE p.id = ${Number(productId)}` : sql``}
-      GROUP BY p.id, p.name
-      ORDER BY SUM(o.total_amount) DESC NULLS LAST
-    `,
+    // (removed: Customer Performance, Daily Sales Trend, Product Performance)
+    [] as Record<string, unknown>[],
+    [] as Record<string, unknown>[],
+    [] as Record<string, unknown>[],
 
     // Sheet 5: Expense Breakdown
     sql`
@@ -510,22 +448,12 @@ export async function GET(request: Request) {
       ]
     : [];
 
-  const formattedDailyTrend = dailyTrend.map((r: Record<string, unknown>) => ({
-    ...r,
-    Date: fmt(r["Date"]),
-  }));
-
   const formattedDues = dues.map((r: Record<string, unknown>) => ({
     ...r,
     Date: fmt(r["Date"]),
   }));
 
   const formattedSupplies = supplies.map((r: Record<string, unknown>) => ({
-    ...r,
-    Date: fmt(r["Date"]),
-  }));
-
-  const formattedCustomers = customers.map((r: Record<string, unknown>) => ({
     ...r,
     Date: fmt(r["Date"]),
   }));
@@ -537,9 +465,9 @@ export async function GET(request: Request) {
 
   return Response.json({
     summary: summaryRows,
-    customers: formattedCustomers,
-    dailyTrend: formattedDailyTrend,
-    products,
+    customers: [],
+    dailyTrend: [],
+    products: [],
     expenseBreakdown,
     dues: formattedDues,
     supplies: formattedSupplies,
