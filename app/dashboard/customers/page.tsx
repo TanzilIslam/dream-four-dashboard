@@ -15,6 +15,7 @@ import {
   Eye,
   BanknoteIcon,
   Download,
+  Link,
 } from "lucide-react";
 
 import {
@@ -851,6 +852,7 @@ export default function CustomersPage() {
                         size="icon"
                         onClick={() => setViewingCustomer(c)}
                         className="size-7 hover:bg-muted"
+                        title="View details"
                       >
                         <Eye className="size-3.5" />
                       </Button>
@@ -866,8 +868,26 @@ export default function CustomersPage() {
                       <Button
                         variant="ghost"
                         size="icon"
+                        onClick={async () => {
+                          const publicUrl = `${typeof window !== "undefined" ? window.location.origin : ""}/score?name=${encodeURIComponent(c.name)}`;
+                          try {
+                            await navigator.clipboard.writeText(publicUrl);
+                            toast.success(`Link copied: ${c.name}`);
+                          } catch {
+                            toast.error("Failed to copy link");
+                          }
+                        }}
+                        className="size-7 text-blue-600 hover:bg-blue-50 hover:text-blue-700"
+                        title="Copy public score link"
+                      >
+                        <Link className="size-3.5" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
                         onClick={() => openEdit(c)}
                         className="size-7 hover:bg-muted"
+                        title="Edit customer"
                       >
                         <Pencil className="size-3.5" />
                       </Button>
