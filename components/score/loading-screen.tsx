@@ -13,7 +13,9 @@ export function LoadingScreen() {
           <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-100 mb-2">
             Searching for customer...
           </h2>
-          <p className="text-slate-600 dark:text-slate-400">Please wait while we find your details</p>
+          <p className="text-slate-600 dark:text-slate-400">
+            Please wait while we find your details
+          </p>
         </div>
       </div>
     </div>

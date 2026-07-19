@@ -65,7 +65,9 @@ export default function CustomerScorePage({ initialName }: CustomerScorePageProp
       try {
         setLoading(true);
         setError(null);
-        const response = await fetch(`/api/public/customers/lookup?name=${encodeURIComponent(initialName)}`);
+        const response = await fetch(
+          `/api/public/customers/lookup?name=${encodeURIComponent(initialName)}`
+        );
 
         if (!response.ok) {
           const errorData = await response.json();
@@ -133,9 +135,7 @@ export default function CustomerScorePage({ initialName }: CustomerScorePageProp
           <p className="text-slate-600 dark:text-slate-400 mb-6">
             Visit this page with a customer name parameter to get started.
           </p>
-          <p className="text-sm text-slate-500 dark:text-slate-500">
-            Example: /score?name=John
-          </p>
+          <p className="text-sm text-slate-500 dark:text-slate-500">Example: /score?name=John</p>
         </Card>
       </div>
     );
@@ -180,7 +180,9 @@ export default function CustomerScorePage({ initialName }: CustomerScorePageProp
                 className="w-full p-4 text-left border rounded-lg hover:bg-blue-50 dark:hover:bg-blue-900 transition-colors"
               >
                 <p className="font-semibold">{customer.name}</p>
-                <p className="text-sm text-slate-600 dark:text-slate-400">{customer.phone_masked}</p>
+                <p className="text-sm text-slate-600 dark:text-slate-400">
+                  {customer.phone_masked}
+                </p>
               </button>
             ))}
           </div>

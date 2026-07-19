@@ -497,7 +497,8 @@ export default function CustomersPage() {
       // Sort by date (day only); within same day, deliveries before payments
       const dayKey = (d: Date) => `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
       entries.sort((a, b) => {
-        const da = dayKey(a.date), db = dayKey(b.date);
+        const da = dayKey(a.date),
+          db = dayKey(b.date);
         if (da !== db) return a.date.getTime() - b.date.getTime();
         if (a.type === "delivery" && b.type === "payment") return -1;
         if (a.type === "payment" && b.type === "delivery") return 1;

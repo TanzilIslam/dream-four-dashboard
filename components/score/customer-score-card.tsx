@@ -95,7 +95,15 @@ export function CustomerScoreCard({ details }: CustomerScoreCardProps) {
               <div className="relative w-40 h-40 mb-6">
                 <svg className="w-full h-full" viewBox="0 0 180 180">
                   {/* Background circle */}
-                  <circle cx="90" cy="90" r="80" fill="none" stroke="currentColor" strokeWidth="8" className="text-slate-200 dark:text-slate-700" />
+                  <circle
+                    cx="90"
+                    cy="90"
+                    r="80"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="8"
+                    className="text-slate-200 dark:text-slate-700"
+                  />
                   {/* Score circle */}
                   <circle
                     cx="90"
@@ -123,16 +131,24 @@ export function CustomerScoreCard({ details }: CustomerScoreCardProps) {
                 <h3 className="text-lg font-semibold mb-4">Purchase Summary</h3>
                 <div className="space-y-3">
                   <div className="flex justify-between items-center p-3 bg-slate-50 dark:bg-slate-800 rounded">
-                    <span className="text-slate-600 dark:text-slate-400">Total Amount Ordered:</span>
-                    <span className="font-semibold">₹{details.summary.total_ordered.toFixed(2)}</span>
+                    <span className="text-slate-600 dark:text-slate-400">
+                      Total Amount Ordered:
+                    </span>
+                    <span className="font-semibold">
+                      ₹{details.summary.total_ordered.toFixed(2)}
+                    </span>
                   </div>
                   <div className="flex justify-between items-center p-3 bg-slate-50 dark:bg-slate-800 rounded">
                     <span className="text-slate-600 dark:text-slate-400">Total Paid:</span>
-                    <span className="font-semibold text-green-600">₹{details.summary.total_paid.toFixed(2)}</span>
+                    <span className="font-semibold text-green-600">
+                      ₹{details.summary.total_paid.toFixed(2)}
+                    </span>
                   </div>
                   <div className="flex justify-between items-center p-3 bg-slate-50 dark:bg-slate-800 rounded">
                     <span className="text-slate-600 dark:text-slate-400">Outstanding Due:</span>
-                    <span className={`font-semibold ${details.summary.total_due > 0 ? "text-red-600" : "text-green-600"}`}>
+                    <span
+                      className={`font-semibold ${details.summary.total_due > 0 ? "text-red-600" : "text-green-600"}`}
+                    >
                       ₹{details.summary.total_due.toFixed(2)}
                     </span>
                   </div>
@@ -146,7 +162,8 @@ export function CustomerScoreCard({ details }: CustomerScoreCardProps) {
                     <span className="font-medium">Protein per egg:</span> {PROTEIN_PER_EGG}g
                   </p>
                   <p className="text-slate-600 dark:text-slate-400">
-                    <span className="font-medium">Adult daily need:</span> {DAILY_PROTEIN_NEED}g ({EGGS_NEEDED_PER_DAY} eggs)
+                    <span className="font-medium">Adult daily need:</span> {DAILY_PROTEIN_NEED}g (
+                    {EGGS_NEEDED_PER_DAY} eggs)
                   </p>
                   <p className="text-slate-600 dark:text-slate-400">
                     <span className="font-medium">Monthly target:</span> {monthlyTarget} eggs
@@ -164,7 +181,8 @@ export function CustomerScoreCard({ details }: CustomerScoreCardProps) {
             <div>
               <div className="flex justify-between items-center mb-4">
                 <label className="text-lg font-medium">
-                  Members: <span className="text-blue-600 dark:text-blue-400 text-2xl">{familyMembers}</span>
+                  Members:{" "}
+                  <span className="text-blue-600 dark:text-blue-400 text-2xl">{familyMembers}</span>
                 </label>
               </div>
 
@@ -199,9 +217,11 @@ export function CustomerScoreCard({ details }: CustomerScoreCardProps) {
             <div className="p-4 bg-slate-50 dark:bg-slate-800 rounded-lg">
               <p className="text-sm text-slate-600 dark:text-slate-400 mb-2">What this means:</p>
               <p className="text-sm">
-                For a family of <span className="font-semibold">{familyMembers}</span>, you should ideally purchase about{" "}
-                <span className="font-semibold">{monthlyTarget} eggs per month</span> to meet daily protein requirements.
-                Your current purchase rate suggests a score of <Badge className={getScoreBadgeColor(score)}>{score}</Badge>
+                For a family of <span className="font-semibold">{familyMembers}</span>, you should
+                ideally purchase about{" "}
+                <span className="font-semibold">{monthlyTarget} eggs per month</span> to meet daily
+                protein requirements. Your current purchase rate suggests a score of{" "}
+                <Badge className={getScoreBadgeColor(score)}>{score}</Badge>
               </p>
             </div>
           </div>
@@ -228,10 +248,14 @@ export function CustomerScoreCard({ details }: CustomerScoreCardProps) {
                       key={order.id}
                       className="border-b border-slate-100 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/50"
                     >
-                      <td className="py-3 px-3">{new Date(order.ordered_at).toLocaleDateString()}</td>
+                      <td className="py-3 px-3">
+                        {new Date(order.ordered_at).toLocaleDateString()}
+                      </td>
                       <td className="py-3 px-3">{order.product_name}</td>
                       <td className="py-3 px-3 text-right">{order.quantity}</td>
-                      <td className="py-3 px-3 text-right">₹{(order.unit_price * order.quantity).toFixed(2)}</td>
+                      <td className="py-3 px-3 text-right">
+                        ₹{(order.unit_price * order.quantity).toFixed(2)}
+                      </td>
                       <td className="py-3 px-3">
                         <Badge variant="outline">{order.status}</Badge>
                       </td>

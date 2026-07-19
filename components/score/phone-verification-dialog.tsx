@@ -93,11 +93,7 @@ export function PhoneVerificationDialog({
             >
               Cancel
             </Button>
-            <Button
-              type="submit"
-              disabled={loading}
-              className="flex-1"
-            >
+            <Button type="submit" disabled={loading} className="flex-1">
               {loading ? "Verifying..." : "Verify"}
             </Button>
           </div>
