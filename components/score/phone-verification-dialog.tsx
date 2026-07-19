@@ -38,7 +38,7 @@ export function PhoneVerificationDialog({
     // Extract only digits
     const phoneDigits = phone.replace(/\D/g, "");
     if (phoneDigits.length < 10) {
-      setError("Please enter a valid phone number");
+      setError("Please enter a valid phone number (at least 10 digits)");
       return;
     }
 
@@ -47,7 +47,19 @@ export function PhoneVerificationDialog({
       await onVerify(phoneDigits);
       toast.success("Phone verified successfully");
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : "Phone verification failed";
+      let errorMessage = "Phone verification failed";
+
+      if (err instanceof Error) {
+        const message = err.message.toLowerCase();
+        if (message.includes("does not match")) {
+          errorMessage = "The phone number doesn't match our records. Please check and try again.";
+        } else if (message.includes("not found")) {
+          errorMessage = "Customer not found. Please go back and try a different name.";
+        } else {
+          errorMessage = err.message;
+        }
+      }
+
       setError(errorMessage);
       toast.error(errorMessage);
     } finally {
