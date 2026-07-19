@@ -68,9 +68,9 @@ export function PhoneVerificationDialog({
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800 flex items-center justify-center p-4">
-      <Card className="w-full max-w-md p-8">
-        <h2 className="text-2xl font-bold mb-2">Verify Phone Number</h2>
+    <div className="min-h-screen bg-gradient-to-br from-white to-green-50 dark:from-slate-900 dark:to-slate-800 flex items-center justify-center p-4">
+      <Card className="w-full max-w-md p-8 border-green-200 shadow-lg shadow-green-100">
+        <h2 className="text-2xl font-bold mb-2 text-green-700">Verify Phone Number</h2>
         <p className="text-slate-600 dark:text-slate-400 mb-6">
           We have you registered as <span className="font-semibold">{customer.name}</span>
         </p>
