@@ -185,6 +185,8 @@ export default function CustomersPage() {
       paid_amount: string;
       due_amount: string;
       product_name: string;
+      assets_sent: number;
+      assets_returned: number;
     }[]
   >([]);
   const [paymentListLoading, setPaymentListLoading] = useState(false);
@@ -457,6 +459,8 @@ export default function CustomersPage() {
         rate: number | null;
         purchase: number;
         paid: number;
+        assetSent: number;
+        assetReturned: number;
       };
 
       const entries: LedgerEntry[] = [];
@@ -470,6 +474,8 @@ export default function CustomersPage() {
           rate: Number(o.unit_price),
           purchase: Number(o.total_amount),
           paid: 0,
+          assetSent: o.assets_sent ?? 0,
+          assetReturned: o.assets_returned ?? 0,
         });
       }
 
@@ -482,66 +488,76 @@ export default function CustomersPage() {
           rate: null,
           purchase: 0,
           paid: Number(p.amount),
+          assetSent: 0,
+          assetReturned: 0,
         });
       }
 
-      entries.sort((a, b) => a.date.getTime() - b.date.getTime());
+      // Sort by date (day only); within same day, deliveries before payments
+      const dayKey = (d: Date) => `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+      entries.sort((a, b) => {
+        const da = dayKey(a.date), db = dayKey(b.date);
+        if (da !== db) return a.date.getTime() - b.date.getTime();
+        if (a.type === "delivery" && b.type === "payment") return -1;
+        if (a.type === "payment" && b.type === "delivery") return 1;
+        return 0;
+      });
+
+      const shortDate = (d: Date) =>
+        d.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "2-digit" });
+
+      const hasAssets = entries.some((e) => e.assetSent > 0 || e.assetReturned > 0);
 
       const aoa: (string | number | null)[][] = [];
 
       // Header rows
-      aoa.push(["Dream Four — Customer Ledger"]);
-      aoa.push([
-        `Customer: ${paymentCustomer.name}`,
-        null,
-        `Phone: ${paymentCustomer.phone ?? "—"}`,
-        null,
-        `Area: ${paymentCustomer.area_name ?? "—"}`,
-      ]);
-      aoa.push([`Generated: ${formatDate(new Date())}`]);
-      aoa.push([]); // separator
+      const colCount = hasAssets ? 12 : 9;
+      aoa.push([paymentCustomer.name]);
 
       // Column headers
-      aoa.push(["Date", "Details", "Qty", "Rate", "Purchase (৳)", "Paid (৳)", "Balance (৳)"]);
+      const headers = ["Date", "Details", "Qty", "Rate", "Total", "Paid", "Due"];
+      if (hasAssets) headers.push("Received", "Returned", "In Hand");
+      headers.push("Customer Sign", "Staff Sign");
+      aoa.push(headers);
 
       // Data rows with running balance
       let balance = 0;
       let totalPurchase = 0;
       let totalPaid = 0;
+      let assetBalance = 0;
+      let totalAssetSent = 0;
+      let totalAssetReturned = 0;
 
       for (const e of entries) {
         balance += e.purchase - e.paid;
         totalPurchase += e.purchase;
         totalPaid += e.paid;
-        aoa.push([
-          formatDate(e.date),
+        assetBalance += e.assetSent - e.assetReturned;
+        totalAssetSent += e.assetSent;
+        totalAssetReturned += e.assetReturned;
+
+        const row: (string | number | null)[] = [
+          shortDate(e.date),
           e.details,
           e.qty,
           e.rate,
           e.purchase || null,
           e.paid || null,
           Math.round(balance * 100) / 100,
-        ]);
+        ];
+        if (hasAssets) {
+          row.push(e.assetSent || null, e.assetReturned || null, assetBalance);
+        }
+        aoa.push(row);
       }
-
-      // Total row
-      aoa.push([
-        null,
-        "TOTAL",
-        null,
-        null,
-        Math.round(totalPurchase * 100) / 100,
-        Math.round(totalPaid * 100) / 100,
-        Math.round(balance * 100) / 100,
-      ]);
 
       const ws = utils.aoa_to_sheet(aoa);
 
       // Merge header row across all columns
-      ws["!merges"] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: 6 } }];
+      ws["!merges"] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: colCount - 1 } }];
 
       // Column widths
-      ws["!cols"] = [
+      const cols = [
         { wch: 14 }, // Date
         { wch: 22 }, // Details
         { wch: 6 }, // Qty
@@ -550,6 +566,11 @@ export default function CustomersPage() {
         { wch: 14 }, // Paid
         { wch: 14 }, // Balance
       ];
+      if (hasAssets) {
+        cols.push({ wch: 12 }, { wch: 14 }, { wch: 14 });
+      }
+      cols.push({ wch: 16 }, { wch: 16 });
+      ws["!cols"] = cols;
 
       const wb = utils.book_new();
       utils.book_append_sheet(wb, ws, "Ledger");

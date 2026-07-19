@@ -31,7 +31,9 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
       o.total_amount,
       o.paid_amount,
       o.due_amount,
-      p.name AS product_name
+      p.name AS product_name,
+      COALESCE((SELECT SUM(oa.quantity) FROM order_assets oa WHERE oa.order_id = o.id), 0)::int AS assets_sent,
+      COALESCE((SELECT SUM(oar.quantity) FROM order_asset_returns oar WHERE oar.order_id = o.id), 0)::int AS assets_returned
     FROM orders o
     JOIN products p ON p.id = o.product_id
     WHERE o.customer_id = ${customerId}
