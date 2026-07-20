@@ -12,8 +12,7 @@ const ALLOWED_TABLES: Record<string, ReturnType<typeof sql>> = {
   stock: sql`
     SELECT p.name, p.unit,
            COALESCE(SUM(pr.actual_qty) FILTER (WHERE pr.status = 'purchased'), 0) AS purchased_qty,
-           COALESCE(SUM(o.quantity) FILTER (WHERE o.status IN ('pending','delivered')), 0) AS reserved_qty,
-           COALESCE(SUM(o.quantity) FILTER (WHERE o.status = 'delivered'), 0) AS delivered_qty,
+           COALESCE(SUM(o.quantity) FILTER (WHERE o.status IN ('delivered', 'paid')), 0) AS delivered_qty,
            COALESCE(SUM(r.quantity), 0) AS returned_qty,
            COALESCE(SUM(sa.quantity), 0) AS adjusted_qty
     FROM products p

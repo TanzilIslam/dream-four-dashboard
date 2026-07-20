@@ -106,7 +106,6 @@ type StockItem = {
   unit: string;
   low_stock_threshold: number;
   available_qty: number;
-  reserved_qty: number;
 };
 
 type OrderPayment = {
@@ -151,8 +150,8 @@ export default function OrdersPage() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
-  const [tiers, setTiers] = useState<Tier[]>([]);
-  const [stock, setStock] = useState<StockItem[]>([]);
+  const [_tiers, setTiers] = useState<Tier[]>([]);
+  const [_stock, setStock] = useState<StockItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
   const [orderSummary, setOrderSummary] = useState({ total: 0, paid: 0, due: 0 });
@@ -218,8 +217,8 @@ export default function OrdersPage() {
 
   // Order detail view
   const [viewingOrder, setViewingOrder] = useState<Order | null>(null);
-  const [viewOrderPayments, setViewOrderPayments] = useState<OrderPayment[]>([]);
-  const [viewOrderLoading, setViewOrderLoading] = useState(false);
+  const [_viewOrderPayments, setViewOrderPayments] = useState<OrderPayment[]>([]);
+  const [_viewOrderLoading, setViewOrderLoading] = useState(false);
 
   const createForm = useForm<z.input<typeof createOrderSchema>, unknown, CreateOrderInput>({
     resolver: zodResolver(createOrderSchema),
@@ -1044,7 +1043,6 @@ export default function OrdersPage() {
                   <span className="font-medium">{s.name}</span>
                   <span className="text-muted-foreground">
                     {s.available_qty} {s.unit} available
-                    {s.reserved_qty > 0 && ` · ${s.reserved_qty} reserved`}
                   </span>
                   {low && <span className="text-xs font-medium">Low stock</span>}
                 </div>

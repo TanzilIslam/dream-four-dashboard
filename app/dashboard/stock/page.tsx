@@ -41,7 +41,6 @@ type StockRow = {
   unit: string;
   low_stock_threshold: number | null;
   purchased_qty: number;
-  reserved_qty: number;
   delivered_qty: number;
   returned_qty: number;
   adjusted_qty: number;
@@ -161,7 +160,6 @@ export default function StockPage() {
     return data.map((row) => ({
       ...row,
       purchased_qty: Number(row.purchased_qty),
-      reserved_qty: Number(row.reserved_qty),
       delivered_qty: Number(row.delivered_qty),
       returned_qty: Number(row.returned_qty),
       adjusted_qty: Number(row.adjusted_qty),
@@ -396,10 +394,9 @@ export default function StockPage() {
                 </div>
 
                 {/* Breakdown */}
-                <div className="border-t pt-3 grid grid-cols-4 gap-2 text-center">
+                <div className="border-t pt-3 grid grid-cols-3 gap-2 text-center">
                   {[
                     { label: "Purchased", value: row.purchased_qty },
-                    { label: "Reserved", value: row.reserved_qty },
                     { label: "Delivered", value: row.delivered_qty },
                     { label: "Returned", value: row.returned_qty },
                   ].map(({ label, value }) => (

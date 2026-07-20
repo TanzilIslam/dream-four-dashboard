@@ -135,21 +135,21 @@ export function CustomerScoreCard({ details }: CustomerScoreCardProps) {
                       Total Amount Ordered:
                     </span>
                     <span className="font-semibold">
-                      ₹{details.summary.total_ordered.toFixed(2)}
+                      ₹{Number(details.summary.total_ordered).toFixed(2)}
                     </span>
                   </div>
                   <div className="flex justify-between items-center p-3 bg-green-50 dark:bg-green-900/20 rounded">
                     <span className="text-slate-600 dark:text-slate-400">Total Paid:</span>
                     <span className="font-semibold text-green-600">
-                      ₹{details.summary.total_paid.toFixed(2)}
+                      ₹{Number(details.summary.total_paid).toFixed(2)}
                     </span>
                   </div>
                   <div className="flex justify-between items-center p-3 bg-green-50 dark:bg-green-900/20 rounded">
                     <span className="text-slate-600 dark:text-slate-400">Outstanding Due:</span>
                     <span
-                      className={`font-semibold ${details.summary.total_due > 0 ? "text-red-600" : "text-green-600"}`}
+                      className={`font-semibold ${Number(details.summary.total_due) > 0 ? "text-red-600" : "text-green-600"}`}
                     >
-                      ₹{details.summary.total_due.toFixed(2)}
+                      ₹{Number(details.summary.total_due).toFixed(2)}
                     </span>
                   </div>
                 </div>
@@ -182,7 +182,9 @@ export function CustomerScoreCard({ details }: CustomerScoreCardProps) {
               <div className="flex justify-between items-center mb-4">
                 <label className="text-lg font-medium">
                   Members:{" "}
-                  <span className="text-green-600 dark:text-green-400 text-2xl">{familyMembers}</span>
+                  <span className="text-green-600 dark:text-green-400 text-2xl">
+                    {familyMembers}
+                  </span>
                 </label>
               </div>
 

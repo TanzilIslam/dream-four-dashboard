@@ -8,11 +8,9 @@ export async function getProductStock() {
       p.unit,
       p.low_stock_threshold,
       COALESCE(purchased.qty, 0)                                          AS purchased_qty,
-      COALESCE(reserved.qty, 0)                                           AS reserved_qty,
       COALESCE(delivered.qty, 0)                                          AS delivered_qty,
       COALESCE(returned.qty, 0)                                           AS returned_qty,
       COALESCE(purchased.qty, 0)
-        - COALESCE(reserved.qty, 0)
         - COALESCE(delivered.qty, 0)
         + COALESCE(returned.qty, 0)
         + COALESCE(adjusted.qty, 0)                                       AS available_qty,
@@ -24,12 +22,6 @@ export async function getProductStock() {
       WHERE status = 'purchased'
       GROUP BY product_id
     ) purchased ON purchased.product_id = p.id
-    LEFT JOIN (
-      SELECT product_id, SUM(quantity) AS qty
-      FROM orders
-      WHERE status = 'pending'
-      GROUP BY product_id
-    ) reserved ON reserved.product_id = p.id
     LEFT JOIN (
       SELECT product_id, SUM(quantity) AS qty
       FROM orders

@@ -87,8 +87,7 @@ export async function GET(request: Request) {
   const actualFrom: Date | string | null = from ?? earliest_date ?? null;
   const actualTo: Date | string = to ?? new Date();
 
-  // Per-product order/qty breakdown when all products selected
-  const perProductStats =
+  const _perProductStats =
     !productId || productId === "all"
       ? await sql`
           SELECT p.name,
@@ -102,19 +101,10 @@ export async function GET(request: Request) {
         `
       : [];
 
-  const [
-    summary,
-    customers,
-    dailyTrend,
-    products,
-    expenseBreakdown,
-    dues,
-    supplies,
-    miniDueList,
-    assetOverview,
-  ] = await Promise.all([
-    // Sheet 1: Summary KPIs
-    sql`
+  const [summary, , , , expenseBreakdown, dues, supplies, miniDueList, assetOverview] =
+    await Promise.all([
+      // Sheet 1: Summary KPIs
+      sql`
       WITH order_stats AS (
         SELECT
           COUNT(*)::int                    AS total_orders,
@@ -189,13 +179,13 @@ export async function GET(request: Request) {
       FROM order_stats os, purchase_stats ps, expense_stats es, loan_stats ls, customer_stats cs, supplier_stats ss, supplier_payment_stats sps, stock_stats stk
     `,
 
-    // (removed: Customer Performance, Daily Sales Trend, Product Performance)
-    [] as Record<string, unknown>[],
-    [] as Record<string, unknown>[],
-    [] as Record<string, unknown>[],
+      // (removed: Customer Performance, Daily Sales Trend, Product Performance)
+      [] as Record<string, unknown>[],
+      [] as Record<string, unknown>[],
+      [] as Record<string, unknown>[],
 
-    // Sheet 5: Expense Breakdown
-    sql`
+      // Sheet 5: Expense Breakdown
+      sql`
       SELECT
         COALESCE(ec.name, 'Uncategorized')                      AS "Category",
         COALESCE(p.name, 'Common (No Product)')                 AS "Product",
@@ -209,8 +199,8 @@ export async function GET(request: Request) {
       ORDER BY SUM(e.amount) DESC
     `,
 
-    // Sheet 6: All Sales (one row per fulfilled order)
-    sql`
+      // Sheet 6: All Sales (one row per fulfilled order)
+      sql`
       SELECT
         o.ordered_at::date                                        AS "Date",
         CASE WHEN c.phone IS NOT NULL AND c.phone != '' THEN c.name || E'\n' || c.phone ELSE c.name END AS "Customer",
@@ -235,8 +225,8 @@ export async function GET(request: Request) {
       ORDER BY o.ordered_at ASC
     `,
 
-    // Sheet 7: Purchases
-    sql`
+      // Sheet 7: Purchases
+      sql`
       SELECT
         pr.purchased_at::date                                   AS "Date",
         CASE WHEN s.phone IS NOT NULL AND s.phone != '' THEN s.name || E'\n' || s.phone ELSE COALESCE(s.name, '—') END AS "Supplier",
@@ -267,9 +257,9 @@ export async function GET(request: Request) {
       ORDER BY pr.purchased_at ASC
     `,
 
-    // Sheet 8: Mini Due List (per-customer summary, grouped by area)
-    // Include ALL non-cancelled orders for customers who have outstanding dues
-    sql`
+      // Sheet 8: Mini Due List (per-customer summary, grouped by area)
+      // Include ALL non-cancelled orders for customers who have outstanding dues
+      sql`
       SELECT
         COALESCE(a.name, 'No Area')                               AS "Area",
         c.name                                                    AS "Customer",
@@ -294,8 +284,8 @@ export async function GET(request: Request) {
       ORDER BY a.name NULLS LAST, SUM(o.due_amount) DESC
     `,
 
-    // Sheet 9: Asset Overview — unreturned assets per customer + supplier return summary
-    sql`
+      // Sheet 9: Asset Overview — unreturned assets per customer + supplier return summary
+      sql`
       SELECT
         c.name                           AS "Customer",
         COALESCE(c.phone, '')            AS "Phone",
@@ -319,7 +309,7 @@ export async function GET(request: Request) {
       HAVING SUM(oa.quantity) - COALESCE(SUM(oar.returned), 0) > 0
       ORDER BY c.name, pa.name
     `,
-  ]);
+    ]);
 
   const fmt = (d: unknown) =>
     d
@@ -342,14 +332,6 @@ export async function GET(request: Request) {
   const periodValue = actualFrom
     ? `${fmt(actualFrom)} – ${fmt(actualTo)}${daysDiff !== null ? ` (${daysDiff} Days)` : ""}`
     : "All Time";
-
-  const formatBreakdown = (key: "orders" | "qty", total: number): string => {
-    if ((perProductStats as Record<string, unknown>[]).length === 0) return String(total);
-    const parts = (perProductStats as Record<string, unknown>[])
-      .map((p) => `${p.name}: ${p[key]}`)
-      .join(" | ");
-    return `${parts} | Total: ${total}`;
-  };
 
   // Purchase totals from supplies query
   const purchaseQty = supplies.reduce(
@@ -399,9 +381,6 @@ export async function GET(request: Request) {
   const totalStock = Number(s?.total_stock ?? 0);
   const avgPrice = salesQty > 0 ? salesAmount / salesQty : 0;
   const stockValue = totalStock * avgPrice;
-  const actualCash = salesPaid - purchasePaid - totalExpenses;
-  const cashInHand = salesDue + stockValue + actualCash;
-
   const summaryRows = s
     ? [
         { Metric: "Product", Value: productLabel },

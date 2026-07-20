@@ -436,7 +436,6 @@ export default function CustomersPage() {
     if (!paymentCustomer) return;
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setPaymentListLoading(true);
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     setCustomerSheetTab("payments");
     fetch(`/api/customers/${paymentCustomer.id}/payments`)
       .then((r) => r.json())
@@ -524,19 +523,11 @@ export default function CustomersPage() {
 
       // Data rows with running balance
       let balance = 0;
-      let totalPurchase = 0;
-      let totalPaid = 0;
       let assetBalance = 0;
-      let totalAssetSent = 0;
-      let totalAssetReturned = 0;
 
       for (const e of entries) {
         balance += e.purchase - e.paid;
-        totalPurchase += e.purchase;
-        totalPaid += e.paid;
         assetBalance += e.assetSent - e.assetReturned;
-        totalAssetSent += e.assetSent;
-        totalAssetReturned += e.assetReturned;
 
         const row: (string | number | null)[] = [
           shortDate(e.date),

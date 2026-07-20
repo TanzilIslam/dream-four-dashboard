@@ -66,8 +66,8 @@ export async function POST(request: Request) {
   `;
 
   // Calculate total ordered and total paid
-  const totalOrdered = orders.reduce((sum, order) => sum + (order.unit_price * order.quantity), 0);
-  const totalPaid = payments.reduce((sum, payment) => sum + payment.amount, 0);
+  const totalOrdered = orders.reduce((sum, order) => sum + (Number(order.unit_price) * Number(order.quantity)), 0);
+  const totalPaid = payments.reduce((sum, payment) => sum + Number(payment.amount), 0);
 
   return Response.json({
     customer: {

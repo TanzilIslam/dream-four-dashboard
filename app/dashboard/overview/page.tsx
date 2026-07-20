@@ -29,7 +29,6 @@ type AdminData = {
     low_stock_threshold: number;
     purchased_qty: string;
     delivered_qty: string;
-    reserved_qty: string;
     returned_qty: string;
     available_qty: string;
   }[];
