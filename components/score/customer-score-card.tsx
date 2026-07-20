@@ -79,16 +79,16 @@ export function CustomerScoreCard({ details }: CustomerScoreCardProps) {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800 p-4">
+    <div className="min-h-screen bg-gradient-to-br from-white to-green-50 dark:from-slate-900 dark:to-slate-800 p-4">
       <div className="max-w-4xl mx-auto space-y-6">
         {/* Header */}
         <div className="text-center mb-8">
-          <h1 className="text-4xl font-bold mb-2">{details.customer.name}</h1>
+          <h1 className="text-4xl font-bold mb-2 text-green-700">{details.customer.name}</h1>
           <p className="text-slate-600 dark:text-slate-400">{details.customer.address}</p>
         </div>
 
         {/* Score Card */}
-        <Card className="p-8">
+        <Card className="p-8 border-green-200 shadow-lg shadow-green-100">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
             {/* Score Visualization */}
             <div className="flex flex-col items-center justify-center">
@@ -102,7 +102,7 @@ export function CustomerScoreCard({ details }: CustomerScoreCardProps) {
                     fill="none"
                     stroke="currentColor"
                     strokeWidth="8"
-                    className="text-slate-200 dark:text-slate-700"
+                    className="text-green-200 dark:text-green-700"
                   />
                   {/* Score circle */}
                   <circle
@@ -130,7 +130,7 @@ export function CustomerScoreCard({ details }: CustomerScoreCardProps) {
               <div>
                 <h3 className="text-lg font-semibold mb-4">Purchase Summary</h3>
                 <div className="space-y-3">
-                  <div className="flex justify-between items-center p-3 bg-slate-50 dark:bg-slate-800 rounded">
+                  <div className="flex justify-between items-center p-3 bg-green-50 dark:bg-green-900/20 rounded">
                     <span className="text-slate-600 dark:text-slate-400">
                       Total Amount Ordered:
                     </span>
@@ -138,13 +138,13 @@ export function CustomerScoreCard({ details }: CustomerScoreCardProps) {
                       ₹{details.summary.total_ordered.toFixed(2)}
                     </span>
                   </div>
-                  <div className="flex justify-between items-center p-3 bg-slate-50 dark:bg-slate-800 rounded">
+                  <div className="flex justify-between items-center p-3 bg-green-50 dark:bg-green-900/20 rounded">
                     <span className="text-slate-600 dark:text-slate-400">Total Paid:</span>
                     <span className="font-semibold text-green-600">
                       ₹{details.summary.total_paid.toFixed(2)}
                     </span>
                   </div>
-                  <div className="flex justify-between items-center p-3 bg-slate-50 dark:bg-slate-800 rounded">
+                  <div className="flex justify-between items-center p-3 bg-green-50 dark:bg-green-900/20 rounded">
                     <span className="text-slate-600 dark:text-slate-400">Outstanding Due:</span>
                     <span
                       className={`font-semibold ${details.summary.total_due > 0 ? "text-red-600" : "text-green-600"}`}
@@ -175,14 +175,14 @@ export function CustomerScoreCard({ details }: CustomerScoreCardProps) {
         </Card>
 
         {/* Family Size Slider */}
-        <Card className="p-8">
+        <Card className="p-8 border-green-200 shadow-lg shadow-green-100">
           <h3 className="text-xl font-semibold mb-6">Family Member Count</h3>
           <div className="space-y-6">
             <div>
               <div className="flex justify-between items-center mb-4">
                 <label className="text-lg font-medium">
                   Members:{" "}
-                  <span className="text-blue-600 dark:text-blue-400 text-2xl">{familyMembers}</span>
+                  <span className="text-green-600 dark:text-green-400 text-2xl">{familyMembers}</span>
                 </label>
               </div>
 
@@ -193,7 +193,7 @@ export function CustomerScoreCard({ details }: CustomerScoreCardProps) {
                 max="7"
                 value={familyMembers}
                 onChange={(e) => setFamilyMembers(parseInt(e.target.value))}
-                className="w-full h-3 bg-slate-200 dark:bg-slate-700 rounded-lg appearance-none cursor-pointer accent-blue-600"
+                className="w-full h-3 bg-green-200 dark:bg-green-700 rounded-lg appearance-none cursor-pointer accent-green-600"
               />
 
               <div className="flex justify-between text-xs text-slate-500 mt-2">
@@ -204,17 +204,17 @@ export function CustomerScoreCard({ details }: CustomerScoreCardProps) {
 
             {/* Updated Stats */}
             <div className="grid grid-cols-2 gap-4">
-              <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+              <div className="p-4 bg-green-50 dark:bg-green-900/20 rounded-lg">
                 <p className="text-sm text-slate-600 dark:text-slate-400 mb-1">Updated Score</p>
                 <p className={`text-3xl font-bold ${getScoreColor(score)}`}>{score}</p>
               </div>
-              <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+              <div className="p-4 bg-green-50 dark:bg-green-900/20 rounded-lg">
                 <p className="text-sm text-slate-600 dark:text-slate-400 mb-1">Monthly Target</p>
                 <p className="text-2xl font-bold">{monthlyTarget} eggs</p>
               </div>
             </div>
 
-            <div className="p-4 bg-slate-50 dark:bg-slate-800 rounded-lg">
+            <div className="p-4 bg-green-50 dark:bg-green-900/20 rounded-lg">
               <p className="text-sm text-slate-600 dark:text-slate-400 mb-2">What this means:</p>
               <p className="text-sm">
                 For a family of <span className="font-semibold">{familyMembers}</span>, you should
@@ -229,12 +229,12 @@ export function CustomerScoreCard({ details }: CustomerScoreCardProps) {
 
         {/* Orders History */}
         {details.orders.length > 0 && (
-          <Card className="p-8">
-            <h3 className="text-xl font-semibold mb-6">Recent Orders</h3>
+          <Card className="p-8 border-green-200 shadow-lg shadow-green-100">
+            <h3 className="text-xl font-semibold mb-6 text-green-700">Recent Orders</h3>
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="border-b border-slate-200 dark:border-slate-700">
+                  <tr className="border-b border-green-200 dark:border-green-700">
                     <th className="text-left py-3 px-3 font-semibold">Date</th>
                     <th className="text-left py-3 px-3 font-semibold">Product</th>
                     <th className="text-right py-3 px-3 font-semibold">Qty</th>
@@ -246,7 +246,7 @@ export function CustomerScoreCard({ details }: CustomerScoreCardProps) {
                   {details.orders.slice(0, 10).map((order) => (
                     <tr
                       key={order.id}
-                      className="border-b border-slate-100 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/50"
+                      className="border-b border-green-100 dark:border-green-800 hover:bg-green-50 dark:hover:bg-green-800/50"
                     >
                       <td className="py-3 px-3">
                         {new Date(order.ordered_at).toLocaleDateString()}

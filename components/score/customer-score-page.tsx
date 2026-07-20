@@ -129,9 +129,9 @@ export default function CustomerScorePage({ initialName }: CustomerScorePageProp
   // No name provided - show empty state
   if (!initialName) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800 flex items-center justify-center p-4">
-        <Card className="w-full max-w-md p-8 text-center">
-          <h1 className="text-3xl font-bold mb-4">Customer Score</h1>
+      <div className="min-h-screen bg-gradient-to-br from-white to-green-50 dark:from-slate-900 dark:to-slate-800 flex items-center justify-center p-4">
+        <Card className="w-full max-w-md p-8 text-center border-green-200 shadow-lg shadow-green-100">
+          <h1 className="text-3xl font-bold mb-4 text-green-700">Customer Score</h1>
           <p className="text-slate-600 dark:text-slate-400 mb-6">
             Visit this page with a customer name parameter to get started.
           </p>
@@ -169,15 +169,15 @@ export default function CustomerScorePage({ initialName }: CustomerScorePageProp
   // Customer selection view
   if (customers.length > 0) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800 flex items-center justify-center p-4">
-        <Card className="w-full max-w-md p-8">
-          <h2 className="text-2xl font-bold mb-6">Select Customer</h2>
+      <div className="min-h-screen bg-gradient-to-br from-white to-green-50 dark:from-slate-900 dark:to-slate-800 flex items-center justify-center p-4">
+        <Card className="w-full max-w-md p-8 border-green-200 shadow-lg shadow-green-100">
+          <h2 className="text-2xl font-bold mb-6 text-green-700">Select Customer</h2>
           <div className="space-y-3">
             {customers.map((customer) => (
               <button
                 key={customer.id}
                 onClick={() => handleCustomerSelect(customer)}
-                className="w-full p-4 text-left border rounded-lg hover:bg-blue-50 dark:hover:bg-blue-900 transition-colors"
+                className="w-full p-4 text-left border border-green-200 rounded-lg hover:bg-green-50 dark:hover:bg-green-900 transition-colors"
               >
                 <p className="font-semibold">{customer.name}</p>
                 <p className="text-sm text-slate-600 dark:text-slate-400">
@@ -194,8 +194,8 @@ export default function CustomerScorePage({ initialName }: CustomerScorePageProp
   // Error state
   if (error) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800 flex items-center justify-center p-4">
-        <Card className="w-full max-w-md p-8 text-center">
+      <div className="min-h-screen bg-gradient-to-br from-white to-green-50 dark:from-slate-900 dark:to-slate-800 flex items-center justify-center p-4">
+        <Card className="w-full max-w-md p-8 text-center border-red-200 shadow-lg shadow-red-100">
           <h2 className="text-2xl font-bold mb-4 text-red-600">Error</h2>
           <p className="text-slate-600 dark:text-slate-400">{error}</p>
         </Card>
