@@ -247,16 +247,12 @@ export async function GET(request: Request) {
       // Include ALL non-cancelled orders for customers who have outstanding dues
       sql`
       SELECT
-        COALESCE(a.name, 'No Area')                               AS "Area",
         c.name                                                    AS "Customer",
-        COALESCE(c.phone, '')                                     AS "Phone",
         COALESCE(SUM(o.due_amount), 0)::numeric                   AS "Due",
         GREATEST(0,
           COALESCE(SUM((SELECT SUM(oa.quantity) FROM order_assets oa WHERE oa.order_id = o.id)), 0)
           - COALESCE(SUM((SELECT SUM(oar.quantity) FROM order_asset_returns oar WHERE oar.order_id = o.id)), 0)
-        )::int                                                    AS "Asset",
-        MAX(o.ordered_at)::date                                   AS "Last Order Date",
-        ''                                                        AS "Remarks"
+        )::int                                                    AS "Asset"
       FROM orders o
       JOIN customers c ON c.id = o.customer_id
       LEFT JOIN areas a ON a.id = c.area_id
@@ -265,7 +261,7 @@ export async function GET(request: Request) {
           SELECT o2.customer_id FROM orders o2
           WHERE o2.due_amount > 0 AND o2.status IN ('delivered', 'paid')
         )
-      GROUP BY a.name, c.id, c.name, c.phone
+      GROUP BY a.name, c.id, c.name
       HAVING SUM(o.due_amount) > 0
       ORDER BY a.name NULLS LAST, SUM(o.due_amount) DESC
     `,
@@ -423,10 +419,7 @@ export async function GET(request: Request) {
     Date: fmt(r["Date"]),
   }));
 
-  const formattedMiniDueList = miniDueList.map((r: Record<string, unknown>) => ({
-    ...r,
-    "Last Order Date": fmt(r["Last Order Date"]),
-  }));
+  const formattedMiniDueList = miniDueList;
 
   return Response.json({
     summary: summaryRows,

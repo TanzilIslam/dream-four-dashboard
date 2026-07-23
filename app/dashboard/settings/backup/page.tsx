@@ -291,10 +291,7 @@ export default function ExportPage() {
           );
         if (s.key === "supplies")
           rows = addTotalsRow(rows, ["Qty", "Total", "S.Paid", "Due"], "Date");
-        if (s.key === "miniDueList") {
-          rows = addGroupSubtotals(rows, "Area", ["Due", "Asset"], "Customer");
-          rows = addTotalsRow(rows, ["Due", "Asset"], "Customer");
-        }
+        if (s.key === "miniDueList") rows = addTotalsRow(rows, ["Due", "Asset"], "Customer");
         if (s.key === "assetOverview")
           rows = addTotalsRow(rows, ["Sent", "Returned", "Unreturned"], "Customer");
         return { key: s.key, label: SHEET_LABELS[s.key], rows };
