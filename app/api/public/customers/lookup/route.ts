@@ -11,7 +11,7 @@ export async function GET(request: Request) {
   const customers = await sql`
     SELECT id, name, phone
     FROM customers
-    WHERE LOWER(name) LIKE LOWER(${`%${name}%`})
+    WHERE LOWER(TRIM(name)) = LOWER(TRIM(${name}))
     AND is_active = true
     LIMIT 10
   `;
