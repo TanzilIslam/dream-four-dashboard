@@ -122,10 +122,10 @@ export function CustomerScoreCard({ details }: CustomerScoreCardProps) {
                       <td className="py-3 px-3">{order.product_name}</td>
                       <td className="py-3 px-3 text-right">{order.quantity}</td>
                       <td className="py-3 px-3 text-right">
-                        ₹{Number(order.unit_price).toFixed(2)}
+                        ৳{Number(order.unit_price).toFixed(2)}
                       </td>
                       <td className="py-3 px-3 text-right font-medium">
-                        ₹{(Number(order.unit_price) * Number(order.quantity)).toFixed(2)}
+                        ৳{(Number(order.unit_price) * Number(order.quantity)).toFixed(2)}
                       </td>
                     </tr>
                   ))
@@ -164,7 +164,7 @@ export function CustomerScoreCard({ details }: CustomerScoreCardProps) {
                         {new Date(payment.paid_at).toLocaleDateString()}
                       </td>
                       <td className="py-3 px-3 text-right font-medium text-green-600">
-                        ₹{Number(payment.amount).toFixed(2)}
+                        ৳{Number(payment.amount).toFixed(2)}
                       </td>
                     </tr>
                   ))
@@ -187,13 +187,13 @@ export function CustomerScoreCard({ details }: CustomerScoreCardProps) {
             <div className="flex justify-between items-center p-3 bg-green-50 dark:bg-green-900/20 rounded">
               <span className="text-slate-600 dark:text-slate-400">মোট ক্রয়:</span>
               <span className="font-semibold">
-                ₹{Number(details.summary.total_ordered).toFixed(2)}
+                ৳{Number(details.summary.total_ordered).toFixed(2)}
               </span>
             </div>
             <div className="flex justify-between items-center p-3 bg-green-50 dark:bg-green-900/20 rounded">
               <span className="text-slate-600 dark:text-slate-400">মোট পরিশোধ:</span>
               <span className="font-semibold text-green-600">
-                ₹{Number(details.summary.total_paid).toFixed(2)}
+                ৳{Number(details.summary.total_paid).toFixed(2)}
               </span>
             </div>
             <div className="flex justify-between items-center p-3 bg-green-50 dark:bg-green-900/20 rounded">
@@ -201,7 +201,7 @@ export function CustomerScoreCard({ details }: CustomerScoreCardProps) {
               <span
                 className={`font-semibold ${Number(details.summary.total_due) > 0 ? "text-red-600" : "text-green-600"}`}
               >
-                ₹{Number(details.summary.total_due).toFixed(2)}
+                ৳{Number(details.summary.total_due).toFixed(2)}
               </span>
             </div>
           </div>
