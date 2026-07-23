@@ -36,11 +36,9 @@ interface CustomerScoreCardProps {
   };
 }
 
-// Constants for egg-based protein calculation
-const PROTEIN_PER_EGG = 6; // grams
-const DAILY_PROTEIN_NEED = 50; // grams per adult per day
-const EGGS_NEEDED_PER_DAY = Math.ceil(DAILY_PROTEIN_NEED / PROTEIN_PER_EGG); // ~9 eggs
-const EGGS_NEEDED_PER_MONTH = EGGS_NEEDED_PER_DAY * 30; // ~270 eggs per person per month
+// Nutrition target: one egg per day per person
+const EGGS_NEEDED_PER_DAY = 1; // one egg per day per person
+const EGGS_NEEDED_PER_MONTH = EGGS_NEEDED_PER_DAY * 30; // 30 eggs per person per month
 
 export function CustomerScoreCard({ details }: CustomerScoreCardProps) {
   const [familyMembers, setFamilyMembers] = useState(1);
@@ -280,11 +278,10 @@ export function CustomerScoreCard({ details }: CustomerScoreCardProps) {
           {/* Simple explanation */}
           <div className="p-4 bg-green-50 dark:bg-green-900/20 rounded-lg text-sm leading-relaxed">
             <p>
-              {familyMembers} জন সদস্যের একটি পরিবারের প্রতি মাসে প্রায়{" "}
-              <span className="font-semibold">{monthlyTarget} টি ডিম</span> খাওয়া ভালো। কারণ প্রতিটি
-              ডিমে <span className="font-semibold">{PROTEIN_PER_EGG} গ্রাম</span> প্রোটিন থাকে এবং
-              একজন মানুষের প্রতিদিন প্রায়{" "}
-              <span className="font-semibold">{EGGS_NEEDED_PER_DAY} টি ডিম</span> খাওয়া দরকার।
+              একজন মানুষের প্রতিদিন অন্তত{" "}
+              <span className="font-semibold">{EGGS_NEEDED_PER_DAY} টি ডিম</span> খাওয়া ভালো। তাই{" "}
+              <span className="font-semibold">{familyMembers} জন</span> সদস্যের একটি পরিবারের প্রতি
+              মাসে প্রায় <span className="font-semibold">{monthlyTarget} টি ডিম</span> প্রয়োজন।
             </p>
           </div>
         </Card>
