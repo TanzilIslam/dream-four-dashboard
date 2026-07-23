@@ -121,10 +121,7 @@ export function CustomerScoreCard({ details }: CustomerScoreCardProps) {
                   ))
                 ) : (
                   <tr>
-                    <td
-                      colSpan={5}
-                      className="py-6 text-center text-slate-500 dark:text-slate-400"
-                    >
+                    <td colSpan={5} className="py-6 text-center text-slate-500 dark:text-slate-400">
                       কোনো অর্ডার পাওয়া যায়নি
                     </td>
                   </tr>
@@ -160,10 +157,7 @@ export function CustomerScoreCard({ details }: CustomerScoreCardProps) {
                   ))
                 ) : (
                   <tr>
-                    <td
-                      colSpan={2}
-                      className="py-6 text-center text-slate-500 dark:text-slate-400"
-                    >
+                    <td colSpan={2} className="py-6 text-center text-slate-500 dark:text-slate-400">
                       কোনো পেমেন্ট পাওয়া যায়নি
                     </td>
                   </tr>
