@@ -42,9 +42,11 @@ export function BulkPaymentSheet({ customer, onOpenChange, onSuccess }: BulkPaym
   // (same ordering the backend uses so the preview matches exactly).
   useEffect(() => {
     if (!customer) return;
+    /* eslint-disable react-hooks/set-state-in-effect */
     setLoading(true);
     setAmountInput("");
     setPaidAt(todayISO());
+    /* eslint-enable react-hooks/set-state-in-effect */
     fetch(`/api/customers/${customer.id}/payments`)
       .then((r) => r.json())
       .then((data) => {
