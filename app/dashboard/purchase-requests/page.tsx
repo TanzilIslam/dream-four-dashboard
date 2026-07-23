@@ -481,6 +481,73 @@ export default function PurchasesPage() {
     { qty: 0, total: 0, paid: 0, due: 0 }
   );
 
+  // Shared row actions — used by both the desktop table and the mobile cards.
+  function PurchaseActions({ r, fullWidth }: { r: Purchase; fullWidth?: boolean }) {
+    return (
+      <div
+        className={
+          fullWidth
+            ? "flex items-center justify-around border-t border-border pt-2 -mx-1"
+            : "flex items-center gap-1"
+        }
+      >
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={() => openEdit(r)}
+          className="size-7 text-muted-foreground hover:text-foreground"
+          title="Edit"
+        >
+          <Pencil className="size-3.5" />
+        </Button>
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={() => setDeleteTarget(r)}
+          className="size-7 text-destructive hover:bg-destructive/10 hover:text-destructive"
+          title="Delete"
+        >
+          <Trash2 className="size-3.5" />
+        </Button>
+        {Number(r.due_amount) > 0 && (
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => {
+              paymentForm.reset({
+                amount: Number(r.due_amount),
+                paid_at: new Date().toISOString().slice(0, 10),
+                payment_method: "",
+                from_personal: false,
+                note: "",
+              });
+              setPaymentTarget(r);
+            }}
+            className="size-7 text-amber-600 hover:bg-amber-50 hover:text-amber-700"
+            title="Add payment"
+          >
+            <Banknote className="size-3.5" />
+          </Button>
+        )}
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={() => {
+            setDetailPayments([]);
+            setDetailAssets([]);
+            setDetailPaymentSummary(null);
+            setDetailPaymentsLoading(true);
+            setDetailsTarget(r);
+          }}
+          className="size-7 text-muted-foreground hover:text-foreground"
+          title="View details"
+        >
+          <Eye className="size-3.5" />
+        </Button>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-y-2">
@@ -595,129 +662,128 @@ export default function PurchasesPage() {
       </div>
 
       {/* Table */}
-      <div className="rounded-lg border border-border overflow-x-auto">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>ID</TableHead>
-              <TableHead>Product</TableHead>
-              <TableHead>Supplier</TableHead>
-              <TableHead>Qty</TableHead>
-              <TableHead>Unit Price</TableHead>
-              <TableHead>Total</TableHead>
-              <TableHead>Paid</TableHead>
-              <TableHead>Due</TableHead>
-              <TableHead>Note</TableHead>
-              <TableHead>Date</TableHead>
-              <TableHead className="w-35" />
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {loading ? (
-              <TableRow>
-                <TableCell colSpan={11} className="text-center text-muted-foreground py-10">
-                  Loading…
-                </TableCell>
-              </TableRow>
-            ) : filteredPurchases.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={11} className="text-center text-muted-foreground py-10">
-                  No purchases
-                </TableCell>
-              </TableRow>
-            ) : (
-              filteredPurchases.map((r) => (
-                <TableRow key={r.id}>
-                  <TableCell className="text-muted-foreground text-xs">#{r.id}</TableCell>
-                  <TableCell className="font-medium">
-                    {r.product_name ?? "—"}
-                    {r.product_unit && (
-                      <span className="text-muted-foreground text-xs ml-1">({r.product_unit})</span>
-                    )}
-                  </TableCell>
-                  <TableCell>{r.supplier_name ?? "—"}</TableCell>
-                  <TableCell>{r.actual_qty ?? "—"}</TableCell>
-                  <TableCell className="whitespace-nowrap">
-                    {r.actual_price ? `৳${Number(r.actual_price).toFixed(2)}` : "—"}
-                  </TableCell>
-                  <TableCell className="whitespace-nowrap">
-                    {r.actual_total ? `৳${Number(r.actual_total).toFixed(2)}` : "—"}
-                  </TableCell>
-                  <TableCell className="whitespace-nowrap text-green-600">
-                    {Number(r.paid_total) > 0 ? `৳${Number(r.paid_total).toFixed(2)}` : "—"}
-                  </TableCell>
-                  <TableCell className="whitespace-nowrap text-amber-600">
-                    {Number(r.due_amount) > 0 ? `৳${Number(r.due_amount).toFixed(2)}` : "—"}
-                  </TableCell>
-                  <TableCell className="text-sm text-muted-foreground max-w-40 truncate">
-                    {r.note ?? "—"}
-                  </TableCell>
-                  <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
-                    {formatDate(r.purchased_at ?? r.created_at)}
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-1">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => openEdit(r)}
-                        className="size-7 text-muted-foreground hover:text-foreground"
-                        title="Edit"
-                      >
-                        <Pencil className="size-3.5" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => setDeleteTarget(r)}
-                        className="size-7 text-destructive hover:bg-destructive/10 hover:text-destructive"
-                        title="Delete"
-                      >
-                        <Trash2 className="size-3.5" />
-                      </Button>
-                      {Number(r.due_amount) > 0 && (
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => {
-                            paymentForm.reset({
-                              amount: Number(r.due_amount),
-                              paid_at: new Date().toISOString().slice(0, 10),
-                              payment_method: "",
-                              from_personal: false,
-                              note: "",
-                            });
-                            setPaymentTarget(r);
-                          }}
-                          className="size-7 text-amber-600 hover:bg-amber-50 hover:text-amber-700"
-                          title="Add payment"
-                        >
-                          <Banknote className="size-3.5" />
-                        </Button>
-                      )}
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => {
-                          setDetailPayments([]);
-                          setDetailAssets([]);
-                          setDetailPaymentSummary(null);
-                          setDetailPaymentsLoading(true);
-                          setDetailsTarget(r);
-                        }}
-                        className="size-7 text-muted-foreground hover:text-foreground"
-                        title="View details"
-                      >
-                        <Eye className="size-3.5" />
-                      </Button>
-                    </div>
-                  </TableCell>
+      {loading ? (
+        <div className="text-center text-muted-foreground py-10">Loading…</div>
+      ) : filteredPurchases.length === 0 ? (
+        <div className="text-center text-muted-foreground py-10">No purchases</div>
+      ) : (
+        <>
+          {/* Desktop table */}
+          <div className="hidden md:block rounded-lg border border-border overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>ID</TableHead>
+                  <TableHead>Product</TableHead>
+                  <TableHead>Supplier</TableHead>
+                  <TableHead>Qty</TableHead>
+                  <TableHead>Unit Price</TableHead>
+                  <TableHead>Total</TableHead>
+                  <TableHead>Paid</TableHead>
+                  <TableHead>Due</TableHead>
+                  <TableHead>Note</TableHead>
+                  <TableHead>Date</TableHead>
+                  <TableHead className="w-35" />
                 </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
-      </div>
+              </TableHeader>
+              <TableBody>
+                {filteredPurchases.map((r) => (
+                  <TableRow key={r.id}>
+                    <TableCell className="text-muted-foreground text-xs">#{r.id}</TableCell>
+                    <TableCell className="font-medium">
+                      {r.product_name ?? "—"}
+                      {r.product_unit && (
+                        <span className="text-muted-foreground text-xs ml-1">
+                          ({r.product_unit})
+                        </span>
+                      )}
+                    </TableCell>
+                    <TableCell>{r.supplier_name ?? "—"}</TableCell>
+                    <TableCell>{r.actual_qty ?? "—"}</TableCell>
+                    <TableCell className="whitespace-nowrap">
+                      {r.actual_price ? `৳${Number(r.actual_price).toFixed(2)}` : "—"}
+                    </TableCell>
+                    <TableCell className="whitespace-nowrap">
+                      {r.actual_total ? `৳${Number(r.actual_total).toFixed(2)}` : "—"}
+                    </TableCell>
+                    <TableCell className="whitespace-nowrap text-green-600">
+                      {Number(r.paid_total) > 0 ? `৳${Number(r.paid_total).toFixed(2)}` : "—"}
+                    </TableCell>
+                    <TableCell className="whitespace-nowrap text-amber-600">
+                      {Number(r.due_amount) > 0 ? `৳${Number(r.due_amount).toFixed(2)}` : "—"}
+                    </TableCell>
+                    <TableCell className="text-sm text-muted-foreground max-w-40 truncate">
+                      {r.note ?? "—"}
+                    </TableCell>
+                    <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
+                      {formatDate(r.purchased_at ?? r.created_at)}
+                    </TableCell>
+                    <TableCell>
+                      <PurchaseActions r={r} />
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+
+          {/* Mobile cards */}
+          <div className="md:hidden space-y-3">
+            {filteredPurchases.map((r) => (
+              <div key={r.id} className="rounded-lg border border-border bg-card p-4 space-y-3">
+                {/* Top: product · total */}
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <p className="font-medium truncate">
+                      {r.product_name ?? "—"}
+                      {r.product_unit && (
+                        <span className="text-muted-foreground text-xs ml-1">
+                          ({r.product_unit})
+                        </span>
+                      )}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      #{r.id} · {r.supplier_name ?? "—"} ·{" "}
+                      {formatDate(r.purchased_at ?? r.created_at)}
+                    </p>
+                  </div>
+                  <span className="font-semibold tabular-nums whitespace-nowrap">
+                    {r.actual_total ? `৳${Number(r.actual_total).toFixed(2)}` : "—"}
+                  </span>
+                </div>
+
+                {/* Meta */}
+                <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm tabular-nums">
+                  <span>
+                    <span className="text-muted-foreground">Qty:</span> {r.actual_qty ?? "—"}
+                  </span>
+                  <span>
+                    <span className="text-muted-foreground">Rate:</span>{" "}
+                    {r.actual_price ? `৳${Number(r.actual_price).toFixed(2)}` : "—"}
+                  </span>
+                  <span>
+                    <span className="text-muted-foreground">Paid:</span>{" "}
+                    <span className="text-green-600">
+                      {Number(r.paid_total) > 0 ? `৳${Number(r.paid_total).toFixed(2)}` : "—"}
+                    </span>
+                  </span>
+                  {Number(r.due_amount) > 0 && (
+                    <span>
+                      <span className="text-muted-foreground">Due:</span>{" "}
+                      <span className="text-amber-600">৳{Number(r.due_amount).toFixed(2)}</span>
+                    </span>
+                  )}
+                </div>
+
+                {r.note && <p className="text-sm text-muted-foreground">{r.note}</p>}
+
+                {/* Actions */}
+                <PurchaseActions r={r} fullWidth />
+              </div>
+            ))}
+          </div>
+        </>
+      )}
 
       {/* Create / Edit sheet */}
       <Sheet

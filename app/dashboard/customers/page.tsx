@@ -659,6 +659,84 @@ export default function CustomersPage() {
     setFilters((prev) => ({ ...prev, [key]: value }));
   }
 
+  // Shared row actions — used by both the desktop table and the mobile cards.
+  function CustomerActions({ c, fullWidth }: { c: Customer; fullWidth?: boolean }) {
+    return (
+      <div
+        className={
+          fullWidth
+            ? "flex items-center justify-around border-t border-border pt-2 -mx-1"
+            : "flex items-center gap-1"
+        }
+      >
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={() => setViewingCustomer(c)}
+          className="size-7 hover:bg-muted"
+          title="View details"
+        >
+          <Eye className="size-3.5" />
+        </Button>
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={() => setPaymentCustomer(c)}
+          className="size-7 text-green-600 hover:bg-green-50 hover:text-green-700"
+          title="Payment history"
+        >
+          <BanknoteIcon className="size-3.5" />
+        </Button>
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={() => setCollectCustomer(c)}
+          className="size-7 text-emerald-600 hover:bg-emerald-50 hover:text-emerald-700"
+          title="Collect payment (auto-apply to due orders)"
+        >
+          <HandCoins className="size-3.5" />
+        </Button>
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={async () => {
+            const publicUrl = `${typeof window !== "undefined" ? window.location.origin : ""}/score?name=${encodeURIComponent(c.name)}`;
+            try {
+              await navigator.clipboard.writeText(publicUrl);
+              toast.success(`Link copied: ${c.name}`);
+            } catch {
+              toast.error("Failed to copy link");
+            }
+          }}
+          className="size-7 text-blue-600 hover:bg-blue-50 hover:text-blue-700"
+          title="Copy public score link"
+        >
+          <Link className="size-3.5" />
+        </Button>
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={() => openEdit(c)}
+          className="size-7 hover:bg-muted"
+          title="Edit customer"
+        >
+          <Pencil className="size-3.5" />
+        </Button>
+        {c.is_active && (
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setConfirmTarget(c)}
+            className="size-7 text-destructive hover:bg-destructive/10 hover:text-destructive"
+            title="Deactivate customer"
+          >
+            <Power className="size-3.5" />
+          </Button>
+        )}
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-y-2">
@@ -751,53 +829,45 @@ export default function CustomersPage() {
         />
       </div>
 
-      <div className="rounded-lg border border-border overflow-x-auto">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>
-                <button
-                  className="flex items-center gap-1 hover:text-foreground text-inherit"
-                  onClick={() => setNameSortDir((d) => (d === "asc" ? "desc" : "asc"))}
-                >
-                  Name
-                  {nameSortDir === "asc" ? (
-                    <ArrowUp className="size-3" />
-                  ) : (
-                    <ArrowDown className="size-3" />
-                  )}
-                </button>
-              </TableHead>
-              {/* <TableHead>Type</TableHead> */}
-              {/* <TableHead>Area</TableHead> */}
-              <TableHead>Phone</TableHead>
-              {/* <TableHead className="text-right">Orders</TableHead> */}
-              {/* <TableHead className="text-right">Qty</TableHead> */}
-              <TableHead>Summary</TableHead>
-              <TableHead className="text-right">Last Order</TableHead>
-              <TableHead className="text-right">Total Assets</TableHead>
-              <TableHead className="text-right">Assets to Return</TableHead>
-              <TableHead className="w-[80px]">Actions</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {loading ? (
-              <TableRow>
-                <TableCell colSpan={8} className="text-center text-muted-foreground py-10">
-                  Loading…
-                </TableCell>
-              </TableRow>
-            ) : filteredCustomers.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={8} className="text-center text-muted-foreground py-10">
-                  {activeFilterCount > 0 ? "No customers match your filters" : "No customers yet"}
-                </TableCell>
-              </TableRow>
-            ) : (
-              filteredCustomers.map((c) => (
-                <TableRow key={c.id}>
-                  <TableCell className="font-medium">{c.name}</TableCell>
-                  {/* <TableCell>
+      {loading ? (
+        <div className="text-center text-muted-foreground py-10">Loading…</div>
+      ) : filteredCustomers.length === 0 ? (
+        <div className="text-center text-muted-foreground py-10">
+          {activeFilterCount > 0 ? "No customers match your filters" : "No customers yet"}
+        </div>
+      ) : (
+        <>
+          {/* Desktop table */}
+          <div className="hidden md:block rounded-lg border border-border overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>
+                    <button
+                      className="flex items-center gap-1 hover:text-foreground text-inherit"
+                      onClick={() => setNameSortDir((d) => (d === "asc" ? "desc" : "asc"))}
+                    >
+                      Name
+                      {nameSortDir === "asc" ? (
+                        <ArrowUp className="size-3" />
+                      ) : (
+                        <ArrowDown className="size-3" />
+                      )}
+                    </button>
+                  </TableHead>
+                  <TableHead>Phone</TableHead>
+                  <TableHead>Summary</TableHead>
+                  <TableHead className="text-right">Last Order</TableHead>
+                  <TableHead className="text-right">Total Assets</TableHead>
+                  <TableHead className="text-right">Assets to Return</TableHead>
+                  <TableHead className="w-[80px]">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredCustomers.map((c) => (
+                  <TableRow key={c.id}>
+                    <TableCell className="font-medium">{c.name}</TableCell>
+                    {/* <TableCell>
                     {c.customer_type ? (
                       <Badge variant="outline" className="capitalize">
                         {c.customer_type}
@@ -806,113 +876,98 @@ export default function CustomersPage() {
                       "—"
                     )}
                   </TableCell> */}
-                  {/* <TableCell>{c.area_name ?? "—"}</TableCell> */}
-                  <TableCell>{c.phone ?? "—"}</TableCell>
-                  {/* <TableCell className="text-right tabular-nums">{c.total_orders}</TableCell> */}
-                  {/* <TableCell className="text-right tabular-nums">{c.total_quantity}</TableCell> */}
-                  <TableCell className="text-sm space-y-0.5 tabular-nums">
-                    <div>
-                      <span className="text-muted-foreground">Sold:</span> ৳
-                      {(Number(c.total_paid) + Number(c.total_due)).toFixed(0)} ({c.total_quantity}{" "}
-                      unit)
-                    </div>
-                    <div>
-                      <span className="text-muted-foreground">Paid:</span>{" "}
-                      <span className="text-green-600">৳{Number(c.total_paid).toFixed(0)}</span>
-                    </div>
-                    {Number(c.total_due) > 0 && (
+                    {/* <TableCell>{c.area_name ?? "—"}</TableCell> */}
+                    <TableCell>{c.phone ?? "—"}</TableCell>
+                    {/* <TableCell className="text-right tabular-nums">{c.total_orders}</TableCell> */}
+                    {/* <TableCell className="text-right tabular-nums">{c.total_quantity}</TableCell> */}
+                    <TableCell className="text-sm space-y-0.5 tabular-nums">
                       <div>
-                        <span className="text-muted-foreground">Due:</span>{" "}
-                        <span className="text-destructive">৳{Number(c.total_due).toFixed(0)}</span>
+                        <span className="text-muted-foreground">Sold:</span> ৳
+                        {(Number(c.total_paid) + Number(c.total_due)).toFixed(0)} (
+                        {c.total_quantity} unit)
                       </div>
-                    )}
-                  </TableCell>
-                  <TableCell className="text-right tabular-nums text-muted-foreground text-xs">
-                    {formatDate(c.last_order_date)}
-                  </TableCell>
-                  <TableCell className="text-right tabular-nums">
-                    {c.total_assets_sent > 0 ? c.total_assets_sent : "—"}
-                  </TableCell>
-                  <TableCell className="text-right tabular-nums">
-                    {c.unreturned_assets > 0 ? (
-                      <span className="text-destructive font-medium">{c.unreturned_assets}</span>
-                    ) : (
-                      "—"
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-1">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => setViewingCustomer(c)}
-                        className="size-7 hover:bg-muted"
-                        title="View details"
-                      >
-                        <Eye className="size-3.5" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => setPaymentCustomer(c)}
-                        className="size-7 text-green-600 hover:bg-green-50 hover:text-green-700"
-                        title="Payment history"
-                      >
-                        <BanknoteIcon className="size-3.5" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => setCollectCustomer(c)}
-                        className="size-7 text-emerald-600 hover:bg-emerald-50 hover:text-emerald-700"
-                        title="Collect payment (auto-apply to due orders)"
-                      >
-                        <HandCoins className="size-3.5" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={async () => {
-                          const publicUrl = `${typeof window !== "undefined" ? window.location.origin : ""}/score?name=${encodeURIComponent(c.name)}`;
-                          try {
-                            await navigator.clipboard.writeText(publicUrl);
-                            toast.success(`Link copied: ${c.name}`);
-                          } catch {
-                            toast.error("Failed to copy link");
-                          }
-                        }}
-                        className="size-7 text-blue-600 hover:bg-blue-50 hover:text-blue-700"
-                        title="Copy public score link"
-                      >
-                        <Link className="size-3.5" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => openEdit(c)}
-                        className="size-7 hover:bg-muted"
-                        title="Edit customer"
-                      >
-                        <Pencil className="size-3.5" />
-                      </Button>
-                      {c.is_active && (
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => setConfirmTarget(c)}
-                          className="size-7 text-destructive hover:bg-destructive/10 hover:text-destructive"
-                        >
-                          <Power className="size-3.5" />
-                        </Button>
+                      <div>
+                        <span className="text-muted-foreground">Paid:</span>{" "}
+                        <span className="text-green-600">৳{Number(c.total_paid).toFixed(0)}</span>
+                      </div>
+                      {Number(c.total_due) > 0 && (
+                        <div>
+                          <span className="text-muted-foreground">Due:</span>{" "}
+                          <span className="text-destructive">
+                            ৳{Number(c.total_due).toFixed(0)}
+                          </span>
+                        </div>
                       )}
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
-      </div>
+                    </TableCell>
+                    <TableCell className="text-right tabular-nums text-muted-foreground text-xs">
+                      {formatDate(c.last_order_date)}
+                    </TableCell>
+                    <TableCell className="text-right tabular-nums">
+                      {c.total_assets_sent > 0 ? c.total_assets_sent : "—"}
+                    </TableCell>
+                    <TableCell className="text-right tabular-nums">
+                      {c.unreturned_assets > 0 ? (
+                        <span className="text-destructive font-medium">{c.unreturned_assets}</span>
+                      ) : (
+                        "—"
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      <CustomerActions c={c} />
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+
+          {/* Mobile cards */}
+          <div className="md:hidden space-y-3">
+            {filteredCustomers.map((c) => (
+              <div key={c.id} className="rounded-lg border border-border bg-card p-4 space-y-3">
+                {/* Top row: name · phone */}
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <p className="font-medium truncate">{c.name}</p>
+                    <p className="text-xs text-muted-foreground">{c.phone ?? "—"}</p>
+                  </div>
+                  <p className="text-xs text-muted-foreground whitespace-nowrap">
+                    {formatDate(c.last_order_date)}
+                  </p>
+                </div>
+
+                {/* Summary */}
+                <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm tabular-nums">
+                  <span>
+                    <span className="text-muted-foreground">Sold:</span> ৳
+                    {(Number(c.total_paid) + Number(c.total_due)).toFixed(0)} ({c.total_quantity}{" "}
+                    unit)
+                  </span>
+                  <span>
+                    <span className="text-muted-foreground">Paid:</span>{" "}
+                    <span className="text-green-600">৳{Number(c.total_paid).toFixed(0)}</span>
+                  </span>
+                  {Number(c.total_due) > 0 && (
+                    <span>
+                      <span className="text-muted-foreground">Due:</span>{" "}
+                      <span className="text-destructive">৳{Number(c.total_due).toFixed(0)}</span>
+                    </span>
+                  )}
+                  {c.unreturned_assets > 0 && (
+                    <span>
+                      <span className="text-muted-foreground">Assets to return:</span>{" "}
+                      <span className="text-destructive font-medium">{c.unreturned_assets}</span>
+                    </span>
+                  )}
+                </div>
+
+                {/* Actions */}
+                <CustomerActions c={c} fullWidth />
+              </div>
+            ))}
+          </div>
+        </>
+      )}
 
       {/* ── Filter Sheet (mobile only) ────────────────────────────── */}
       <Sheet open={filterOpen && isMobile} onOpenChange={(open) => !open && setFilterOpen(false)}>

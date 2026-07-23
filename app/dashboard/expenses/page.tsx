@@ -209,7 +209,30 @@ export default function ExpensesPage() {
     });
 
   const total = filteredExpenses.reduce((sum, e) => sum + Number(e.amount), 0);
-  const colSpan = isAdmin ? 9 : 8;
+  // Shared row actions — used by both the desktop table and the mobile cards.
+  function ExpenseActions({ e, fullWidth }: { e: Expense; fullWidth?: boolean }) {
+    return (
+      <div
+        className={
+          fullWidth
+            ? "flex items-center justify-around border-t border-border pt-2 -mx-1"
+            : "flex items-center gap-1 justify-end"
+        }
+      >
+        <Button variant="ghost" size="icon" className="size-7" onClick={() => openEdit(e)}>
+          <Pencil className="size-3.5" />
+        </Button>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="size-7 text-destructive hover:text-destructive"
+          onClick={() => deleteExpense(e.id)}
+        >
+          <Trash2 className="size-3.5" />
+        </Button>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4">
@@ -339,73 +362,98 @@ export default function ExpensesPage() {
         )}
       </div>
 
-      <div className="rounded-lg border border-border overflow-x-auto">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              {isAdmin && <TableHead>Partner</TableHead>}
-              <TableHead>Category</TableHead>
-              <TableHead>Product</TableHead>
-              <TableHead>Area</TableHead>
-              <TableHead>Amount</TableHead>
-              <TableHead>Method</TableHead>
-              <TableHead>Description</TableHead>
-              <TableHead>Date</TableHead>
-              <TableHead />
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {loading ? (
-              <TableRow>
-                <TableCell colSpan={colSpan} className="text-center text-muted-foreground py-10">
-                  Loading…
-                </TableCell>
-              </TableRow>
-            ) : filteredExpenses.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={colSpan} className="text-center text-muted-foreground py-10">
-                  No expenses
-                </TableCell>
-              </TableRow>
-            ) : (
-              filteredExpenses.map((e) => (
-                <TableRow key={e.id}>
-                  {isAdmin && <TableCell>{e.partner_name ?? "—"}</TableCell>}
-                  <TableCell className="font-medium">{e.category_name ?? "—"}</TableCell>
-                  <TableCell>{e.product_name ?? "—"}</TableCell>
-                  <TableCell>{e.area_name ?? "—"}</TableCell>
-                  <TableCell>৳{Number(e.amount).toFixed(2)}</TableCell>
-                  <TableCell className="text-muted-foreground">{e.payment_method ?? "—"}</TableCell>
-                  <TableCell className="text-muted-foreground max-w-[160px] truncate">
-                    {e.description ?? "—"}
-                  </TableCell>
-                  <TableCell className="text-muted-foreground">{formatDate(e.date)}</TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-1 justify-end">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="size-7"
-                        onClick={() => openEdit(e)}
-                      >
-                        <Pencil className="size-3.5" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="size-7 text-destructive hover:text-destructive"
-                        onClick={() => deleteExpense(e.id)}
-                      >
-                        <Trash2 className="size-3.5" />
-                      </Button>
-                    </div>
-                  </TableCell>
+      {loading ? (
+        <div className="text-center text-muted-foreground py-10">Loading…</div>
+      ) : filteredExpenses.length === 0 ? (
+        <div className="text-center text-muted-foreground py-10">No expenses</div>
+      ) : (
+        <>
+          {/* Desktop table */}
+          <div className="hidden md:block rounded-lg border border-border overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  {isAdmin && <TableHead>Partner</TableHead>}
+                  <TableHead>Category</TableHead>
+                  <TableHead>Product</TableHead>
+                  <TableHead>Area</TableHead>
+                  <TableHead>Amount</TableHead>
+                  <TableHead>Method</TableHead>
+                  <TableHead>Description</TableHead>
+                  <TableHead>Date</TableHead>
+                  <TableHead />
                 </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
-      </div>
+              </TableHeader>
+              <TableBody>
+                {filteredExpenses.map((e) => (
+                  <TableRow key={e.id}>
+                    {isAdmin && <TableCell>{e.partner_name ?? "—"}</TableCell>}
+                    <TableCell className="font-medium">{e.category_name ?? "—"}</TableCell>
+                    <TableCell>{e.product_name ?? "—"}</TableCell>
+                    <TableCell>{e.area_name ?? "—"}</TableCell>
+                    <TableCell>৳{Number(e.amount).toFixed(2)}</TableCell>
+                    <TableCell className="text-muted-foreground">
+                      {e.payment_method ?? "—"}
+                    </TableCell>
+                    <TableCell className="text-muted-foreground max-w-[160px] truncate">
+                      {e.description ?? "—"}
+                    </TableCell>
+                    <TableCell className="text-muted-foreground">{formatDate(e.date)}</TableCell>
+                    <TableCell>
+                      <ExpenseActions e={e} />
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+
+          {/* Mobile cards */}
+          <div className="md:hidden space-y-3">
+            {filteredExpenses.map((e) => (
+              <div key={e.id} className="rounded-lg border border-border bg-card p-4 space-y-3">
+                {/* Top row: category · amount */}
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <p className="font-medium truncate">{e.category_name ?? "—"}</p>
+                    <p className="text-xs text-muted-foreground">{formatDate(e.date)}</p>
+                  </div>
+                  <span className="font-semibold tabular-nums whitespace-nowrap">
+                    ৳{Number(e.amount).toFixed(2)}
+                  </span>
+                </div>
+
+                {/* Meta grid */}
+                <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-sm">
+                  {isAdmin && (
+                    <div>
+                      <span className="text-muted-foreground">Partner: </span>
+                      {e.partner_name ?? "—"}
+                    </div>
+                  )}
+                  <div>
+                    <span className="text-muted-foreground">Product: </span>
+                    {e.product_name ?? "—"}
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">Area: </span>
+                    {e.area_name ?? "—"}
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">Method: </span>
+                    {e.payment_method ?? "—"}
+                  </div>
+                </div>
+
+                {e.description && <p className="text-sm text-muted-foreground">{e.description}</p>}
+
+                {/* Actions */}
+                <ExpenseActions e={e} fullWidth />
+              </div>
+            ))}
+          </div>
+        </>
+      )}
 
       <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
         <SheetContent className="!w-full sm:max-w-md overflow-y-auto">
