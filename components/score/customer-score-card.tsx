@@ -13,6 +13,13 @@ interface Order {
   product_name: string;
 }
 
+interface Payment {
+  id: number;
+  amount: number;
+  payment_method: string;
+  paid_at: string;
+}
+
 interface CustomerScoreCardProps {
   details: {
     customer: {
@@ -21,7 +28,7 @@ interface CustomerScoreCardProps {
       address: string;
     };
     orders: Order[];
-    payments: unknown[];
+    payments: Payment[];
     summary: {
       total_ordered: number;
       total_paid: number;
@@ -87,6 +94,119 @@ export function CustomerScoreCard({ details }: CustomerScoreCardProps) {
           <p className="text-slate-600 dark:text-slate-400">{details.customer.address}</p>
         </div>
 
+        {/* Order & Payment Summary Card */}
+        <Card className="p-8 border-green-200 shadow-lg shadow-green-100">
+          {/* Order Summary Table */}
+          <h3 className="text-xl font-semibold mb-4 text-green-700">Order Summary</h3>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-green-200 dark:border-green-700">
+                  <th className="text-left py-3 px-3 font-semibold">Date</th>
+                  <th className="text-left py-3 px-3 font-semibold">Delivered</th>
+                  <th className="text-right py-3 px-3 font-semibold">Qty</th>
+                  <th className="text-right py-3 px-3 font-semibold">Rate</th>
+                  <th className="text-right py-3 px-3 font-semibold">Total</th>
+                </tr>
+              </thead>
+              <tbody>
+                {details.orders.length > 0 ? (
+                  details.orders.map((order) => (
+                    <tr
+                      key={order.id}
+                      className="border-b border-green-100 dark:border-green-800 hover:bg-green-50 dark:hover:bg-green-800/50"
+                    >
+                      <td className="py-3 px-3">
+                        {new Date(order.ordered_at).toLocaleDateString()}
+                      </td>
+                      <td className="py-3 px-3">{order.product_name}</td>
+                      <td className="py-3 px-3 text-right">{order.quantity}</td>
+                      <td className="py-3 px-3 text-right">
+                        ₹{Number(order.unit_price).toFixed(2)}
+                      </td>
+                      <td className="py-3 px-3 text-right font-medium">
+                        ₹{(Number(order.unit_price) * Number(order.quantity)).toFixed(2)}
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td
+                      colSpan={5}
+                      className="py-6 text-center text-slate-500 dark:text-slate-400"
+                    >
+                      No orders found
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Payments Table */}
+          <h3 className="text-xl font-semibold mb-4 mt-8 text-green-700">Payments</h3>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-green-200 dark:border-green-700">
+                  <th className="text-left py-3 px-3 font-semibold">Date</th>
+                  <th className="text-right py-3 px-3 font-semibold">Amount Paid</th>
+                </tr>
+              </thead>
+              <tbody>
+                {details.payments.length > 0 ? (
+                  details.payments.map((payment) => (
+                    <tr
+                      key={payment.id}
+                      className="border-b border-green-100 dark:border-green-800 hover:bg-green-50 dark:hover:bg-green-800/50"
+                    >
+                      <td className="py-3 px-3">
+                        {new Date(payment.paid_at).toLocaleDateString()}
+                      </td>
+                      <td className="py-3 px-3 text-right font-medium text-green-600">
+                        ₹{Number(payment.amount).toFixed(2)}
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td
+                      colSpan={2}
+                      className="py-6 text-center text-slate-500 dark:text-slate-400"
+                    >
+                      No payments found
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Totals */}
+          <div className="mt-8 space-y-3 border-t border-green-200 dark:border-green-700 pt-6">
+            <div className="flex justify-between items-center p-3 bg-green-50 dark:bg-green-900/20 rounded">
+              <span className="text-slate-600 dark:text-slate-400">Total Purchase:</span>
+              <span className="font-semibold">
+                ₹{Number(details.summary.total_ordered).toFixed(2)}
+              </span>
+            </div>
+            <div className="flex justify-between items-center p-3 bg-green-50 dark:bg-green-900/20 rounded">
+              <span className="text-slate-600 dark:text-slate-400">Total Paid:</span>
+              <span className="font-semibold text-green-600">
+                ₹{Number(details.summary.total_paid).toFixed(2)}
+              </span>
+            </div>
+            <div className="flex justify-between items-center p-3 bg-green-50 dark:bg-green-900/20 rounded">
+              <span className="text-slate-600 dark:text-slate-400">Total Due:</span>
+              <span
+                className={`font-semibold ${Number(details.summary.total_due) > 0 ? "text-red-600" : "text-green-600"}`}
+              >
+                ₹{Number(details.summary.total_due).toFixed(2)}
+              </span>
+            </div>
+          </div>
+        </Card>
+
         {/* Score Card */}
         <Card className="p-8 border-green-200 shadow-lg shadow-green-100">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
@@ -127,34 +247,6 @@ export function CustomerScoreCard({ details }: CustomerScoreCardProps) {
 
             {/* Stats and Info */}
             <div className="space-y-6">
-              <div>
-                <h3 className="text-lg font-semibold mb-4">Purchase Summary</h3>
-                <div className="space-y-3">
-                  <div className="flex justify-between items-center p-3 bg-green-50 dark:bg-green-900/20 rounded">
-                    <span className="text-slate-600 dark:text-slate-400">
-                      Total Amount Ordered:
-                    </span>
-                    <span className="font-semibold">
-                      ₹{Number(details.summary.total_ordered).toFixed(2)}
-                    </span>
-                  </div>
-                  <div className="flex justify-between items-center p-3 bg-green-50 dark:bg-green-900/20 rounded">
-                    <span className="text-slate-600 dark:text-slate-400">Total Paid:</span>
-                    <span className="font-semibold text-green-600">
-                      ₹{Number(details.summary.total_paid).toFixed(2)}
-                    </span>
-                  </div>
-                  <div className="flex justify-between items-center p-3 bg-green-50 dark:bg-green-900/20 rounded">
-                    <span className="text-slate-600 dark:text-slate-400">Outstanding Due:</span>
-                    <span
-                      className={`font-semibold ${Number(details.summary.total_due) > 0 ? "text-red-600" : "text-green-600"}`}
-                    >
-                      ₹{Number(details.summary.total_due).toFixed(2)}
-                    </span>
-                  </div>
-                </div>
-              </div>
-
               <div>
                 <h3 className="text-lg font-semibold mb-4">Nutrition Insights</h3>
                 <div className="space-y-2 text-sm">
@@ -229,45 +321,6 @@ export function CustomerScoreCard({ details }: CustomerScoreCardProps) {
           </div>
         </Card>
 
-        {/* Orders History */}
-        {details.orders.length > 0 && (
-          <Card className="p-8 border-green-200 shadow-lg shadow-green-100">
-            <h3 className="text-xl font-semibold mb-6 text-green-700">Recent Orders</h3>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-green-200 dark:border-green-700">
-                    <th className="text-left py-3 px-3 font-semibold">Date</th>
-                    <th className="text-left py-3 px-3 font-semibold">Product</th>
-                    <th className="text-right py-3 px-3 font-semibold">Qty</th>
-                    <th className="text-right py-3 px-3 font-semibold">Amount</th>
-                    <th className="text-left py-3 px-3 font-semibold">Status</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {details.orders.slice(0, 10).map((order) => (
-                    <tr
-                      key={order.id}
-                      className="border-b border-green-100 dark:border-green-800 hover:bg-green-50 dark:hover:bg-green-800/50"
-                    >
-                      <td className="py-3 px-3">
-                        {new Date(order.ordered_at).toLocaleDateString()}
-                      </td>
-                      <td className="py-3 px-3">{order.product_name}</td>
-                      <td className="py-3 px-3 text-right">{order.quantity}</td>
-                      <td className="py-3 px-3 text-right">
-                        ₹{(order.unit_price * order.quantity).toFixed(2)}
-                      </td>
-                      <td className="py-3 px-3">
-                        <Badge variant="outline">{order.status}</Badge>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </Card>
-        )}
       </div>
     </div>
   );
