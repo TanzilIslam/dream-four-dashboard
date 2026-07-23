@@ -16,6 +16,7 @@ import {
   BanknoteIcon,
   Download,
   Link,
+  HandCoins,
 } from "lucide-react";
 
 import {
@@ -48,6 +49,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { BulkPaymentSheet } from "@/components/customers/bulk-payment-sheet";
 import { formatDate } from "@/lib/utils";
 
 type Customer = {
@@ -167,6 +169,7 @@ export default function CustomersPage() {
   const [customerHistory, setCustomerHistory] = useState<CustomerHistoryProduct[] | null>(null);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [paymentCustomer, setPaymentCustomer] = useState<Customer | null>(null);
+  const [collectCustomer, setCollectCustomer] = useState<Customer | null>(null);
   const [paymentList, setPaymentList] = useState<
     {
       id: number;
@@ -856,6 +859,15 @@ export default function CustomersPage() {
                         title="Payment history"
                       >
                         <BanknoteIcon className="size-3.5" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => setCollectCustomer(c)}
+                        className="size-7 text-emerald-600 hover:bg-emerald-50 hover:text-emerald-700"
+                        title="Collect payment (auto-apply to due orders)"
+                      >
+                        <HandCoins className="size-3.5" />
                       </Button>
                       <Button
                         variant="ghost"
@@ -1554,6 +1566,21 @@ export default function CustomersPage() {
           </div>
         </SheetContent>
       </Sheet>
+
+      {/* ── Collect Payment (auto-allocate) Sheet ────────────────── */}
+      <BulkPaymentSheet
+        customer={collectCustomer}
+        onOpenChange={(open) => !open && setCollectCustomer(null)}
+        onSuccess={() => {
+          refreshCustomers();
+          // If the payments sheet is open for the same customer, refresh it too.
+          if (paymentCustomer && collectCustomer && paymentCustomer.id === collectCustomer.id) {
+            const cust = paymentCustomer;
+            setPaymentCustomer(null);
+            setTimeout(() => setPaymentCustomer(cust), 0);
+          }
+        }}
+      />
 
       <ConfirmDialog
         open={confirmTarget !== null}

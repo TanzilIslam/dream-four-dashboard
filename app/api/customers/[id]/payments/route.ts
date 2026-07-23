@@ -25,7 +25,9 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   const orders = await sql`
     SELECT
       o.id,
+      o.ordered_at,
       o.delivered_at,
+      o.status,
       o.quantity,
       o.unit_price,
       o.total_amount,
