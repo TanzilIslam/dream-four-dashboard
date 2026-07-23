@@ -97,16 +97,16 @@ export function CustomerScoreCard({ details }: CustomerScoreCardProps) {
         {/* Order & Payment Summary Card */}
         <Card className="p-8 border-green-200 shadow-lg shadow-green-100">
           {/* Order Summary Table */}
-          <h3 className="text-xl font-semibold mb-4 text-green-700">Order Summary</h3>
+          <h3 className="text-xl font-semibold mb-4 text-green-700">অর্ডার সারসংক্ষেপ</h3>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-green-200 dark:border-green-700">
-                  <th className="text-left py-3 px-3 font-semibold">Date</th>
-                  <th className="text-left py-3 px-3 font-semibold">Delivered</th>
-                  <th className="text-right py-3 px-3 font-semibold">Qty</th>
-                  <th className="text-right py-3 px-3 font-semibold">Rate</th>
-                  <th className="text-right py-3 px-3 font-semibold">Total</th>
+                  <th className="text-left py-3 px-3 font-semibold">তারিখ</th>
+                  <th className="text-left py-3 px-3 font-semibold">পণ্য</th>
+                  <th className="text-right py-3 px-3 font-semibold">পরিমাণ</th>
+                  <th className="text-right py-3 px-3 font-semibold">দর</th>
+                  <th className="text-right py-3 px-3 font-semibold">মোট</th>
                 </tr>
               </thead>
               <tbody>
@@ -135,7 +135,7 @@ export function CustomerScoreCard({ details }: CustomerScoreCardProps) {
                       colSpan={5}
                       className="py-6 text-center text-slate-500 dark:text-slate-400"
                     >
-                      No orders found
+                      কোনো অর্ডার পাওয়া যায়নি
                     </td>
                   </tr>
                 )}
@@ -144,13 +144,13 @@ export function CustomerScoreCard({ details }: CustomerScoreCardProps) {
           </div>
 
           {/* Payments Table */}
-          <h3 className="text-xl font-semibold mb-4 mt-8 text-green-700">Payments</h3>
+          <h3 className="text-xl font-semibold mb-4 mt-8 text-green-700">পেমেন্ট সারসংক্ষেপ</h3>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-green-200 dark:border-green-700">
-                  <th className="text-left py-3 px-3 font-semibold">Date</th>
-                  <th className="text-right py-3 px-3 font-semibold">Amount Paid</th>
+                  <th className="text-left py-3 px-3 font-semibold">তারিখ</th>
+                  <th className="text-right py-3 px-3 font-semibold">পরিশোধিত টাকা</th>
                 </tr>
               </thead>
               <tbody>
@@ -174,7 +174,7 @@ export function CustomerScoreCard({ details }: CustomerScoreCardProps) {
                       colSpan={2}
                       className="py-6 text-center text-slate-500 dark:text-slate-400"
                     >
-                      No payments found
+                      কোনো পেমেন্ট পাওয়া যায়নি
                     </td>
                   </tr>
                 )}
@@ -185,19 +185,19 @@ export function CustomerScoreCard({ details }: CustomerScoreCardProps) {
           {/* Totals */}
           <div className="mt-8 space-y-3 border-t border-green-200 dark:border-green-700 pt-6">
             <div className="flex justify-between items-center p-3 bg-green-50 dark:bg-green-900/20 rounded">
-              <span className="text-slate-600 dark:text-slate-400">Total Purchase:</span>
+              <span className="text-slate-600 dark:text-slate-400">মোট ক্রয়:</span>
               <span className="font-semibold">
                 ₹{Number(details.summary.total_ordered).toFixed(2)}
               </span>
             </div>
             <div className="flex justify-between items-center p-3 bg-green-50 dark:bg-green-900/20 rounded">
-              <span className="text-slate-600 dark:text-slate-400">Total Paid:</span>
+              <span className="text-slate-600 dark:text-slate-400">মোট পরিশোধ:</span>
               <span className="font-semibold text-green-600">
                 ₹{Number(details.summary.total_paid).toFixed(2)}
               </span>
             </div>
             <div className="flex justify-between items-center p-3 bg-green-50 dark:bg-green-900/20 rounded">
-              <span className="text-slate-600 dark:text-slate-400">Total Due:</span>
+              <span className="text-slate-600 dark:text-slate-400">মোট বকেয়া:</span>
               <span
                 className={`font-semibold ${Number(details.summary.total_due) > 0 ? "text-red-600" : "text-green-600"}`}
               >
