@@ -131,6 +131,13 @@ export async function POST(request: Request) {
     RETURNING *
   `;
 
+  if (paid_amount > 0) {
+    await sql`
+      INSERT INTO payments (partner_id, customer_id, order_id, amount, paid_at)
+      VALUES (${user.id}, ${d.customer_id}, ${order.id}, ${paid_amount}, ${d.ordered_at}::TIMESTAMPTZ)
+    `;
+  }
+
   if (d.assets && d.assets.length > 0) {
     for (const a of d.assets) {
       await sql`

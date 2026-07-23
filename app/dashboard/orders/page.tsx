@@ -13,7 +13,6 @@ import {
   XCircle,
   ChevronsUpDown,
   Check,
-  SlidersHorizontal,
   X,
   Trash2,
   Loader2,
@@ -154,9 +153,9 @@ export default function OrdersPage() {
   const [_stock, setStock] = useState<StockItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
-  const [orderSummary, setOrderSummary] = useState({ total: 0, paid: 0, due: 0 });
+  const [_orderSummary, setOrderSummary] = useState({ total: 0, paid: 0, due: 0 });
   const [filterOpen, setFilterOpen] = useState(false);
-  const [orderSort, setOrderSort] = useState<
+  const [orderSort, _setOrderSort] = useState<
     | "none"
     | "id_desc"
     | "id_asc"

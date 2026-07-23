@@ -87,20 +87,6 @@ export async function GET(request: Request) {
   const actualFrom: Date | string | null = from ?? earliest_date ?? null;
   const actualTo: Date | string = to ?? new Date();
 
-  const _perProductStats =
-    !productId || productId === "all"
-      ? await sql`
-          SELECT p.name,
-                 COUNT(o.id)::int                    AS orders,
-                 COALESCE(SUM(o.quantity), 0)::int   AS qty
-          FROM orders o
-          JOIN products p ON p.id = o.product_id
-          WHERE o.status IN ('delivered', 'paid') ${dateFilter}
-          GROUP BY p.id, p.name
-          ORDER BY p.name
-        `
-      : [];
-
   const [summary, , , , expenseBreakdown, dues, supplies, miniDueList, assetOverview] =
     await Promise.all([
       // Sheet 1: Summary KPIs
