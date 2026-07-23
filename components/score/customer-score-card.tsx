@@ -2,7 +2,6 @@
 
 import { useState, useMemo } from "react";
 import { Card } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 
 interface Order {
   id: number;
@@ -71,18 +70,11 @@ export function CustomerScoreCard({ details }: CustomerScoreCardProps) {
     return "text-red-600 dark:text-red-400";
   };
 
-  const getScoreBadgeColor = (score: number) => {
-    if (score >= 80) return "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100";
-    if (score >= 60) return "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-100";
-    if (score >= 40) return "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-100";
-    return "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-100";
-  };
-
   const getScoreInterpretation = (score: number) => {
-    if (score >= 80) return "Excellent! Meeting family protein needs well";
-    if (score >= 60) return "Good! Adequate protein intake for your family";
-    if (score >= 40) return "Fair! Consider increasing purchases for better nutrition";
-    return "Low! Your family might need more protein from eggs";
+    if (score >= 80) return "চমৎকার! আপনার পরিবারের প্রোটিনের চাহিদা ভালোভাবে পূরণ হচ্ছে।";
+    if (score >= 60) return "ভালো! আপনার পরিবারের জন্য পর্যাপ্ত প্রোটিন পাওয়া যাচ্ছে।";
+    if (score >= 40) return "মোটামুটি। আরও কিছু ডিম কিনলে পুষ্টি আরও ভালো হবে।";
+    return "কম! আপনার পরিবারের জন্য আরও বেশি ডিম প্রয়োজন।";
   };
 
   return (
@@ -207,120 +199,95 @@ export function CustomerScoreCard({ details }: CustomerScoreCardProps) {
           </div>
         </Card>
 
-        {/* Score Card */}
+        {/* Nutrition Score Card (simplified, Bangla) */}
         <Card className="p-8 border-green-200 shadow-lg shadow-green-100">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-            {/* Score Visualization */}
-            <div className="flex flex-col items-center justify-center">
-              <div className="relative w-40 h-40 mb-6">
-                <svg className="w-full h-full" viewBox="0 0 180 180">
-                  {/* Background circle */}
-                  <circle
-                    cx="90"
-                    cy="90"
-                    r="80"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="8"
-                    className="text-green-200 dark:text-green-700"
-                  />
-                  {/* Score circle */}
-                  <circle
-                    cx="90"
-                    cy="90"
-                    r="80"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="8"
-                    strokeDasharray={`${(scorePercentage / 100) * 502.4} 502.4`}
-                    className={getScoreColor(score)}
-                    style={{ transform: "rotate(-90deg)", transformOrigin: "50% 50%" }}
-                  />
-                </svg>
-                <div className="absolute inset-0 flex flex-col items-center justify-center">
-                  <div className={`text-5xl font-bold ${getScoreColor(score)}`}>{score}</div>
-                  <div className="text-sm text-slate-600 dark:text-slate-400">Score</div>
-                </div>
-              </div>
-              <p className="text-center text-sm">{getScoreInterpretation(score)}</p>
-            </div>
+          <h3 className="text-xl font-semibold text-green-700 text-center mb-1">পুষ্টি স্কোর</h3>
+          <p className="text-sm text-slate-600 dark:text-slate-400 text-center mb-8">
+            ডিম প্রোটিনের একটি সহজ ও পুষ্টিকর উৎস
+          </p>
 
-            {/* Stats and Info */}
-            <div className="space-y-6">
-              <div>
-                <h3 className="text-lg font-semibold mb-4">Nutrition Insights</h3>
-                <div className="space-y-2 text-sm">
-                  <p className="text-slate-600 dark:text-slate-400">
-                    <span className="font-medium">Protein per egg:</span> {PROTEIN_PER_EGG}g
-                  </p>
-                  <p className="text-slate-600 dark:text-slate-400">
-                    <span className="font-medium">Adult daily need:</span> {DAILY_PROTEIN_NEED}g (
-                    {EGGS_NEEDED_PER_DAY} eggs)
-                  </p>
-                  <p className="text-slate-600 dark:text-slate-400">
-                    <span className="font-medium">Monthly target:</span> {monthlyTarget} eggs
-                  </p>
-                </div>
-              </div>
+          {/* Family member selector */}
+          <div className="mb-8">
+            <div className="flex justify-between items-center mb-3">
+              <label className="text-base font-medium">আপনার পরিবারে সদস্য সংখ্যা</label>
+              <span className="text-green-600 dark:text-green-400 text-2xl font-bold">
+                {familyMembers} জন
+              </span>
+            </div>
+            <input
+              type="range"
+              min="1"
+              max="7"
+              value={familyMembers}
+              onChange={(e) => setFamilyMembers(parseInt(e.target.value))}
+              className="w-full h-3 bg-green-200 dark:bg-green-700 rounded-lg appearance-none cursor-pointer accent-green-600"
+            />
+            <div className="flex justify-between text-xs text-slate-500 mt-2">
+              <span>১ জন</span>
+              <span>৭ জন</span>
             </div>
           </div>
-        </Card>
 
-        {/* Family Size Slider */}
-        <Card className="p-8 border-green-200 shadow-lg shadow-green-100">
-          <h3 className="text-xl font-semibold mb-6">Family Member Count</h3>
-          <div className="space-y-6">
-            <div>
-              <div className="flex justify-between items-center mb-4">
-                <label className="text-lg font-medium">
-                  Members:{" "}
-                  <span className="text-green-600 dark:text-green-400 text-2xl">
-                    {familyMembers}
-                  </span>
-                </label>
-              </div>
-
-              {/* Slider */}
-              <input
-                type="range"
-                min="1"
-                max="7"
-                value={familyMembers}
-                onChange={(e) => setFamilyMembers(parseInt(e.target.value))}
-                className="w-full h-3 bg-green-200 dark:bg-green-700 rounded-lg appearance-none cursor-pointer accent-green-600"
-              />
-
-              <div className="flex justify-between text-xs text-slate-500 mt-2">
-                <span>1</span>
-                <span>7</span>
-              </div>
-            </div>
-
-            {/* Updated Stats */}
-            <div className="grid grid-cols-2 gap-4">
-              <div className="p-4 bg-green-50 dark:bg-green-900/20 rounded-lg">
-                <p className="text-sm text-slate-600 dark:text-slate-400 mb-1">Updated Score</p>
-                <p className={`text-3xl font-bold ${getScoreColor(score)}`}>{score}</p>
-              </div>
-              <div className="p-4 bg-green-50 dark:bg-green-900/20 rounded-lg">
-                <p className="text-sm text-slate-600 dark:text-slate-400 mb-1">Monthly Target</p>
-                <p className="text-2xl font-bold">{monthlyTarget} eggs</p>
+          {/* Score gauge */}
+          <div className="flex flex-col items-center justify-center mb-8">
+            <div className="relative w-40 h-40 mb-4">
+              <svg className="w-full h-full" viewBox="0 0 180 180">
+                {/* Background circle */}
+                <circle
+                  cx="90"
+                  cy="90"
+                  r="80"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="8"
+                  className="text-green-200 dark:text-green-700"
+                />
+                {/* Score circle */}
+                <circle
+                  cx="90"
+                  cy="90"
+                  r="80"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="8"
+                  strokeDasharray={`${(scorePercentage / 100) * 502.4} 502.4`}
+                  className={getScoreColor(score)}
+                  style={{ transform: "rotate(-90deg)", transformOrigin: "50% 50%" }}
+                />
+              </svg>
+              <div className="absolute inset-0 flex flex-col items-center justify-center">
+                <div className={`text-5xl font-bold ${getScoreColor(score)}`}>{score}</div>
+                <div className="text-sm text-slate-600 dark:text-slate-400">স্কোর</div>
               </div>
             </div>
+            <p className="text-center text-base font-medium max-w-sm">
+              {getScoreInterpretation(score)}
+            </p>
+          </div>
 
-            <div className="p-4 bg-green-50 dark:bg-green-900/20 rounded-lg">
-              <p className="text-sm text-slate-600 dark:text-slate-400 mb-2">What this means:</p>
-              <p className="text-sm">
-                For a family of <span className="font-semibold">{familyMembers}</span>, you should
-                ideally purchase about{" "}
-                <span className="font-semibold">{monthlyTarget} eggs per month</span> to meet daily
-                protein requirements. Your current purchase rate suggests a score of{" "}
-                <Badge className={getScoreBadgeColor(score)}>{score}</Badge>
-              </p>
+          {/* Simple stats */}
+          <div className="grid grid-cols-2 gap-4 mb-6">
+            <div className="p-4 bg-green-50 dark:bg-green-900/20 rounded-lg text-center">
+              <p className="text-sm text-slate-600 dark:text-slate-400 mb-1">মাসে যত ডিম দরকার</p>
+              <p className="text-2xl font-bold">{monthlyTarget} টি</p>
+            </div>
+            <div className="p-4 bg-green-50 dark:bg-green-900/20 rounded-lg text-center">
+              <p className="text-sm text-slate-600 dark:text-slate-400 mb-1">আপনার স্কোর</p>
+              <p className={`text-2xl font-bold ${getScoreColor(score)}`}>{score}</p>
             </div>
           </div>
-        </Card>
 
+          {/* Simple explanation */}
+          <div className="p-4 bg-green-50 dark:bg-green-900/20 rounded-lg text-sm leading-relaxed">
+            <p>
+              {familyMembers} জন সদস্যের একটি পরিবারের প্রতি মাসে প্রায়{" "}
+              <span className="font-semibold">{monthlyTarget} টি ডিম</span> খাওয়া ভালো। কারণ প্রতিটি
+              ডিমে <span className="font-semibold">{PROTEIN_PER_EGG} গ্রাম</span> প্রোটিন থাকে এবং
+              একজন মানুষের প্রতিদিন প্রায়{" "}
+              <span className="font-semibold">{EGGS_NEEDED_PER_DAY} টি ডিম</span> খাওয়া দরকার।
+            </p>
+          </div>
+        </Card>
       </div>
     </div>
   );
