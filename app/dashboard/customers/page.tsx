@@ -1491,44 +1491,46 @@ export default function CustomersPage() {
                       No payments recorded.
                     </p>
                   ) : (
-                    <>
-                      <div className="rounded-md border border-border overflow-x-auto text-sm">
-                        <Table>
-                          <TableHeader>
-                            <TableRow>
-                              <TableHead>Date</TableHead>
-                              <TableHead>Product</TableHead>
-                              <TableHead>Method</TableHead>
-                              <TableHead className="text-right">Amount</TableHead>
-                            </TableRow>
-                          </TableHeader>
-                          <TableBody>
-                            {paymentList.map((p) => (
-                              <TableRow key={p.id}>
-                                <TableCell className="whitespace-nowrap text-muted-foreground">
-                                  {formatDate(p.paid_at)}
-                                </TableCell>
-                                <TableCell className="text-muted-foreground">
-                                  {p.product_name}
-                                </TableCell>
-                                <TableCell className="text-muted-foreground">
-                                  {p.payment_method ?? "—"}
-                                </TableCell>
-                                <TableCell className="text-right font-medium text-green-600 tabular-nums">
-                                  ৳{Number(p.amount).toFixed(2)}
-                                </TableCell>
-                              </TableRow>
-                            ))}
-                          </TableBody>
-                        </Table>
-                      </div>
-                      <div className="mt-3 flex justify-between items-center px-3 py-2 rounded-md bg-muted/50 text-sm font-semibold">
-                        <span>Total</span>
-                        <span className="text-green-600 tabular-nums">
-                          ৳{paymentList.reduce((sum, p) => sum + Number(p.amount), 0).toFixed(2)}
-                        </span>
-                      </div>
-                    </>
+                    (() => {
+                      const grouped = new Map<string, number>();
+                      for (const p of paymentList) {
+                        const date = formatDate(p.paid_at);
+                        grouped.set(date, (grouped.get(date) ?? 0) + Number(p.amount));
+                      }
+                      return (
+                        <>
+                          <div className="rounded-md border border-border overflow-x-auto text-sm">
+                            <Table>
+                              <TableHeader>
+                                <TableRow>
+                                  <TableHead>Date</TableHead>
+                                  <TableHead className="text-right">Amount</TableHead>
+                                </TableRow>
+                              </TableHeader>
+                              <TableBody>
+                                {[...grouped.entries()].map(([date, total]) => (
+                                  <TableRow key={date}>
+                                    <TableCell className="whitespace-nowrap text-muted-foreground">
+                                      {date}
+                                    </TableCell>
+                                    <TableCell className="text-right font-medium text-green-600 tabular-nums">
+                                      ৳{total.toFixed(2)}
+                                    </TableCell>
+                                  </TableRow>
+                                ))}
+                              </TableBody>
+                            </Table>
+                          </div>
+                          <div className="mt-3 flex justify-between items-center px-3 py-2 rounded-md bg-muted/50 text-sm font-semibold">
+                            <span>Total</span>
+                            <span className="text-green-600 tabular-nums">
+                              ৳
+                              {paymentList.reduce((sum, p) => sum + Number(p.amount), 0).toFixed(2)}
+                            </span>
+                          </div>
+                        </>
+                      );
+                    })()
                   )}
                 </TabsContent>
 

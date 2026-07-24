@@ -487,7 +487,12 @@ export default function CalendarPage() {
                 {activeTab === "collection" && (
                   <div className="space-y-4">
                     <div className="grid grid-cols-2 gap-2">
-                      <SummaryCard label="Payments" value={String(dayData.collections.length)} />
+                      <SummaryCard
+                        label="Payments"
+                        value={String(
+                          new Set(dayData.collections.map((c) => c.customer_name)).size
+                        )}
+                      />
                       <SummaryCard label="Total Collected" value={`৳${fmt(collectionTotal)}`} />
                     </div>
 
@@ -496,47 +501,39 @@ export default function CalendarPage() {
                         No collections on this date.
                       </p>
                     ) : (
-                      <div className="rounded-lg border border-border overflow-x-auto">
-                        <Table>
-                          <TableHeader>
-                            <TableRow>
-                              <TableHead>Customer</TableHead>
-                              <TableHead>Product</TableHead>
-                              <TableHead className="text-right">Amount</TableHead>
-                              <TableHead>Method</TableHead>
-                              <TableHead>Note</TableHead>
-                            </TableRow>
-                          </TableHeader>
-                          <TableBody>
-                            {dayData.collections.map((c) => (
-                              <TableRow key={c.id}>
-                                <TableCell className="font-medium text-sm whitespace-nowrap">
-                                  <div>
-                                    {c.customer_name ?? "—"}
-                                    {c.customer_phone && (
-                                      <p className="text-xs text-muted-foreground">
-                                        {c.customer_phone}
-                                      </p>
-                                    )}
-                                  </div>
-                                </TableCell>
-                                <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
-                                  {c.product_name ?? "—"}
-                                </TableCell>
-                                <TableCell className="text-right tabular-nums text-sm font-medium text-green-600">
-                                  ৳{fmt(c.amount)}
-                                </TableCell>
-                                <TableCell className="text-sm text-muted-foreground">
-                                  {c.payment_method ?? "—"}
-                                </TableCell>
-                                <TableCell className="text-sm text-muted-foreground">
-                                  {c.note ?? "—"}
-                                </TableCell>
-                              </TableRow>
-                            ))}
-                          </TableBody>
-                        </Table>
-                      </div>
+                      (() => {
+                        const grouped = new Map<string, { total: number; count: number }>();
+                        for (const c of dayData.collections) {
+                          const name = c.customer_name ?? "—";
+                          const prev = grouped.get(name) ?? { total: 0, count: 0 };
+                          grouped.set(name, {
+                            total: prev.total + Number(c.amount),
+                            count: prev.count + 1,
+                          });
+                        }
+                        return (
+                          <div className="rounded-lg border border-border overflow-x-auto">
+                            <Table>
+                              <TableHeader>
+                                <TableRow>
+                                  <TableHead>Customer</TableHead>
+                                  <TableHead className="text-right">Total</TableHead>
+                                </TableRow>
+                              </TableHeader>
+                              <TableBody>
+                                {[...grouped.entries()].map(([name, { total }]) => (
+                                  <TableRow key={name}>
+                                    <TableCell className="font-medium text-sm">{name}</TableCell>
+                                    <TableCell className="text-right tabular-nums text-sm font-medium text-green-600">
+                                      ৳{fmt(total)}
+                                    </TableCell>
+                                  </TableRow>
+                                ))}
+                              </TableBody>
+                            </Table>
+                          </div>
+                        );
+                      })()
                     )}
                   </div>
                 )}
