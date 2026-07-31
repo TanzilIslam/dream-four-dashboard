@@ -740,24 +740,29 @@ export default function CustomersPage() {
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-y-2">
-        <div>
+        <div className="hidden sm:block">
           <h1 className="text-xl font-semibold">Customers</h1>
-          <p className="text-sm text-muted-foreground">
-            Manage your delivery customers.
-            {!loading && (
-              <span className="ml-1 font-medium text-foreground">
-                {filteredCustomers.length}
-                {filteredCustomers.length !== customers.length
-                  ? ` of ${customers.length}`
-                  : ""}{" "}
-                total
-              </span>
-            )}
-          </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          <Button size="sm" onClick={openCreate}>
+            <PlusIcon className="size-4" />
+            <span className="hidden sm:inline">Add Customer</span>
+          </Button>
+        </div>
+      </div>
+
+      {/* Inline filter bar */}
+      <div className="grid grid-cols-12 items-start gap-4">
+        <FilterSection label="Customer" className="col-span-6">
+          <Input
+            placeholder="Search by name or phone…"
+            value={filters.search}
+            onChange={(e) => setFilter("search", e.target.value)}
+          />
+        </FilterSection>
+        <FilterSection label="Sort" className="col-span-6">
           <Select value={orderSort} onValueChange={(v) => setOrderSort(v as typeof orderSort)}>
-            <SelectTrigger className="h-8 text-sm w-full sm:w-48">
+            <SelectTrigger className="w-full overflow-hidden">
               <SelectValue>
                 {
                   {
@@ -798,35 +803,7 @@ export default function CustomersPage() {
               <SelectItem value="created_asc">Created: oldest first</SelectItem>
             </SelectContent>
           </Select>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setFilterOpen((v) => !v)}
-            className="relative md:hidden"
-          >
-            <SlidersHorizontal className="size-4" />
-            Filters
-            {activeFilterCount > 0 && (
-              <span className="absolute -top-1.5 -right-1.5 size-4 rounded-full bg-foreground text-background text-[10px] font-bold flex items-center justify-center leading-none">
-                {activeFilterCount}
-              </span>
-            )}
-          </Button>
-          <Button size="sm" onClick={openCreate}>
-            <PlusIcon className="size-4" />
-            Add Customer
-          </Button>
-        </div>
-      </div>
-
-      {/* Desktop inline filter bar */}
-      <div className="hidden md:block">
-        <Input
-          placeholder="Search by name or phone…"
-          value={filters.search}
-          onChange={(e) => setFilter("search", e.target.value)}
-          className="max-w-sm"
-        />
+        </FilterSection>
       </div>
 
       {loading ? (

@@ -905,32 +905,34 @@ export default function PurchasesPage() {
               />
             </Field>
 
-            <Field label="Transport Cost per Unit (৳)">
-              <Input
-                type="number"
-                step="0.01"
-                min={0}
-                {...purchaseForm.register("unit_transport_cost", { valueAsNumber: true })}
-              />
-            </Field>
+            <div className="hidden">
+              <Field label="Transport Cost per Unit (৳)">
+                <Input
+                  type="number"
+                  step="0.01"
+                  min={0}
+                  {...purchaseForm.register("unit_transport_cost", { valueAsNumber: true })}
+                />
+              </Field>
 
-            <Field label="Label Cost per Unit (৳)">
-              <Input
-                type="number"
-                step="0.01"
-                min={0}
-                {...purchaseForm.register("unit_label_cost", { valueAsNumber: true })}
-              />
-            </Field>
+              <Field label="Label Cost per Unit (৳)">
+                <Input
+                  type="number"
+                  step="0.01"
+                  min={0}
+                  {...purchaseForm.register("unit_label_cost", { valueAsNumber: true })}
+                />
+              </Field>
 
-            <Field label="Other Cost per Unit (৳)">
-              <Input
-                type="number"
-                step="0.01"
-                min={0}
-                {...purchaseForm.register("unit_other_cost", { valueAsNumber: true })}
-              />
-            </Field>
+              <Field label="Other Cost per Unit (৳)">
+                <Input
+                  type="number"
+                  step="0.01"
+                  min={0}
+                  {...purchaseForm.register("unit_other_cost", { valueAsNumber: true })}
+                />
+              </Field>
+            </div>
 
             {/* Live computed display */}
             <div className="rounded-md bg-muted px-3 py-2 text-sm space-y-1">

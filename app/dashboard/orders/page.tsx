@@ -1498,41 +1498,43 @@ export default function OrdersPage() {
               />
             </Field>
 
-            <Field
-              label="Transport Cost per Unit (৳)"
-              error={createForm.formState.errors.unit_transport_cost?.message}
-            >
-              <Input
-                type="number"
-                step="0.01"
-                min={0}
-                {...createForm.register("unit_transport_cost", { valueAsNumber: true })}
-              />
-            </Field>
+            <div className="hidden">
+              <Field
+                label="Transport Cost per Unit (৳)"
+                error={createForm.formState.errors.unit_transport_cost?.message}
+              >
+                <Input
+                  type="number"
+                  step="0.01"
+                  min={0}
+                  {...createForm.register("unit_transport_cost", { valueAsNumber: true })}
+                />
+              </Field>
 
-            <Field
-              label="Label Cost per Unit (৳)"
-              error={createForm.formState.errors.unit_label_cost?.message}
-            >
-              <Input
-                type="number"
-                step="0.01"
-                min={0}
-                {...createForm.register("unit_label_cost", { valueAsNumber: true })}
-              />
-            </Field>
+              <Field
+                label="Label Cost per Unit (৳)"
+                error={createForm.formState.errors.unit_label_cost?.message}
+              >
+                <Input
+                  type="number"
+                  step="0.01"
+                  min={0}
+                  {...createForm.register("unit_label_cost", { valueAsNumber: true })}
+                />
+              </Field>
 
-            <Field
-              label="Other Cost per Unit (৳)"
-              error={createForm.formState.errors.unit_other_cost?.message}
-            >
-              <Input
-                type="number"
-                step="0.01"
-                min={0}
-                {...createForm.register("unit_other_cost", { valueAsNumber: true })}
-              />
-            </Field>
+              <Field
+                label="Other Cost per Unit (৳)"
+                error={createForm.formState.errors.unit_other_cost?.message}
+              >
+                <Input
+                  type="number"
+                  step="0.01"
+                  min={0}
+                  {...createForm.register("unit_other_cost", { valueAsNumber: true })}
+                />
+              </Field>
+            </div>
 
             <Field label="Sales Price (৳)" error={createForm.formState.errors.unit_price?.message}>
               <Input
@@ -1544,20 +1546,22 @@ export default function OrdersPage() {
             </Field>
 
             {formMode !== "edit" && (
-              <Field
-                label="Paid Now / Collection (৳)"
-                error={
-                  (createForm.formState.errors as Record<string, { message?: string }>).paid_amount
-                    ?.message
-                }
-              >
-                <Input
-                  type="number"
-                  step="0.01"
-                  min={0}
-                  {...createForm.register("paid_amount", { valueAsNumber: true })}
-                />
-              </Field>
+              <div className="hidden">
+                <Field
+                  label="Paid Now / Collection (৳)"
+                  error={
+                    (createForm.formState.errors as Record<string, { message?: string }>)
+                      .paid_amount?.message
+                  }
+                >
+                  <Input
+                    type="number"
+                    step="0.01"
+                    min={0}
+                    {...createForm.register("paid_amount", { valueAsNumber: true })}
+                  />
+                </Field>
+              </div>
             )}
 
             {orderSales > 0 && (
