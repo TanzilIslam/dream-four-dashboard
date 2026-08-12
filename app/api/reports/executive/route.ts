@@ -363,10 +363,18 @@ export async function GET(request: Request) {
   const totalStock = Number(s?.total_stock ?? 0);
   const avgPrice = salesQty > 0 ? salesAmount / salesQty : 0;
   const stockValue = totalStock * avgPrice;
+  const investment = 60000;
+  const totalInHand = salesPaid + salesDue + stockValue;
+  const totalSpent = purchasePaid + totalExpenses;
+  const profitLoss = totalInHand - totalSpent;
+  const roi = ((profitLoss / investment) * 100);
   const summaryRows = s
     ? [
         { Metric: "Product", Value: productLabel },
         { Metric: "Period", Value: periodValue },
+        { Metric: "", Value: "" },
+        { Metric: "--- INVESTMENT ---", Value: "" },
+        { Metric: "Initial Investment", Value: investment.toFixed(2) },
         { Metric: "", Value: "" },
         { Metric: "--- PURCHASES ---", Value: "" },
         { Metric: "Qty", Value: purchaseQty },
@@ -393,19 +401,24 @@ export async function GET(request: Request) {
         { Metric: "--- TOTAL SPENT ---", Value: "" },
         { Metric: "Supplier Paid", Value: purchasePaid.toFixed(2) },
         { Metric: "Expenses", Value: totalExpenses.toFixed(2) },
-        { Metric: "= Total Spent", Value: (purchasePaid + totalExpenses).toFixed(2) },
+        { Metric: "= Total Spent", Value: totalSpent.toFixed(2) },
         { Metric: "", Value: "" },
         { Metric: "--- TOTAL IN HAND ---", Value: "" },
         { Metric: "Collected", Value: salesPaid.toFixed(2) },
         { Metric: "+ Due from Customers", Value: salesDue.toFixed(2) },
         { Metric: "+ Stock Value", Value: stockValue.toFixed(2) },
-        { Metric: "= Total In Hand", Value: (salesPaid + salesDue + stockValue).toFixed(2) },
+        { Metric: "= Total In Hand", Value: totalInHand.toFixed(2) },
         { Metric: "", Value: "" },
         { Metric: "--- PROFIT / LOSS ---", Value: "" },
         {
           Metric: "Total In Hand - Total Spent",
-          Value: `${(salesPaid + salesDue + stockValue).toFixed(2)} - ${(purchasePaid + totalExpenses).toFixed(2)} = ${(salesPaid + salesDue + stockValue - purchasePaid - totalExpenses).toFixed(2)}`,
+          Value: `${totalInHand.toFixed(2)} - ${totalSpent.toFixed(2)} = ${profitLoss.toFixed(2)}`,
         },
+        { Metric: "", Value: "" },
+        { Metric: "--- ROI (Return on Investment) ---", Value: "" },
+        { Metric: "Investment", Value: investment.toFixed(2) },
+        { Metric: "Profit / Loss", Value: profitLoss.toFixed(2) },
+        { Metric: "ROI %", Value: `${roi.toFixed(2)}%` },
       ]
     : [];
 

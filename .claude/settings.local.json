@@ -10,7 +10,9 @@
       "Bash(wc:*)",
       "Bash(echo:*)",
       "Bash(rm:*)",
-      "Bash(python3:*)"
+      "Bash(python3:*)",
+      "Bash(neonctl:*)",
+      "Bash(neon:*)"
     ]
   }
 }
