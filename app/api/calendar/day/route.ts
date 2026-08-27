@@ -138,7 +138,8 @@ export async function GET(request: Request) {
       c.name  AS customer_name,
       p.name  AS product_name,
       p.unit  AS product_unit,
-      a.name  AS area_name
+      a.name  AS area_name,
+      o.delivered_at
     FROM orders o
     LEFT JOIN customers c ON c.id = o.customer_id
     LEFT JOIN products  p ON p.id = o.product_id

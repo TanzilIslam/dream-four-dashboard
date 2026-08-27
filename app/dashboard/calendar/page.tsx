@@ -59,6 +59,7 @@ type OrderRow = {
   paid_amount: string;
   due_amount: string;
   status: string;
+  delivered_at: string | null;
 };
 
 type CollectionRow = {
@@ -424,6 +425,7 @@ export default function CalendarPage() {
                         <Table>
                           <TableHeader>
                             <TableRow>
+                              <TableHead>#</TableHead>
                               <TableHead>Customer</TableHead>
                               <TableHead>Product</TableHead>
                               <TableHead className="text-right">Qty</TableHead>
@@ -437,6 +439,9 @@ export default function CalendarPage() {
                           <TableBody>
                             {dayData.orders.map((o) => (
                               <TableRow key={o.id}>
+                                <TableCell className="text-sm text-muted-foreground tabular-nums">
+                                  {o.id}
+                                </TableCell>
                                 <TableCell className="font-medium text-sm whitespace-nowrap">
                                   {o.customer_name ?? "—"}
                                 </TableCell>

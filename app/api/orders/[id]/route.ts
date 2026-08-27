@@ -53,12 +53,6 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   const { action, ...rest } = body as { action: string } & Record<string, unknown>;
 
   if (action === "edit") {
-    if (!["pending", "delivered"].includes(order.status)) {
-      return Response.json(
-        { error: "Only pending or delivered orders can be edited" },
-        { status: 400 }
-      );
-    }
     const parsed = editOrderSchema.safeParse(rest);
     if (!parsed.success) {
       return Response.json({ error: parsed.error.flatten().fieldErrors }, { status: 400 });

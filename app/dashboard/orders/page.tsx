@@ -511,6 +511,7 @@ export default function OrdersPage() {
       if (filters.area_id !== "all" && String(o.area_id) !== filters.area_id) return false;
       if (
         filters.customer_search &&
+        !String(o.id).includes(filters.customer_search) &&
         !(o.customer_name ?? "").toLowerCase().includes(filters.customer_search.toLowerCase())
       )
         return false;
@@ -878,17 +879,15 @@ export default function OrdersPage() {
         >
           <Eye className="size-3.5" />
         </Button>
-        {(o.status === "pending" || o.status === "delivered") && (
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => openEdit(o)}
-            className="size-7 text-muted-foreground hover:text-foreground"
-            title="Edit order"
-          >
-            <Pencil className="size-3.5" />
-          </Button>
-        )}
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={() => openEdit(o)}
+          className="size-7 text-muted-foreground hover:text-foreground"
+          title="Edit order"
+        >
+          <Pencil className="size-3.5" />
+        </Button>
         {o.status === "pending" && (
           <Button
             variant="ghost"
@@ -1054,7 +1053,7 @@ export default function OrdersPage() {
       <div className="grid grid-cols-12 items-start gap-4">
         <OrderFilterSection label="Customer" className="col-span-12 sm:col-span-6">
           <Input
-            placeholder="Search customer…"
+            placeholder="Search ID or customer…"
             value={filters.customer_search}
             onChange={(e) => setFilter("customer_search", e.target.value)}
           />
@@ -1302,7 +1301,7 @@ export default function OrdersPage() {
             {/* Customer */}
             <OrderFilterSection label="Customer">
               <Input
-                placeholder="Search customer…"
+                placeholder="Search ID or customer…"
                 value={filters.customer_search}
                 onChange={(e) => setFilter("customer_search", e.target.value)}
               />
@@ -2185,7 +2184,7 @@ function CustomerSearch({
             <input
               autoFocus
               className="w-full rounded-sm border border-input bg-background px-2 py-1 text-sm outline-none placeholder:text-muted-foreground"
-              placeholder="Search customer…"
+              placeholder="Search ID or customer…"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />
