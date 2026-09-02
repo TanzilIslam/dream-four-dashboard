@@ -5,7 +5,7 @@ import { useForm } from "react-hook-form";
 import { useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
-import { formatDate } from "@/lib/utils";
+import { cn, formatDate } from "@/lib/utils";
 import {
   PlusIcon,
   Truck,
@@ -1406,162 +1406,182 @@ export default function OrdersPage() {
             onSubmit={createForm.handleSubmit(onFormSubmit)}
             className="mt-6 space-y-5 px-4 pb-8"
           >
-            <Field label="Date" error={createForm.formState.errors.ordered_at?.message}>
-              <Input type="date" {...createForm.register("ordered_at")} />
-            </Field>
+            <div className="grid grid-cols-2 gap-4">
+              <Field
+                label="Date"
+                className="col-span-6"
+                error={createForm.formState.errors.ordered_at?.message}
+              >
+                <Input type="date" {...createForm.register("ordered_at")} />
+              </Field>
 
-            <Field
-              label="Customer"
-              error={
-                (createForm.formState.errors as Record<string, { message?: string }>).customer_id
-                  ?.message
-              }
-            >
-              {formMode === "edit" ? (
-                <Input
-                  value={customers.find((c) => c.id === customerId)?.name ?? ""}
-                  disabled
-                  className="bg-muted"
-                />
-              ) : (
-                <CustomerSearch
-                  customers={customers}
-                  value={customerId}
-                  onChange={(id) =>
-                    createForm.setValue("customer_id", id, { shouldValidate: true })
-                  }
-                />
-              )}
-            </Field>
-
-            <Field
-              label="Product"
-              error={
-                (createForm.formState.errors as Record<string, { message?: string }>).product_id
-                  ?.message
-              }
-            >
-              <Select
-                value={productId ? String(productId) : ""}
-                onValueChange={(v) =>
-                  createForm.setValue("product_id", Number(v), { shouldValidate: true })
+              <Field
+                label="Customer"
+                className="col-span-6"
+                error={
+                  (createForm.formState.errors as Record<string, { message?: string }>)
+                    .customer_id?.message
                 }
               >
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Select product">
-                    {selectedProductName ?? undefined}
-                  </SelectValue>
-                </SelectTrigger>
-                <SelectContent>
-                  {products.map((p) => (
-                    <SelectItem key={p.id} value={String(p.id)}>
-                      {p.name} ({p.unit})
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </Field>
+                {formMode === "edit" ? (
+                  <Input
+                    value={customers.find((c) => c.id === customerId)?.name ?? ""}
+                    disabled
+                    className="bg-muted"
+                  />
+                ) : (
+                  <CustomerSearch
+                    customers={customers}
+                    value={customerId}
+                    onChange={(id) =>
+                      createForm.setValue("customer_id", id, { shouldValidate: true })
+                    }
+                  />
+                )}
+              </Field>
 
-            <Field label="Unit">
-              <Select
-                value={String(watchUnit ?? "")}
-                onValueChange={(v) => createForm.setValue("unit", v ?? "")}
-              >
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Select unit" />
-                </SelectTrigger>
-                <SelectContent>
-                  {UNIT_OPTIONS.map((u) => (
-                    <SelectItem key={u} value={u}>
-                      {u}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </Field>
-
-            <Field label="Quantity" error={createForm.formState.errors.quantity?.message}>
-              <Input
-                type="number"
-                min={1}
-                {...createForm.register("quantity", { valueAsNumber: true })}
-              />
-            </Field>
-
-            <Field label="Unit Cost (৳)" error={createForm.formState.errors.unit_cost?.message}>
-              <Input
-                type="number"
-                step="0.01"
-                min={0}
-                {...createForm.register("unit_cost", { valueAsNumber: true })}
-              />
-            </Field>
-
-            <div className="hidden">
               <Field
-                label="Transport Cost per Unit (৳)"
-                error={createForm.formState.errors.unit_transport_cost?.message}
+                label="Product"
+                className="col-span-6"
+                error={
+                  (createForm.formState.errors as Record<string, { message?: string }>)
+                    .product_id?.message
+                }
+              >
+                <Select
+                  value={productId ? String(productId) : ""}
+                  onValueChange={(v) =>
+                    createForm.setValue("product_id", Number(v), { shouldValidate: true })
+                  }
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Select product">
+                      {selectedProductName ?? undefined}
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent>
+                    {products.map((p) => (
+                      <SelectItem key={p.id} value={String(p.id)}>
+                        {p.name} ({p.unit})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </Field>
+
+              <Field label="Unit" className="col-span-6">
+                <Select
+                  value={String(watchUnit ?? "")}
+                  onValueChange={(v) => createForm.setValue("unit", v ?? "")}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Select unit" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {UNIT_OPTIONS.map((u) => (
+                      <SelectItem key={u} value={u}>
+                        {u}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </Field>
+
+              <Field
+                label="Quantity"
+                className="col-span-6"
+                error={createForm.formState.errors.quantity?.message}
+              >
+                <Input
+                  type="number"
+                  min={1}
+                  {...createForm.register("quantity", { valueAsNumber: true })}
+                />
+              </Field>
+
+              <Field
+                label="Unit Cost (৳)"
+                className="col-span-6"
+                error={createForm.formState.errors.unit_cost?.message}
               >
                 <Input
                   type="number"
                   step="0.01"
                   min={0}
-                  {...createForm.register("unit_transport_cost", { valueAsNumber: true })}
+                  {...createForm.register("unit_cost", { valueAsNumber: true })}
                 />
               </Field>
 
-              <Field
-                label="Label Cost per Unit (৳)"
-                error={createForm.formState.errors.unit_label_cost?.message}
-              >
-                <Input
-                  type="number"
-                  step="0.01"
-                  min={0}
-                  {...createForm.register("unit_label_cost", { valueAsNumber: true })}
-                />
-              </Field>
-
-              <Field
-                label="Other Cost per Unit (৳)"
-                error={createForm.formState.errors.unit_other_cost?.message}
-              >
-                <Input
-                  type="number"
-                  step="0.01"
-                  min={0}
-                  {...createForm.register("unit_other_cost", { valueAsNumber: true })}
-                />
-              </Field>
-            </div>
-
-            <Field label="Sales Price (৳)" error={createForm.formState.errors.unit_price?.message}>
-              <Input
-                type="number"
-                step="0.01"
-                min={0}
-                {...createForm.register("unit_price", { valueAsNumber: true })}
-              />
-            </Field>
-
-            {formMode !== "edit" && (
               <div className="hidden">
                 <Field
-                  label="Paid Now / Collection (৳)"
-                  error={
-                    (createForm.formState.errors as Record<string, { message?: string }>)
-                      .paid_amount?.message
-                  }
+                  label="Transport Cost per Unit (৳)"
+                  error={createForm.formState.errors.unit_transport_cost?.message}
                 >
                   <Input
                     type="number"
                     step="0.01"
                     min={0}
-                    {...createForm.register("paid_amount", { valueAsNumber: true })}
+                    {...createForm.register("unit_transport_cost", { valueAsNumber: true })}
+                  />
+                </Field>
+
+                <Field
+                  label="Label Cost per Unit (৳)"
+                  error={createForm.formState.errors.unit_label_cost?.message}
+                >
+                  <Input
+                    type="number"
+                    step="0.01"
+                    min={0}
+                    {...createForm.register("unit_label_cost", { valueAsNumber: true })}
+                  />
+                </Field>
+
+                <Field
+                  label="Other Cost per Unit (৳)"
+                  error={createForm.formState.errors.unit_other_cost?.message}
+                >
+                  <Input
+                    type="number"
+                    step="0.01"
+                    min={0}
+                    {...createForm.register("unit_other_cost", { valueAsNumber: true })}
                   />
                 </Field>
               </div>
-            )}
+
+              <Field
+                label="Sales Price (৳)"
+                className="col-span-6"
+                error={createForm.formState.errors.unit_price?.message}
+              >
+                <Input
+                  type="number"
+                  step="0.01"
+                  min={0}
+                  {...createForm.register("unit_price", { valueAsNumber: true })}
+                />
+              </Field>
+
+              {formMode !== "edit" && (
+                <div className="hidden">
+                  <Field
+                    label="Paid Now / Collection (৳)"
+                    error={
+                      (createForm.formState.errors as Record<string, { message?: string }>)
+                        .paid_amount?.message
+                    }
+                  >
+                    <Input
+                      type="number"
+                      step="0.01"
+                      min={0}
+                      {...createForm.register("paid_amount", { valueAsNumber: true })}
+                    />
+                  </Field>
+                </div>
+              )}
+            </div>
 
             {orderSales > 0 && (
               <div className="rounded-md bg-muted/50 px-3 py-2 text-sm space-y-1">
@@ -2224,13 +2244,15 @@ function Field({
   label,
   error,
   children,
+  className,
 }: {
   label: string;
   error?: string;
   children: React.ReactNode;
+  className?: string;
 }) {
   return (
-    <div className="space-y-1.5">
+    <div className={cn("space-y-1.5", className)}>
       <Label>{label}</Label>
       {children}
       {error && <p className="text-xs text-destructive">{error}</p>}
