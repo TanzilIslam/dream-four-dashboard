@@ -1419,8 +1419,8 @@ export default function OrdersPage() {
                 label="Customer"
                 className="col-span-6"
                 error={
-                  (createForm.formState.errors as Record<string, { message?: string }>)
-                    .customer_id?.message
+                  (createForm.formState.errors as Record<string, { message?: string }>).customer_id
+                    ?.message
                 }
               >
                 {formMode === "edit" ? (
@@ -1444,8 +1444,8 @@ export default function OrdersPage() {
                 label="Product"
                 className="col-span-6"
                 error={
-                  (createForm.formState.errors as Record<string, { message?: string }>)
-                    .product_id?.message
+                  (createForm.formState.errors as Record<string, { message?: string }>).product_id
+                    ?.message
                 }
               >
                 <Select

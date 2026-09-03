@@ -14,7 +14,8 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
       py.amount,
       py.paid_at,
       py.payment_method,
-      p.name AS product_name
+      p.name AS product_name,
+      o.ordered_at
     FROM payments py
     JOIN orders o ON o.id = py.order_id
     JOIN products p ON p.id = o.product_id

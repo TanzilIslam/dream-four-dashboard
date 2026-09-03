@@ -367,7 +367,7 @@ export async function GET(request: Request) {
   const totalInHand = salesPaid + salesDue + stockValue;
   const totalSpent = purchasePaid + totalExpenses;
   const profitLoss = totalInHand - totalSpent;
-  const roi = ((profitLoss / investment) * 100);
+  const roi = (profitLoss / investment) * 100;
   const summaryRows = s
     ? [
         { Metric: "Product", Value: productLabel },
