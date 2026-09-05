@@ -87,7 +87,7 @@ export async function GET(request: Request) {
   const actualFrom: Date | string | null = from ?? earliest_date ?? null;
   const actualTo: Date | string = to ?? new Date();
 
-  const [summary, , , , expenseBreakdown, dues, supplies, miniDueList, assetOverview] =
+  const [summary, , , , expenseBreakdown, dues, supplies, miniDueList, assetOverview, investStats] =
     await Promise.all([
       // Sheet 1: Summary KPIs
       sql`
@@ -291,6 +291,9 @@ export async function GET(request: Request) {
       HAVING SUM(oa.quantity) - COALESCE(SUM(oar.returned), 0) > 0
       ORDER BY c.name, pa.name
     `,
+
+      // Total investment across all users
+      sql`SELECT COALESCE(SUM(invest), 0)::numeric AS total_invest FROM users`,
     ]);
 
   const fmt = (d: unknown) =>
@@ -363,7 +366,7 @@ export async function GET(request: Request) {
   const totalStock = Number(s?.total_stock ?? 0);
   const avgPrice = salesQty > 0 ? salesAmount / salesQty : 0;
   const stockValue = totalStock * avgPrice;
-  const investment = 60000;
+  const investment = Number(investStats[0]?.total_invest ?? 0);
   const totalInHand = salesPaid + salesDue + stockValue;
   const totalSpent = purchasePaid + totalExpenses;
   const profitLoss = totalInHand - totalSpent;

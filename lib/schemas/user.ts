@@ -5,6 +5,8 @@ export const createUserSchema = z.object({
   email: z.string().email("Invalid email"),
   password: z.string().min(6, "Password must be at least 6 characters"),
   role: z.enum(["admin", "partner"], { error: "Role is required" }),
+  invest: z.number().min(0).default(0),
+  loan: z.number().min(0).default(0),
 });
 
 export const updateUserSchema = z.object({
@@ -16,6 +18,8 @@ export const updateUserSchema = z.object({
     .optional()
     .or(z.literal("")),
   role: z.enum(["admin", "partner"], { error: "Role is required" }),
+  invest: z.number().min(0).default(0),
+  loan: z.number().min(0).default(0),
 });
 
 export type CreateUserInput = z.infer<typeof createUserSchema>;

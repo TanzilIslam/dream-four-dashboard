@@ -20,6 +20,8 @@ export async function GET() {
   await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS whatsapp TEXT`;
   await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar_url TEXT`;
   await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS documents JSONB NOT NULL DEFAULT '[]'`;
+  await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS invest NUMERIC(12,2) NOT NULL DEFAULT 0`;
+  await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS loan NUMERIC(12,2) NOT NULL DEFAULT 0`;
 
   // ── Master data ───────────────────────────────────────────────
 
