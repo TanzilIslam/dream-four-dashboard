@@ -8,7 +8,7 @@ export async function GET() {
   if ("error" in auth) return auth.error;
 
   const users = await sql`
-    SELECT id, name, email, role, permissions, created_at
+    SELECT id, name, email, role, permissions, invest, loan, created_at
     FROM users ORDER BY created_at DESC
   `;
   return Response.json(users);
@@ -25,7 +25,7 @@ export async function POST(request: Request) {
     return Response.json({ error: parsed.error.flatten().fieldErrors }, { status: 400 });
   }
 
-  const { name, email, password, role } = parsed.data;
+  const { name, email, password, role, invest, loan } = parsed.data;
 
   const existing = await sql`SELECT id FROM users WHERE email = ${email}`;
   if (existing.length > 0) {
@@ -34,9 +34,9 @@ export async function POST(request: Request) {
 
   const password_hash = await bcrypt.hash(password, 10);
   const [user] = await sql`
-    INSERT INTO users (name, email, password_hash, role)
-    VALUES (${name}, ${email}, ${password_hash}, ${role})
-    RETURNING id, name, email, role, created_at
+    INSERT INTO users (name, email, password_hash, role, invest, loan)
+    VALUES (${name}, ${email}, ${password_hash}, ${role}, ${invest}, ${loan})
+    RETURNING id, name, email, role, invest, loan, created_at
   `;
 
   return Response.json(user, { status: 201 });

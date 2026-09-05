@@ -41,6 +41,8 @@ type User = {
   name: string;
   email: string;
   role: "admin" | "partner";
+  invest: number;
+  loan: number;
   created_at: string;
 };
 
@@ -95,20 +97,27 @@ export default function UsersPage() {
   function openCreate() {
     setMode("create");
     setEditingUser(null);
-    createForm.reset({ name: "", email: "", password: "", role: "partner" });
+    createForm.reset({ name: "", email: "", password: "", role: "partner", invest: 0, loan: 0 });
     setSheetOpen(true);
   }
 
   function openEdit(user: User) {
     setMode("edit");
     setEditingUser(user);
-    editForm.reset({ name: user.name, email: user.email, password: "", role: user.role });
+    editForm.reset({
+      name: user.name,
+      email: user.email,
+      password: "",
+      role: user.role,
+      invest: user.invest,
+      loan: user.loan,
+    });
     setSheetOpen(true);
   }
 
   async function onSubmit(data: CreateUserInput | UpdateUserInput) {
     const url = mode === "create" ? "/api/users" : `/api/users/${editingUser!.id}`;
-    const method = mode === "create" ? "POST" : "PUT";
+    const method = mode === "create" ? "POST" : "PATCH";
 
     const res = await fetch(url, {
       method,
@@ -295,6 +304,36 @@ export default function UsersPage() {
               </Select>
               {form.formState.errors.role && (
                 <p className="text-xs text-destructive">{form.formState.errors.role.message}</p>
+              )}
+            </div>
+
+            {/* Invest */}
+            <div className="space-y-1.5">
+              <Label htmlFor="invest">Invest</Label>
+              <Input
+                id="invest"
+                type="number"
+                step="0.01"
+                placeholder="0"
+                {...form.register("invest", { valueAsNumber: true })}
+              />
+              {form.formState.errors.invest && (
+                <p className="text-xs text-destructive">{form.formState.errors.invest.message}</p>
+              )}
+            </div>
+
+            {/* Loan */}
+            <div className="space-y-1.5">
+              <Label htmlFor="loan">Loan</Label>
+              <Input
+                id="loan"
+                type="number"
+                step="0.01"
+                placeholder="0"
+                {...form.register("loan", { valueAsNumber: true })}
+              />
+              {form.formState.errors.loan && (
+                <p className="text-xs text-destructive">{form.formState.errors.loan.message}</p>
               )}
             </div>
 
