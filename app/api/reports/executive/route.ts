@@ -87,8 +87,19 @@ export async function GET(request: Request) {
   const actualFrom: Date | string | null = from ?? earliest_date ?? null;
   const actualTo: Date | string = to ?? new Date();
 
-  const [summary, , , , expenseBreakdown, dues, supplies, miniDueList, assetOverview, investStats] =
-    await Promise.all([
+  const [
+    summary,
+    ,
+    ,
+    ,
+    expenseBreakdown,
+    dues,
+    supplies,
+    miniDueList,
+    assetOverview,
+    investStats,
+    productStockValue,
+  ] = await Promise.all([
       // Sheet 1: Summary KPIs
       sql`
       WITH order_stats AS (
@@ -294,6 +305,42 @@ export async function GET(request: Request) {
 
       // Total investment across all users
       sql`SELECT COALESCE(SUM(invest), 0)::numeric AS total_invest FROM users`,
+
+      // Per-product stock value — each product's own avg selling price, not a blended one
+      sql`
+      WITH product_stock AS (
+        SELECT
+          p.id,
+          p.name,
+          COALESCE(SUM(
+            COALESCE(purchased.qty, 0)
+            - COALESCE(reserved.qty, 0)
+            - COALESCE(delivered.qty, 0)
+            + COALESCE(returned.qty, 0)
+            + COALESCE(adjusted.qty, 0)
+          ), 0)::int AS stock_qty
+        FROM products p
+        LEFT JOIN (SELECT product_id, SUM(actual_qty) AS qty FROM purchase_requests WHERE status = 'purchased' GROUP BY product_id) purchased ON purchased.product_id = p.id
+        LEFT JOIN (SELECT product_id, SUM(quantity) AS qty FROM orders WHERE status = 'pending' GROUP BY product_id) reserved ON reserved.product_id = p.id
+        LEFT JOIN (SELECT product_id, SUM(quantity) AS qty FROM orders WHERE status IN ('delivered', 'paid') GROUP BY product_id) delivered ON delivered.product_id = p.id
+        LEFT JOIN (SELECT product_id, SUM(quantity) AS qty FROM returns GROUP BY product_id) returned ON returned.product_id = p.id
+        LEFT JOIN (SELECT product_id, SUM(quantity) AS qty FROM stock_adjustments GROUP BY product_id) adjusted ON adjusted.product_id = p.id
+        WHERE 1=1 ${productId && productId !== "all" ? sql`AND p.id = ${Number(productId)}` : sql``}
+        GROUP BY p.id, p.name
+      ),
+      product_avg_price AS (
+        SELECT product_id, CASE WHEN SUM(quantity) > 0 THEN SUM(total_amount) / SUM(quantity) ELSE 0 END AS avg_price
+        FROM orders
+        WHERE status IN ('delivered', 'paid')
+        GROUP BY product_id
+      )
+      SELECT
+        ps.name                                              AS "Product",
+        (ps.stock_qty * COALESCE(pap.avg_price, 0))::numeric AS "Value"
+      FROM product_stock ps
+      LEFT JOIN product_avg_price pap ON pap.product_id = ps.id
+      ORDER BY ps.name
+    `,
     ]);
 
   const fmt = (d: unknown) =>
@@ -363,9 +410,10 @@ export async function GET(request: Request) {
   );
 
   const totalExpenses = Number(s?.total_expenses ?? 0);
-  const totalStock = Number(s?.total_stock ?? 0);
-  const avgPrice = salesQty > 0 ? salesAmount / salesQty : 0;
-  const stockValue = totalStock * avgPrice;
+  const stockValue = productStockValue.reduce(
+    (sum: number, r: Record<string, unknown>) => sum + Number(r["Value"] ?? 0),
+    0
+  );
   const investment = Number(investStats[0]?.total_invest ?? 0);
   const totalInHand = salesPaid + salesDue + stockValue;
   const totalSpent = purchasePaid + totalExpenses;
@@ -386,9 +434,11 @@ export async function GET(request: Request) {
         { Metric: "Due", Value: purchaseDue.toFixed(2) },
         { Metric: "", Value: "" },
         { Metric: "--- STOCK ---", Value: "" },
-        { Metric: "Current Stock Qty", Value: totalStock },
-        { Metric: "Avg Selling Price", Value: avgPrice.toFixed(2) },
-        { Metric: "Stock Value", Value: stockValue.toFixed(2) },
+        ...productStockValue.map((r: Record<string, unknown>) => ({
+          Metric: String(r["Product"]),
+          Value: Number(r["Value"] ?? 0).toFixed(2),
+        })),
+        { Metric: "Total Stock Value", Value: stockValue.toFixed(2) },
         { Metric: "", Value: "" },
         { Metric: "--- ALL SALES ---", Value: "" },
         { Metric: "Qty", Value: salesQty },
