@@ -329,16 +329,26 @@ export async function GET(request: Request) {
         GROUP BY p.id, p.name
       ),
       product_avg_price AS (
-        SELECT product_id, CASE WHEN SUM(quantity) > 0 THEN SUM(total_amount) / SUM(quantity) ELSE 0 END AS avg_price
+        SELECT product_id, SUM(total_amount) / SUM(quantity) AS avg_price
         FROM orders
         WHERE status IN ('delivered', 'paid')
         GROUP BY product_id
+        HAVING SUM(quantity) > 0
+      ),
+      product_purchase_price AS (
+        SELECT product_id, SUM(actual_total) / SUM(actual_qty) AS avg_price
+        FROM purchase_requests
+        WHERE status = 'purchased'
+        GROUP BY product_id
+        HAVING SUM(actual_qty) > 0
       )
       SELECT
-        ps.name                                              AS "Product",
-        (ps.stock_qty * COALESCE(pap.avg_price, 0))::numeric AS "Value"
+        ps.name AS "Product",
+        (ps.stock_qty * COALESCE(pap.avg_price, ppp.avg_price, p.default_price, 0))::numeric AS "Value"
       FROM product_stock ps
+      JOIN products p ON p.id = ps.id
       LEFT JOIN product_avg_price pap ON pap.product_id = ps.id
+      LEFT JOIN product_purchase_price ppp ON ppp.product_id = ps.id
       ORDER BY ps.name
     `,
     ]);
