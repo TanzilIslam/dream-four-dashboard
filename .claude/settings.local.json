@@ -12,7 +12,8 @@
       "Bash(rm:*)",
       "Bash(python3:*)",
       "Bash(neonctl:*)",
-      "Bash(neon:*)"
+      "Bash(neon:*)",
+      "Bash(PGPASSWORD=npg_ReBj7kyM6Tbm psql:*)"
     ]
   }
 }

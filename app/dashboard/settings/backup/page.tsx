@@ -53,8 +53,8 @@ const SAMPLE_TEMPLATES = [
       "Other Cost",
       "Qty",
       "Total Cost",
-      "Sales",
-      "Net Value",
+      "Sales Value",
+      "Add Value",
       "Due",
       "Due Collection",
       "Collection",
@@ -286,7 +286,7 @@ export default function ExportPage() {
         if (s.key === "dues")
           rows = addTotalsRow(
             rows,
-            ["Qty", "Total Cost", "Sales", "Net Value", "Paid", "Due"],
+            ["Qty", "Total Cost", "Sales Value", "Add Value", "Sales Value Collection", "Market Due"],
             "Date"
           );
         if (s.key === "supplies")

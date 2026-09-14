@@ -209,10 +209,10 @@ export async function GET(request: Request) {
         COALESCE(o.unit_other_cost, 0)::numeric                  AS "Other Cost",
         o.quantity::int                                           AS "Qty",
         COALESCE(o.total_cost, 0)::numeric                       AS "Total Cost",
-        COALESCE(o.net_value, 0)::numeric                        AS "Net Value",
-        o.total_amount::numeric                                   AS "Sales",
-        o.paid_amount::numeric                                    AS "Paid",
-        o.due_amount::numeric                                     AS "Due",
+        COALESCE(o.net_value, 0)::numeric                        AS "Add Value",
+        o.total_amount::numeric                                   AS "Sales Value",
+        o.paid_amount::numeric                                    AS "Sales Value Collection",
+        o.due_amount::numeric                                     AS "Market Due",
         COALESCE(o.note, '')                                     AS "Remarks"
       FROM orders o
       JOIN customers c ON c.id = o.customer_id
@@ -344,7 +344,7 @@ export async function GET(request: Request) {
       )
       SELECT
         ps.name AS "Product",
-        (ps.stock_qty * COALESCE(pap.avg_price, ppp.avg_price, p.default_price, 0))::numeric AS "Value"
+        (ps.stock_qty * COALESCE(ppp.avg_price, pap.avg_price, p.default_price, 0))::numeric AS "Value"
       FROM product_stock ps
       JOIN products p ON p.id = ps.id
       LEFT JOIN product_avg_price pap ON pap.product_id = ps.id
@@ -403,19 +403,19 @@ export async function GET(request: Request) {
     0
   );
   const salesNetValue = dues.reduce(
-    (s: number, r: Record<string, unknown>) => s + Number(r["Net Value"] ?? 0),
+    (s: number, r: Record<string, unknown>) => s + Number(r["Add Value"] ?? 0),
     0
   );
   const salesAmount = dues.reduce(
-    (s: number, r: Record<string, unknown>) => s + Number(r["Sales"] ?? 0),
+    (s: number, r: Record<string, unknown>) => s + Number(r["Sales Value"] ?? 0),
     0
   );
   const salesPaid = dues.reduce(
-    (s: number, r: Record<string, unknown>) => s + Number(r["Paid"] ?? 0),
+    (s: number, r: Record<string, unknown>) => s + Number(r["Sales Value Collection"] ?? 0),
     0
   );
   const salesDue = dues.reduce(
-    (s: number, r: Record<string, unknown>) => s + Number(r["Due"] ?? 0),
+    (s: number, r: Record<string, unknown>) => s + Number(r["Market Due"] ?? 0),
     0
   );
 
@@ -426,62 +426,64 @@ export async function GET(request: Request) {
   );
   const investment = Number(investStats[0]?.total_invest ?? 0);
   const totalInHand = salesPaid + salesDue + stockValue;
-  const totalSpent = purchasePaid + totalExpenses;
+  const totalSpent = purchaseTotal + totalExpenses;
   const profitLoss = totalInHand - totalSpent;
   const roi = (profitLoss / investment) * 100;
   const summaryRows = s
     ? [
-        { Metric: "Product", Value: productLabel },
-        { Metric: "Period", Value: periodValue },
-        { Metric: "", Value: "" },
-        { Metric: "--- INVESTMENT ---", Value: "" },
-        { Metric: "Initial Investment", Value: investment.toFixed(2) },
-        { Metric: "", Value: "" },
-        { Metric: "--- PURCHASES ---", Value: "" },
-        { Metric: "Qty", Value: purchaseQty },
-        { Metric: "Total", Value: purchaseTotal.toFixed(2) },
-        { Metric: "Paid", Value: purchasePaid.toFixed(2) },
-        { Metric: "Due", Value: purchaseDue.toFixed(2) },
-        { Metric: "", Value: "" },
-        { Metric: "--- STOCK ---", Value: "" },
-        ...productStockValue.map((r: Record<string, unknown>) => ({
+        { Section: "", Metric: "Product", Value: productLabel },
+        { Section: "", Metric: "Period", Value: periodValue },
+        { Section: "", Metric: "", Value: "" },
+        { Section: "A", Metric: "--- INVESTMENT ---", Value: "" },
+        { Section: "A1", Metric: "Initial Investment", Value: investment.toFixed(2) },
+        { Section: "", Metric: "", Value: "" },
+        { Section: "B", Metric: "--- PURCHASES ---", Value: "" },
+        { Section: "B1", Metric: "Qty", Value: purchaseQty },
+        { Section: "B2", Metric: "Total", Value: purchaseTotal.toFixed(2) },
+        { Section: "B3", Metric: "Paid", Value: purchasePaid.toFixed(2) },
+        { Section: "B4", Metric: "Due", Value: purchaseDue.toFixed(2) },
+        { Section: "", Metric: "", Value: "" },
+        { Section: "C", Metric: "--- STOCK ---", Value: "" },
+        ...productStockValue.map((r: Record<string, unknown>, i: number) => ({
+          Section: `C${i + 1}`,
           Metric: String(r["Product"]),
           Value: Number(r["Value"] ?? 0).toFixed(2),
         })),
-        { Metric: "Total Stock Value", Value: stockValue.toFixed(2) },
-        { Metric: "", Value: "" },
-        { Metric: "--- ALL SALES ---", Value: "" },
-        { Metric: "Qty", Value: salesQty },
-        { Metric: "Total Cost", Value: salesTotalCost.toFixed(2) },
-        { Metric: "Net Value", Value: salesNetValue.toFixed(2) },
-        { Metric: "Sales", Value: salesAmount.toFixed(2) },
-        { Metric: "Paid", Value: salesPaid.toFixed(2) },
-        { Metric: "Due", Value: salesDue.toFixed(2) },
-        { Metric: "", Value: "" },
-        { Metric: "--- EXPENSES ---", Value: "" },
-        { Metric: "Total Expenses", Value: totalExpenses.toFixed(2) },
-        { Metric: "", Value: "" },
-        { Metric: "--- TOTAL SPENT ---", Value: "" },
-        { Metric: "Supplier Paid", Value: purchasePaid.toFixed(2) },
-        { Metric: "Expenses", Value: totalExpenses.toFixed(2) },
-        { Metric: "= Total Spent", Value: totalSpent.toFixed(2) },
-        { Metric: "", Value: "" },
-        { Metric: "--- TOTAL IN HAND ---", Value: "" },
-        { Metric: "Collected", Value: salesPaid.toFixed(2) },
-        { Metric: "+ Due from Customers", Value: salesDue.toFixed(2) },
-        { Metric: "+ Stock Value", Value: stockValue.toFixed(2) },
-        { Metric: "= Total In Hand", Value: totalInHand.toFixed(2) },
-        { Metric: "", Value: "" },
-        { Metric: "--- PROFIT / LOSS ---", Value: "" },
+        { Section: `C${productStockValue.length + 1}`, Metric: "Total Stock Value", Value: stockValue.toFixed(2) },
+        { Section: "", Metric: "", Value: "" },
+        { Section: "D", Metric: "--- ALL SALES ---", Value: "" },
+        { Section: "D1", Metric: "Qty", Value: salesQty },
+        { Section: "D2", Metric: "Total Cost", Value: salesTotalCost.toFixed(2) },
+        { Section: "D3", Metric: "Add Value", Value: salesNetValue.toFixed(2) },
+        { Section: "D4", Metric: "Sales Value", Value: salesAmount.toFixed(2) },
+        { Section: "D5", Metric: "Sales Value Collection", Value: salesPaid.toFixed(2) },
+        { Section: "D6", Metric: "Market Due", Value: salesDue.toFixed(2) },
+        { Section: "", Metric: "", Value: "" },
+        { Section: "E", Metric: "--- SALES EXPENSES ---", Value: "" },
+        { Section: "E1", Metric: "Total Sales Expenses", Value: totalExpenses.toFixed(2) },
+        { Section: "", Metric: "", Value: "" },
+        { Section: "F", Metric: "--- TOTAL SPENT ---", Value: "" },
+        { Section: "F1", Metric: "Purchase Cost (B2)", Value: purchaseTotal.toFixed(2) },
+        { Section: "F2", Metric: "Sales Expenses (E1)", Value: totalExpenses.toFixed(2) },
+        { Section: "F3", Metric: "= Total Spent (F1+F2)", Value: totalSpent.toFixed(2) },
+        { Section: "", Metric: "", Value: "" },
+        { Section: "G", Metric: "--- BALANCE LEFT ---", Value: "" },
+        { Section: "G1", Metric: "Sales Value Collection (D5)", Value: salesPaid.toFixed(2) },
+        { Section: "G2", Metric: "+ Market Due (D6)", Value: salesDue.toFixed(2) },
+        { Section: "G3", Metric: `+ Stock Value (C${productStockValue.length + 1})`, Value: stockValue.toFixed(2) },
+        { Section: "G4", Metric: "= Balance Left (G1+G2+G3)", Value: totalInHand.toFixed(2) },
+        { Section: "", Metric: "", Value: "" },
+        { Section: "H", Metric: "--- PROFIT / LOSS ---", Value: "" },
         {
-          Metric: "Total In Hand - Total Spent",
+          Section: "H1",
+          Metric: "Balance Left (G4) - Total Spent (F3)",
           Value: `${totalInHand.toFixed(2)} - ${totalSpent.toFixed(2)} = ${profitLoss.toFixed(2)}`,
         },
-        { Metric: "", Value: "" },
-        { Metric: "--- ROI (Return on Investment) ---", Value: "" },
-        { Metric: "Investment", Value: investment.toFixed(2) },
-        { Metric: "Profit / Loss", Value: profitLoss.toFixed(2) },
-        { Metric: "ROI %", Value: `${roi.toFixed(2)}%` },
+        { Section: "", Metric: "", Value: "" },
+        { Section: "I", Metric: "--- ROI (Return on Investment) ---", Value: "" },
+        { Section: "I1", Metric: "Investment (A1)", Value: investment.toFixed(2) },
+        { Section: "I2", Metric: "Profit / Loss (H1)", Value: profitLoss.toFixed(2) },
+        { Section: "I3", Metric: "ROI %", Value: `${roi.toFixed(2)}%` },
       ]
     : [];
 
