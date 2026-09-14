@@ -303,8 +303,8 @@ export async function GET(request: Request) {
       ORDER BY c.name, pa.name
     `,
 
-      // Total investment across all users
-      sql`SELECT COALESCE(SUM(invest), 0)::numeric AS total_invest FROM users`,
+      // Investment per user + total
+      sql`SELECT name, COALESCE(invest, 0)::numeric AS invest FROM users WHERE COALESCE(invest, 0) > 0 ORDER BY name`,
 
       // Per-product stock value — each product's own avg selling price, not a blended one
       sql`
@@ -344,6 +344,7 @@ export async function GET(request: Request) {
       )
       SELECT
         ps.name AS "Product",
+        ps.stock_qty AS "Qty",
         (ps.stock_qty * COALESCE(ppp.avg_price, pap.avg_price, p.default_price, 0))::numeric AS "Value"
       FROM product_stock ps
       JOIN products p ON p.id = ps.id
@@ -424,7 +425,13 @@ export async function GET(request: Request) {
     (sum: number, r: Record<string, unknown>) => sum + Number(r["Value"] ?? 0),
     0
   );
-  const investment = Number(investStats[0]?.total_invest ?? 0);
+  const investment = investStats.reduce(
+    (sum: number, r: Record<string, unknown>) => sum + Number(r.invest ?? 0),
+    0
+  );
+  const investorLabel = investStats
+    .map((r: Record<string, unknown>) => `${r.name} = ${Number(r.invest ?? 0).toLocaleString()}`)
+    .join(", ");
   const totalInHand = salesPaid + salesDue + stockValue;
   const totalSpent = purchaseTotal + totalExpenses;
   const profitLoss = totalInHand - totalSpent;
@@ -435,7 +442,7 @@ export async function GET(request: Request) {
         { Section: "", Metric: "Period", Value: periodValue },
         { Section: "", Metric: "", Value: "" },
         { Section: "A", Metric: "--- INVESTMENT ---", Value: "" },
-        { Section: "A1", Metric: "Initial Investment", Value: investment.toFixed(2) },
+        { Section: "A1", Metric: investorLabel, Value: investment.toFixed(2) },
         { Section: "", Metric: "", Value: "" },
         { Section: "B", Metric: "--- PURCHASES ---", Value: "" },
         { Section: "B1", Metric: "Qty", Value: purchaseQty },
@@ -444,11 +451,16 @@ export async function GET(request: Request) {
         { Section: "B4", Metric: "Due", Value: purchaseDue.toFixed(2) },
         { Section: "", Metric: "", Value: "" },
         { Section: "C", Metric: "--- STOCK ---", Value: "" },
-        ...productStockValue.map((r: Record<string, unknown>, i: number) => ({
-          Section: `C${i + 1}`,
-          Metric: String(r["Product"]),
-          Value: Number(r["Value"] ?? 0).toFixed(2),
-        })),
+        ...productStockValue.map((r: Record<string, unknown>, i: number) => {
+          const qty = Number(r["Qty"] ?? 0);
+          const value = Number(r["Value"] ?? 0);
+          const price = qty > 0 ? (value / qty) : 0;
+          return {
+            Section: `C${i + 1}`,
+            Metric: String(r["Product"]),
+            Value: `${qty} x ${price.toFixed(2)} = ${value.toFixed(2)}`,
+          };
+        }),
         { Section: `C${productStockValue.length + 1}`, Metric: "Total Stock Value", Value: stockValue.toFixed(2) },
         { Section: "", Metric: "", Value: "" },
         { Section: "D", Metric: "--- ALL SALES ---", Value: "" },
