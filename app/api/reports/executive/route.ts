@@ -41,6 +41,14 @@ export async function GET(request: Request) {
           : sql``;
   const purchaseProductFilter =
     productId && productId !== "all" ? sql`AND pr.product_id = ${Number(productId)}` : sql``;
+  const paymentDateFilter =
+    from && to
+      ? sql`AND py.paid_at::date BETWEEN ${from} AND ${to}`
+      : from
+        ? sql`AND py.paid_at::date >= ${from}`
+        : to
+          ? sql`AND py.paid_at::date <= ${to}`
+          : sql``;
   const loanDateFilter =
     from && to
       ? sql`AND sl.loaned_at BETWEEN ${from}::DATE AND ${to}::DATE`
@@ -95,6 +103,7 @@ export async function GET(request: Request) {
     expenseBreakdown,
     dues,
     supplies,
+    dailyTransaction,
     miniDueList,
     assetOverview,
     investStats,
@@ -252,6 +261,30 @@ export async function GET(request: Request) {
       LEFT JOIN suppliers s ON s.id = pr.supplier_id
       WHERE pr.status = 'purchased' ${purchaseProductFilter} ${purchaseDateFilter}
       ORDER BY pr.purchased_at ASC
+    `,
+
+      // Sheet 7b: Daily Transaction (collection vs purchase per day, days with neither excluded)
+      sql`
+      WITH collection_days AS (
+        SELECT py.paid_at::date AS d, SUM(py.amount) AS collection
+        FROM payments py
+        JOIN orders o ON o.id = py.order_id
+        WHERE 1=1 ${productFilter} ${paymentDateFilter}
+        GROUP BY py.paid_at::date
+      ),
+      purchase_days AS (
+        SELECT pr.purchased_at::date AS d, SUM(pr.actual_total) AS purchase
+        FROM purchase_requests pr
+        WHERE pr.status = 'purchased' ${purchaseProductFilter} ${purchaseDateFilter}
+        GROUP BY pr.purchased_at::date
+      )
+      SELECT
+        COALESCE(cd.d, pd.d)               AS "Date",
+        COALESCE(cd.collection, 0)::numeric AS "Collection",
+        COALESCE(pd.purchase, 0)::numeric   AS "Purchase"
+      FROM collection_days cd
+      FULL OUTER JOIN purchase_days pd ON cd.d = pd.d
+      ORDER BY COALESCE(cd.d, pd.d) ASC
     `,
 
       // Sheet 8: Mini Due List (per-customer summary, grouped by area)
@@ -509,6 +542,11 @@ export async function GET(request: Request) {
     Date: fmt(r["Date"]),
   }));
 
+  const formattedDailyTransaction = dailyTransaction.map((r: Record<string, unknown>) => ({
+    ...r,
+    Date: fmt(r["Date"]),
+  }));
+
   const formattedMiniDueList = miniDueList;
 
   return Response.json({
@@ -519,6 +557,7 @@ export async function GET(request: Request) {
     expenseBreakdown,
     dues: formattedDues,
     supplies: formattedSupplies,
+    dailyTransaction: formattedDailyTransaction,
     miniDueList: formattedMiniDueList,
     assetOverview,
   });
