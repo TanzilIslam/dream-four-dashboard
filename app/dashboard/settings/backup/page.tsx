@@ -70,6 +70,7 @@ const REPORT_SHEETS = [
   { key: "expenseBreakdown", label: "Expense Breakdown" },
   { key: "dues", label: "All Sales" },
   { key: "supplies", label: "Purchases" },
+  { key: "dailyTransaction", label: "Daily Transaction" },
   { key: "miniDueList", label: "Mini Due List" },
   { key: "assetOverview", label: "Asset Overview" },
 ] as const;
@@ -81,6 +82,7 @@ const SHEET_LABELS: Record<SheetKey, string> = {
   expenseBreakdown: "Expense Breakdown",
   dues: "All Sales",
   supplies: "Purchases",
+  dailyTransaction: "Daily Transaction",
   miniDueList: "Mini Due List",
   assetOverview: "Asset Overview",
 };
@@ -291,6 +293,8 @@ export default function ExportPage() {
           );
         if (s.key === "supplies")
           rows = addTotalsRow(rows, ["Qty", "Total", "S.Paid", "Due"], "Date");
+        if (s.key === "dailyTransaction")
+          rows = addTotalsRow(rows, ["Collection", "Purchase"], "Date");
         if (s.key === "miniDueList") rows = addTotalsRow(rows, ["Due", "Asset"], "Customer");
         if (s.key === "assetOverview")
           rows = addTotalsRow(rows, ["Sent", "Returned", "Unreturned"], "Customer");
